@@ -62,7 +62,13 @@ def main():
         
         print(f"Generating {lang} summary with Gemini...")
         summarizer = GeminiSummarizer()
-        post_text = summarizer.summarize(data['title'], data['content'], lang=lang)
+        generated_summary = summarizer.summarize(data['title'], data['content'], lang=lang)
+        
+        # Append the blog link at the end with more spacing
+        if lang == 'en':
+            post_text = f"{generated_summary}\n\n\n👉 Read more:\n{url}"
+        else:
+            post_text = f"{generated_summary}\n\n\n👉 자세히 보기:\n{url}"
         
         uploaded_image_urn = None
         if data['images']:

@@ -18,7 +18,21 @@ def parse_content(html, original_url):
     
     soup = BeautifulSoup(html, 'html.parser')
     
-    title = soup.title.string if soup.title else "No Title"
+    # Better title extraction for Google Doc exports
+    title = "No Title"
+    if soup.title and soup.title.string:
+        title = soup.title.string
+    
+    # If title is still "No Title" or looks like a placeholder, try h1 or first bold text
+    if title == "No Title" or "Google Docs" in title:
+        h1 = soup.find('h1')
+        if h1:
+            title = h1.get_text()
+        else:
+            # Google Docs often uses spans with specific styles for titles
+            first_p = soup.find('p')
+            if first_p:
+                title = first_p.get_text()
     
     content = ""
     # Prioritize specific content areas for better extraction
@@ -44,7 +58,6 @@ def parse_content(html, original_url):
                 images.append(img_src)
             elif img_src.startswith('http') or img_src.startswith('https'):
                 images.append(img_src)
-            # Relative URLs can be handled if needed, but for now we focus on these
     
     return {
         "title": title.strip(),
@@ -73,4 +86,3 @@ if __name__ == "__main__":
             print(f"Images count: {len(data['images'])}")
     else:
         print("Not a recognized wiki URL format.")
-

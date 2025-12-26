@@ -14,7 +14,6 @@ class LinkedInPoster:
         self.person_urn = raw_urn.strip().strip('"') if raw_urn else None
         
         self.api_url = "https://api.linkedin.com/v2/ugcPosts"
-        self.upload_url = "https://api.linkedin.com/v2/assets?action=upload"
 
     def get_me(self):
         if not self.access_token:
@@ -44,12 +43,11 @@ class LinkedInPoster:
             "X-Restli-Protocol-Version": "2.0.0"
         }
 
-        # Request an upload URL
-        upload_request_payload = {
+        # The correct action is registerUpload, not upload
+        register_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
+        register_payload = {
             "registerUploadRequest": {
-                "recipes": [
-                    "urn:li:digitalmediaRecipe:feedshare-image"
-                ],
+                "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
                 "owner": self.person_urn,
                 "serviceRelationships": [
                     {
@@ -61,40 +59,51 @@ class LinkedInPoster:
         }
         
         try:
-            response = requests.post(self.upload_url, headers=headers, json=upload_request_payload)
+            print(f"Registering image upload for owner: {self.person_urn}")
+            response = requests.post(register_url, headers=headers, json=register_payload)
             response.raise_for_status()
-            upload_data = response.json()
-            upload_url = upload_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MultipartUpload']['uploadUrl']
-            asset_urn = upload_data['value']['asset']
+            register_data = response.json()
+            
+            # Defensive check for nested keys
+            try:
+                if 'com.linkedin.digitalmedia.uploading.MultipartUpload' in register_data['value']['uploadMechanism']:
+                    put_url = register_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MultipartUpload']['uploadUrl']
+                elif 'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest' in register_data['value']['uploadMechanism']:
+                    put_url = register_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
+                else:
+                    print(f"DEBUG: register_data structure: {register_data}")
+                    raise KeyError("Unknown upload mechanism")
+            except KeyError:
+                print(f"DEBUG: register_data structure: {register_data}")
+                raise
+            
+            asset_urn = register_data['value']['asset']
 
-            # Upload the image
+            # Upload the image bytes
             if image_data.startswith('data:image'):
-                # Base64 image
                 header, encoded = image_data.split(",", 1)
                 image_bytes = base64.b64decode(encoded)
                 content_type = header.split(';')[0].split(':')[1]
             else:
-                # URL image
                 image_response = requests.get(image_data)
                 image_response.raise_for_status()
                 image_bytes = image_response.content
-                content_type = image_response.headers.get('Content-Type', 'application/octet-stream')
+                content_type = image_response.headers.get('Content-Type', 'image/jpeg')
 
             upload_headers = {
                 "Authorization": f"Bearer {self.access_token}",
                 "Content-Type": content_type
             }
-            upload_response = requests.put(upload_url, headers=upload_headers, data=image_bytes)
+            upload_response = requests.put(put_url, headers=upload_headers, data=image_bytes)
             upload_response.raise_for_status()
-            print(f"Successfully uploaded image: {asset_urn}")
+            
+            print(f"Successfully uploaded image. Asset URN: {asset_urn}")
             return asset_urn
-        except requests.exceptions.HTTPError as e:
-            print(f"HTTP Error uploading image to LinkedIn: {e}")
-            if 'response' in locals() and response.text:
-                print(f"Response details: {response.text}")
-            return None
+            
         except Exception as e:
             print(f"Error uploading image to LinkedIn: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Response details: {e.response.text}")
             return None
 
     def post_text(self, text, title=None, original_url=None, uploaded_image_urn=None):
