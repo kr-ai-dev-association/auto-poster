@@ -39,17 +39,20 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ## 🚀 실행 방법
 
-### LinkedIn 포스팅 실행
-```bash
-python main.py
-```
-- 실행 후 생성된 포스트 프리뷰를 확인하고 `y`를 입력하면 LinkedIn에 게시됩니다.
-
-### 마크다운 위키 변환 실행
+### 1. 마크다운 위키 변환 및 이미지 생성
 ```bash
 python md_to_html_converter.py
 ```
 - `source/` 폴더의 모든 `.md` 파일을 변환하여 `html/` 폴더에 저장합니다.
+- 변환 시 **Gemini 2.5 Flash Image** 모델을 통해 본문 내용을 요약한 16:9 비율의 기술 일러스트를 자동 생성합니다.
+- 생성된 결과물은 자동으로 `/tech-blog/html` 경로로 복사됩니다.
+
+### 2. LinkedIn 포스팅 실행
+```bash
+python main.py
+```
+- **로컬 콘텐츠 우선 참조**: `contents.json`에 정의된 URL의 슬러그(Slug)를 분석하여, `html/` 디렉토리에 이미 변환된 HTML과 요약 이미지가 있다면 이를 우선적으로 사용하여 포스트를 생성합니다. (SPA 구조의 웹사이트 크롤링 한계 극복)
+- 실행 후 생성된 포스트 프리뷰와 첨부된 이미지를 확인하고 `y`를 입력하면 LinkedIn에 게시됩니다.
 
 ## 📂 프로젝트 구조
 

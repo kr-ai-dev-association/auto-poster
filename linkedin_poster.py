@@ -84,7 +84,15 @@ class LinkedInPoster:
                 header, encoded = image_data.split(",", 1)
                 image_bytes = base64.b64decode(encoded)
                 content_type = header.split(';')[0].split(':')[1]
+            elif os.path.exists(image_data):
+                # Local file path
+                with open(image_data, "rb") as f:
+                    image_bytes = f.read()
+                import mimetypes
+                content_type = mimetypes.guess_type(image_data)[0] or 'image/jpeg'
+                print(f"Reading local image: {image_data} ({content_type})")
             else:
+                # Assume it's a URL
                 image_response = requests.get(image_data)
                 image_response.raise_for_status()
                 image_bytes = image_response.content
