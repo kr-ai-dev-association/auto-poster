@@ -36,13 +36,15 @@ def parse_content(html, original_url):
     
     content = ""
     # Prioritize specific content areas for better extraction
-    main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content')
+    main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') or \
+                   soup.find('div', class_='wiki-html-content') or soup.find('div', class_='wiki-content')
     
     if main_content:
         content = main_content.get_text(separator='\n', strip=True)
     else:
         # Try to find common content containers if main/article not found
-        content_div = soup.find('div', id='content') or soup.find('div', id='main')
+        content_div = soup.find('div', id='content') or soup.find('div', id='main') or \
+                      soup.find('div', id='mw-content-text') or soup.find('div', class_='post-content')
         if content_div:
             content = content_div.get_text(separator='\n', strip=True)
         else:
