@@ -156,6 +156,13 @@ class MDToHTMLConverter:
 
         tqdm.write(f"--- Processing {filename} ---")
 
+        # Create subdirectories
+        ko_dir = os.path.join(output_dir, "ko")
+        en_dir = os.path.join(output_dir, "en")
+        images_dir = os.path.join(output_dir, "images")
+        for d in [ko_dir, en_dir, images_dir]:
+            os.makedirs(d, exist_ok=True)
+
         # 1. Determine English filename first (to use for the shared image name)
         tqdm.write(f"  - Translating filename for English version...")
         en_base_name = f"{base_name}_en"
@@ -168,11 +175,16 @@ class MDToHTMLConverter:
             tqdm.write(f"    - Filename translation failed, using default: {e}")
 
         # 2. Generate a single summary image (shared by both versions)
-        # Using the translated English base name for the image file
-        image_rel_path = self._generate_summary_image(md_content, en_base_name, "shared", output_dir)
+        # Images are stored in html/images/, so the relative path for HTML in html/ko/ or html/en/ 
+        # needs to go up one level: ../images/
+        image_rel_path_for_html = self._generate_summary_image(md_content, en_base_name, "shared", output_dir)
+        # Fix relative path for nested HTML structure
+        if image_rel_path_for_html:
+            image_rel_path_for_html = f"../{image_rel_path_for_html}"
+        
         image_html = ""
-        if image_rel_path:
-            image_html = f'<div class="my-6 rounded-lg overflow-hidden border border-[#a2a9b1] shadow-sm"><img src="{image_rel_path}" alt="Summary Image" class="w-full h-auto object-cover" style="aspect-ratio: 16/9;"></div>'
+        if image_rel_path_for_html:
+            image_html = f'<div class="my-6 rounded-lg overflow-hidden border border-[#a2a9b1] shadow-sm"><img src="{image_rel_path_for_html}" alt="Summary Image" class="w-full h-auto object-cover" style="aspect-ratio: 16/9;"></div>'
 
         template_styles = self._get_template_styles()
 
@@ -180,9 +192,13 @@ class MDToHTMLConverter:
         for lang in ["ko", "en"]:
             lang_label = "Korean" if lang == "ko" else "English"
             translation_instruction = ""
-            target_filename = f"{base_name}_ko.html" if lang == "ko" else f"{en_base_name}.html"
-
-            if lang == "en":
+            
+            if lang == "ko":
+                target_filename = f"{base_name}.html"
+                target_path = os.path.join(ko_dir, target_filename)
+            else:
+                target_filename = f"{en_base_name}.html"
+                target_path = os.path.join(en_dir, target_filename)
                 translation_instruction = "IMPORTANT: First, translate the entire content into natural, professional technical English."
             
             tqdm.write(f"  - Generating {lang_label} version...")
@@ -224,8 +240,10 @@ Convert the following Markdown content into a clean, professional, and responsiv
      <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
    - Ensure the generated HTML content inside .wiki-html-content uses appropriate semantic tags (h2, h3, p, ul, li, etc.) and matches the aesthetic of the template.
 
-3. **MathJax v3 Integration**:
-   - Any LaTeX formulas in the Markdown (e.g., $...$ or $$...$$) MUST be preserved exactly in the HTML so MathJax can render them.
+3. **MathJax v3 Integration & Formatting**:
+   - Any LaTeX formulas in the Markdown (e.g., $...$ or $$...$$) MUST be preserved exactly in the HTML.
+   - **IMPORTANT**: Single dollar sign formulas (e.g., $x$) are INLINE math. DO NOT put them on a new line or wrap them in block elements like <div> or <p>. They must remain part of the surrounding text line to prevent unnatural line breaks.
+   - Only double dollar sign formulas (e.g., $$...$$) should be treated as display/block math.
    - Include the following MathJax configuration and script in the <head>:
      <script>
        window.MathJax = {{
@@ -262,12 +280,11 @@ Convert the following Markdown content into a clean, professional, and responsiv
                 html_output = re.sub(r'^```html\s*', '', html_output)
                 html_output = re.sub(r'\s*```$', '', html_output)
 
-                os.makedirs(output_dir, exist_ok=True)
-                output_file_path = os.path.join(output_dir, target_filename)
-                with open(output_file_path, 'w', encoding='utf-8') as f:
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                with open(target_path, 'w', encoding='utf-8') as f:
                     f.write(html_output)
                 
-                tqdm.write(f"    - Successfully saved to: {output_file_path}")
+                tqdm.write(f"    - Successfully saved to: {target_path}")
             except Exception as e:
                 tqdm.write(f"    - Error during Gemini API call for {lang}: {e}")
 
@@ -296,22 +313,12 @@ def main():
     # Copy files to destination after all conversions are done
     print(f"\n📂 Copying generated files to {dest_dir}...")
     try:
-        if not os.path.exists(dest_dir):
-            os.makedirs(dest_dir, exist_ok=True)
-        
-        # Copy all HTML files
-        for html_file in glob.glob(os.path.join(output_dir, "*.html")):
-            shutil.copy2(html_file, dest_dir)
-            
-        # Copy images directory
-        src_images = os.path.join(output_dir, "images")
-        dest_images = os.path.join(dest_dir, "images")
-        if os.path.exists(src_images):
-            if os.path.exists(dest_images):
+        if os.path.exists(output_dir):
+            if os.path.exists(dest_dir):
                 # Using copytree with dirs_exist_ok=True (Python 3.8+)
-                shutil.copytree(src_images, dest_images, dirs_exist_ok=True)
+                shutil.copytree(output_dir, dest_dir, dirs_exist_ok=True)
             else:
-                shutil.copytree(src_images, dest_images)
+                shutil.copytree(output_dir, dest_dir)
         
         print(f"✅ Successfully copied all files to {dest_dir}")
     except Exception as e:
