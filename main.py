@@ -41,23 +41,28 @@ def main():
 
         # Try to find local content first if it exists
         url_slug = url.split('/')[-1]
-        local_html_path = f"html/{url_slug}.html"
-        # For KO, if it's the same slug, we might have a _ko version or just use the same slug
+        
         if lang == 'ko':
-            # Check for _ko version first
-            ko_slug = ""
-            # Try to find a file that ends with _ko.html and matches the prefix if possible, 
-            # or just construct the expected _ko path
-            # Since the user's files are named with original Korean titles, this is tricky.
-            # But we can try to find a file in source/ that matches or just use the converter's output logic.
-            potential_ko_path = f"html/{url_slug}_ko.html"
+            # Check in html/ko/ directory
+            potential_ko_path = f"html/ko/{url_slug}_ko.html"
             if os.path.exists(potential_ko_path):
                 local_html_path = potential_ko_path
             else:
-                # Fallback: try to find any _ko.html file in html/ if we only have one source
-                ko_files = glob.glob("html/*_ko.html")
+                # Fallback: search for any _ko.html file in html/ko/
+                ko_files = glob.glob("html/ko/*_ko.html")
                 if ko_files:
+                    # Sort by modification time to get the latest one
+                    ko_files.sort(key=os.path.getmtime, reverse=True)
                     local_html_path = ko_files[0]
+                else:
+                    local_html_path = f"html/ko/{url_slug}.html" # Legacy fallback
+        else:
+            # Check in html/en/ directory
+            potential_en_path = f"html/en/{url_slug}_en.html"
+            if os.path.exists(potential_en_path):
+                local_html_path = potential_en_path
+            else:
+                local_html_path = f"html/en/{url_slug}.html" # Legacy fallback
 
         data = None
         if os.path.exists(local_html_path):

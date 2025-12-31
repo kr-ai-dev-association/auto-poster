@@ -40,6 +40,8 @@ class GeminiSummarizer:
         if not self.client:
             return self._fallback_summary(title, content, lang)
 
+        max_char_limit = 2400 # Conservative limit for LinkedIn (UTF-16)
+        
         if lang == 'en':
             prompt = f"""
             You are a professional Tech Curator and Social Media Strategist.
@@ -47,22 +49,18 @@ class GeminiSummarizer:
             
             [Persona & Tone]
             - Professional, analytical, and insightful.
-            - Objective curator style (Avoid "I", "Me", "My blog"). 
-            - Use a "Tech Insight" or "Special Report" persona.
+            - Objective curator style.
+            - Use a "Tech Insight" persona.
             
             [Instructions - Important]
-            1. **Hook the reader**: Start with a curiosity-inducing question or a provocative statement about the future of tech. Make people want to click "See more".
-            2. **Depth over Brevity**: Provide a detailed summary. Don't just list titles; explain the *core logic* and *implications* of the content.
-            3. **No Markdown**: LinkedIn does not support (** or __). Do NOT use them.
-            4. **Structure**: 
-               - [Hook Intro]
-               - [Detailed Context/Problem Statement]
-               - [3-5 Deep Bullet Points explaining the "How" and "Why"]
-               - [Strategic Conclusion/Future Outlook]
-            5. **Spacing**: Use double line breaks between sections to ensure a clean, airy layout.
-            6. **Hashtags**: Include 5+ highly relevant hashtags at the bottom.
+            1. **Hook the reader**: Start with a curiosity-inducing question or provocative statement.
+            2. **Depth with Brevity**: Provide a detailed summary but keep it concise.
+            3. **No Markdown**: Do NOT use ** or __.
+            4. **Structure**: Hook, Context, 3-5 Bullet Points, Conclusion.
+            5. **Spacing**: Use double line breaks between sections.
+            6. **Hashtags**: Include 5 relevant hashtags at the bottom.
             7. **No URLs**: Do NOT include any links in your summary.
-            8. **Length Limit**: The total length of the summary MUST NOT exceed 2500 characters.
+            8. **STRICT Length Limit**: The summary MUST be under 2200 characters.
             
             Title: {title}
             Content: {content}
@@ -74,24 +72,17 @@ class GeminiSummarizer:
             
             [페르소나 및 톤앤매너]
             - 전문적이고 분석적이며 통찰력 있는 어조.
-            - 객관적인 기술 리포트 또는 큐레이션 스타일 (1인칭 "나", "제 블로그" 등 개인적인 표현 지양).
-            - 독자가 기술적 갈증을 느끼게 하고 궁금증을 유발하는 스타일.
+            - 객관적인 기술 리포트 스타일.
             
             [지침 - 중요]
-            1. **강렬한 후킹**: 독자의 호기심을 자극하는 질문이나 기술적 화두로 시작하세요. (예: "우리가 알던 개발의 상식이 무너지고 있습니다", "왜 글로벌 테크 기업들은 이 기술에 주목할까요?")
-            2. **깊이 있는 요약**: 단순히 내용을 나열하지 말고, 해당 기술의 핵심 원리와 비즈니스적/기술적 임팩트를 상세히 설명하세요. 본문 분량을 충분히 확보하세요.
-            3. **마크다운 절대 금지**: LinkedIn은 (#, ##, **, __ 등) 마크다운을 전혀 지원하지 않습니다. 
-               - 제목에 #이나 ##을 사용하지 마세요. 대신 텍스트만 쓰거나 이모지를 활용하세요.
-               - 강조가 필요한 제목과 핵심 용어에만 유니코드 볼드체(예: 𝗧𝗲𝘅𝘁)를 사용하세요.
-            4. **구조화**:
-               - [호기심 유발 도입부]
-               - [상세 맥락 및 문제 제기]
-               - [3~5개의 심도 있는 분석 포인트 (원리와 이유 중심)]
-               - [전략적 결론 및 미래 전망]
-            5. **가독성**: 문단 사이와 항목 사이에는 반드시 빈 줄을 1~2개 두어 가독성을 극대화하세요.
-            6. **해시태그**: 마지막에 관련도가 높은 해시태그를 5개 이상 포함하세요.
+            1. **강렬한 후킹**: 독자의 호기심을 자극하는 화두로 시작하세요.
+            2. **핵심 요약**: 핵심 원리와 임팩트를 상세하되 간결하게 설명하세요.
+            3. **마크다운 절대 금지**: (#, ##, **, __ 등) 마크다운을 지원하지 않습니다. 
+            4. **유니코드 볼드**: 강조가 필요한 용어에만 유니코드 볼드체(예: 𝗧𝗲𝘅𝘁)를 사용하세요.
+            5. **구조화**: 도입부, 상세 맥락, 3~5개 분석 포인트, 결론.
+            6. **해시태그**: 마지막에 관련도가 높은 해시태그를 5개 포함하세요.
             7. **URL 제외**: 요약 본문에는 링크를 포함하지 마세요.
-            8. **분량 제한**: 전체 요약문의 길이는 공백 포함 2500자를 초과하지 않도록 작성하세요.
+            8. **STRICT 분량 제한**: 전체 요약문은 공백 포함 2200자를 넘지 않아야 합니다.
             
             제목: {title}
             내용: {content}
@@ -105,9 +96,17 @@ class GeminiSummarizer:
             text = response.text.strip()
             text = self.post_process_bold(text)
             
-            # Final safety check for length
-            if len(text) > 2800:
-                text = text[:2797] + "..."
+            # Final safety check for length (counting UTF-16 code units for LinkedIn)
+            def get_utf16_len(s):
+                return len(s.encode('utf-16-le')) // 2
+
+            while get_utf16_len(text) > max_char_limit:
+                lines = text.split('\n')
+                if len(lines) > 1:
+                    text = '\n'.join(lines[:-1]).strip()
+                else:
+                    text = text[:max_char_limit-3].strip() + "..."
+                if not text: break
             
             return text
         except Exception as e:
