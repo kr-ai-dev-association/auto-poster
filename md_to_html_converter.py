@@ -209,8 +209,9 @@ class MDToHTMLConverter:
             lang_label = "Korean" if lang == "ko" else "English"
             translation_instruction = ""
             
+            # Both versions now use the same English base name for path consistency
             if lang == "ko":
-                target_filename = f"{base_name}_ko.html"
+                target_filename = f"{en_base_name}_ko.html"
                 target_path = os.path.join(ko_dir, target_filename)
             else:
                 target_filename = f"{en_base_name}_en.html"
