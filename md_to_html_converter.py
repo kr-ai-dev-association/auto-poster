@@ -54,13 +54,21 @@ class MDToHTMLConverter:
         try:
             image_data = None
             if "gemini-2.5-flash-image" in self.image_model_id:
-                # gemini-2.5-flash-image uses generate_content for image output
-                # Requested 16:9 aspect ratio
                 response = self.client.models.generate_content(
                     model=self.image_model_id,
                     contents=f"Generate a professional technical illustration in 16:9 aspect ratio for: {visual_prompt}"
                 )
+                
+                if not response.candidates:
+                    tqdm.write(f"    - Image generation response has no candidates. Response: {response}")
+                
                 for candidate in response.candidates:
+                    if candidate.finish_reason and candidate.finish_reason != "STOP":
+                        tqdm.write(f"    - Image generation finished with reason: {candidate.finish_reason}")
+                    
+                    if not candidate.content or not candidate.content.parts:
+                        continue
+                        
                     for part in candidate.content.parts:
                         if part.inline_data and "image" in part.inline_data.mime_type:
                             image_data = part.inline_data.data
@@ -126,6 +134,7 @@ class MDToHTMLConverter:
             with open(image_path, "wb") as f:
                 f.write(image_data)
             
+            tqdm.write(f"    - Successfully generated summary image: {image_path}")
             return f"images/{image_filename}"
         except Exception as e:
             tqdm.write(f"    - Error during image generation with {self.image_model_id}: {e}")
