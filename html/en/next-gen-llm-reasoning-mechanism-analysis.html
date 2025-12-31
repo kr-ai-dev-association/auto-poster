@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>In-Depth Analysis of Next-Generation LLM Inference Mechanisms</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <style>
+    mjx-container {
+      display: inline !important;
+      margin: 0 !important;
+      vertical-align: middle;
+    }
+    mjx-container[display="true"] {
+      display: block !important;
+      margin: 1em 0 !important;
+      text-align: center;
+    }
+    /* Force text color to black and code block styles */
+    .wiki-html-content {
+      color: #000 !important;
+    }
+    .wiki-html-content pre {
+      background-color: #000 !important;
+      color: #fff !important;
+      padding: 1.5em !important;
+      border-radius: 0.5rem !important;
+      overflow-x: auto !important;
+    }
+    .wiki-html-content code {
+      background-color: #000 !important;
+      color: #fff !important;
+      padding: 0.2em 0.4em !important;
+      border-radius: 0.25rem !important;
+      font-size: 0.9em !important;
+    }
+    /* Keep inline code blocks from looking weird inside paragraphs */
+    p code, li code {
+      display: inline !important;
+      vertical-align: baseline !important;
+    }
+    /* Table Styling */
+    .wiki-html-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5em 0;
+    }
+    .wiki-html-content th, .wiki-html-content td {
+      border: 1px solid #a2a9b1;
+      padding: 8px;
+      text-align: left;
+    }
+    .wiki-html-content th {
+      background-color: #f8f9fa;
+    }
+  </style>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        packages: {'[+]': ['base', 'ams', 'noerrors', 'noundefined']}
+      },
+      svg: { fontCache: 'global', scale: 1.0 },
+      startup: { typeset: true }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
+</head>
+<body class="bg-gray-50 py-10 px-4 sm:px-10">
+  <article class="wiki-content max-w-5xl mx-auto bg-white p-8 shadow-sm border border-gray-200">
+    <div class="flex justify-between items-start border-b border-[#a2a9b1] pb-2 mb-6">
+      <h1 class="text-3xl font-sans font-bold text-[#000] leading-tight">In-Depth Analysis of Next-Generation LLM Inference Mechanisms: Token Generation Dynamics by Architecture and Engineering Optimization Research</h1>
+      <div class="flex items-center gap-2 mt-2 ml-4 shrink-0">
+        <button class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-all" title="Copy Link">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="wiki-html-content prose prose-slate max-w-none text-[#202122] leading-relaxed">
+      <style>
+         .wiki-html-content @import url(https://themes.googleusercontent.com/fonts/css?kit=fz37I5dLqkukZAqqEcBXiiZegz6RfUqk5lRQgVKFIc16i_wyt05ZDg82Y47j6MDVmJ5_RyB2JGt_rxfp1qClyw);.lst-kix_3feobs7mewfs-0 > li:before{content:"" counter(lst-ctn-kix_3feobs7mewfs-0,.wiki-html-content decimal) ". "}.lst-kix_3feobs7mewfs-1 > li:before{.wiki-html-content content:"○ "}ul.lst-kix_list_1-0{.wiki-html-content list-style-type:none}ol.lst-kix_list_3-0{.wiki-html-content list-style-type:none}.lst-kix_3feobs7mewfs-4 > li:before{.wiki-html-content content:"■ "}.lst-kix_3feobs7mewfs-0 > li{.wiki-html-content counter-increment:lst-ctn-kix_3feobs7mewfs-0}.lst-kix_3feobs7mewfs-2 > li:before{.wiki-html-content content:"■ "}.lst-kix_3feobs7mewfs-3 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_3-0 > li:before{content:"" counter(lst-ctn-kix_list_3-0,.wiki-html-content decimal) ". "}ul.lst-kix_list_5-7{.wiki-html-content list-style-type:none}ul.lst-kix_list_5-8{.wiki-html-content list-style-type:none}.lst-kix_list_3-1 > li:before{.wiki-html-content content:"○ "}.lst-kix_list_3-2 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_5-5{.wiki-html-content list-style-type:none}ul.lst-kix_list_5-6{.wiki-html-content list-style-type:none}.lst-kix_list_8-1 > li:before{.wiki-html-content content:"○ "}.lst-kix_list_8-2 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_8-0 > li{.wiki-html-content counter-increment:lst-ctn-kix_list_8-0}ul.lst-kix_list_1-3{.wiki-html-content list-style-type:none}.lst-kix_list_3-5 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_5-0{.wiki-html-content list-style-type:none}ul.lst-kix_list_1-4{.wiki-html-content list-style-type:none}ul.lst-kix_list_1-1{.wiki-html-content list-style-type:none}.lst-kix_list_3-4 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_1-2{.wiki-html-content list-style-type:none}ul.lst-kix_list_5-3{.wiki-html-content list-style-type:none}ul.lst-kix_list_1-7{.wiki-html-content list-style-type:none}.lst-kix_list_3-3 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_5-4{.wiki-html-content list-style-type:none}ul.lst-kix_list_1-8{.wiki-html-content list-style-type:none}ul.lst-kix_list_5-1{.wiki-html-content list-style-type:none}.lst-kix_list_8-0 > li:before{content:"" counter(lst-ctn-kix_list_8-0,.wiki-html-content decimal) ". "}ul.lst-kix_list_1-5{.wiki-html-content list-style-type:none}ul.lst-kix_list_5-2{.wiki-html-content list-style-type:none}ul.lst-kix_list_1-6{.wiki-html-content list-style-type:none}.lst-kix_list_8-7 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_3-8 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_8-5 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_8-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_8-3 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_3-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_3-7 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_8-4 > li:before{.wiki-html-content content:"■ "}.lst-kix_3feobs7mewfs-8 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_3feobs7mewfs-7{.wiki-html-content list-style-type:none}ul.lst-kix_3feobs7mewfs-6{.wiki-html-content list-style-type:none}ul.lst-kix_3feobs7mewfs-8{.wiki-html-content list-style-type:none}ul.lst-kix_3feobs7mewfs-3{.wiki-html-content list-style-type:none}ul.lst-kix_3feobs7mewfs-2{.wiki-html-content list-style-type:none}.lst-kix_3feobs7mewfs-5 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_3feobs7mewfs-5{.wiki-html-content list-style-type:none}ul.lst-kix_3feobs7mewfs-4{.wiki-html-content list-style-type:none}.lst-kix_3feobs7mewfs-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_3feobs7mewfs-7 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_8-8 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_3feobs7mewfs-1{.wiki-html-content list-style-type:none}.lst-kix_list_5-0 > li:before{.wiki-html-content content:"● "}.lst-kix_list_4-8 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_5-3 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_4-7 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_5-2 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_5-1 > li:before{.wiki-html-content content:"○ "}ul.lst-kix_list_4-8{.wiki-html-content list-style-type:none}.lst-kix_list_5-7 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_8-4{.wiki-html-content list-style-type:none}ul.lst-kix_list_8-5{.wiki-html-content list-style-type:none}ul.lst-kix_list_4-6{.wiki-html-content list-style-type:none}.lst-kix_list_5-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_5-8 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_8-2{.wiki-html-content list-style-type:none}ul.lst-kix_list_4-7{.wiki-html-content list-style-type:none}ul.lst-kix_list_8-3{.wiki-html-content list-style-type:none}ul.lst-kix_list_8-8{.wiki-html-content list-style-type:none}ul.lst-kix_list_8-6{.wiki-html-content list-style-type:none}ul.lst-kix_list_8-7{.wiki-html-content list-style-type:none}ul.lst-kix_list_4-0{.wiki-html-content list-style-type:none}ul.lst-kix_list_4-1{.wiki-html-content list-style-type:none}.lst-kix_list_5-4 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_4-4{.wiki-html-content list-style-type:none}.lst-kix_list_5-5 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_4-5{.wiki-html-content list-style-type:none}ul.lst-kix_list_8-1{.wiki-html-content list-style-type:none}ul.lst-kix_list_4-2{.wiki-html-content list-style-type:none}ul.lst-kix_list_4-3{.wiki-html-content list-style-type:none}.lst-kix_list_6-1 > li:before{.wiki-html-content content:"○ "}.lst-kix_list_6-3 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_6-0 > li:before{.wiki-html-content content:"● "}.lst-kix_list_6-4 > li:before{.wiki-html-content content:"■ "}ol.lst-kix_3feobs7mewfs-0{.wiki-html-content list-style-type:none}.lst-kix_list_3-0 > li{.wiki-html-content counter-increment:lst-ctn-kix_list_3-0}.lst-kix_list_6-2 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_6-8 > li:before{.wiki-html-content content:"■ "}ol.lst-kix_list_8-0.start{.wiki-html-content counter-reset:lst-ctn-kix_list_8-0 0}.lst-kix_list_6-5 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_6-7 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_7-0 > li:before{.wiki-html-content content:"● "}.lst-kix_list_6-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-7 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_7-4 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_7-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-4 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-5 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-8 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_7-1 > li:before{.wiki-html-content content:"○ "}.lst-kix_list_7-5 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_7-2 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_7-3 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_7-5{.wiki-html-content list-style-type:none}ul.lst-kix_list_7-6{.wiki-html-content list-style-type:none}ul.lst-kix_list_7-3{.wiki-html-content list-style-type:none}ul.lst-kix_list_3-7{.wiki-html-content list-style-type:none}ul.lst-kix_list_7-4{.wiki-html-content list-style-type:none}ul.lst-kix_list_3-8{.wiki-html-content list-style-type:none}ul.lst-kix_list_7-7{.wiki-html-content list-style-type:none}ul.lst-kix_list_7-8{.wiki-html-content list-style-type:none}ol.lst-kix_list_3-0.start{.wiki-html-content counter-reset:lst-ctn-kix_list_3-0 0}ul.lst-kix_list_3-1{.wiki-html-content list-style-type:none}ul.lst-kix_list_3-2{.wiki-html-content list-style-type:none}.lst-kix_list_7-8 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_7-1{.wiki-html-content list-style-type:none}ul.lst-kix_list_3-5{.wiki-html-content list-style-type:none}ul.lst-kix_list_7-2{.wiki-html-content list-style-type:none}ul.lst-kix_list_3-6{.wiki-html-content list-style-type:none}ul.lst-kix_list_3-3{.wiki-html-content list-style-type:none}ul.lst-kix_list_7-0{.wiki-html-content list-style-type:none}.lst-kix_list_7-7 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_3-4{.wiki-html-content list-style-type:none}.lst-kix_list_4-0 > li:before{.wiki-html-content content:"● "}.lst-kix_list_4-1 > li:before{.wiki-html-content content:"○ "}.lst-kix_list_4-4 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_4-3 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_4-5 > li:before{.wiki-html-content content:"■ "}ol.lst-kix_3feobs7mewfs-0.start{.wiki-html-content counter-reset:lst-ctn-kix_3feobs7mewfs-0 0}.lst-kix_list_4-2 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_4-6 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_6-6{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-7{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-4{.wiki-html-content list-style-type:none}ul.lst-kix_list_2-8{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-5{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-8{.wiki-html-content list-style-type:none}ul.lst-kix_list_2-2{.wiki-html-content list-style-type:none}.lst-kix_list_1-0 > li:before{.wiki-html-content content:"● "}ul.lst-kix_list_2-3{.wiki-html-content list-style-type:none}ul.lst-kix_list_2-0{.wiki-html-content list-style-type:none}ul.lst-kix_list_2-1{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-2{.wiki-html-content list-style-type:none}ol.lst-kix_list_8-0{.wiki-html-content list-style-type:none}ul.lst-kix_list_2-6{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-3{.wiki-html-content list-style-type:none}.lst-kix_list_1-1 > li:before{.wiki-html-content content:"○ "}.lst-kix_list_1-2 > li:before{.wiki-html-content content:"■ "}ul.lst-kix_list_2-7{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-0{.wiki-html-content list-style-type:none}ul.lst-kix_list_2-4{.wiki-html-content list-style-type:none}ul.lst-kix_list_6-1{.wiki-html-content list-style-type:none}ul.lst-kix_list_2-5{.wiki-html-content list-style-type:none}.lst-kix_list_1-3 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_1-4 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_1-7 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_1-5 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_1-6 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-0 > li:before{.wiki-html-content content:"● "}.lst-kix_list_2-1 > li:before{.wiki-html-content content:"○ "}.lst-kix_list_1-8 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-2 > li:before{.wiki-html-content content:"■ "}.lst-kix_list_2-3 > li:before{content:"■ "}
+      </style>
+      
+      <h2>1. Introduction: Paradigm Shift in LLM Inference and Engineering Challenges</h2>
+      <p>The years 2024 and 2025 will be recorded as a major inflection point in the history of Artificial Intelligence, specifically Large Language Models (LLMs). If research from the emergence of GPT-3 until 2023 was primarily the era of the "Scaling Law"—focusing on increasing parameter counts and training data to secure "Emergent Capabilities"—then the period from 2024 onwards can be defined as the era of "Efficiency and Architecture," focusing on efficiently serving and inferring the secured intelligence within real-world hardware constraints.</p>
+      <p>This report provides an in-depth analysis of the internal inference mechanisms governing token generation in three iconic model architectures introduced since 2024: Meta's <strong>Llama 3.1</strong> (Dense Transformer), DeepSeek-AI's <strong>DeepSeek-V3</strong> (MoE + MLA), and AI21 Labs' <strong>Jamba 1.5</strong> (Hybrid SSM-Transformer).</p>
+      <p>A core engineering challenge facing modern LLM inference is the <strong>"Memory Wall."</strong> During the autoregressive generation process, the model must maintain the <strong>KV Cache</strong>, which stores the Key and Value states of all previously generated tokens. As context lengths expand beyond 128K tokens, the size of this KV cache increases exponentially, exhausting the GPU's High Bandwidth Memory (HBM) and becoming the primary bottleneck limiting overall system throughput.</p>
+      <p>In this report, we analyze the mathematical techniques and algorithmic innovations each model has introduced to overcome these physical limits. We compare Llama 3.1’s choice of FP8 quantization and optimization strategies for massive dense models, the mathematical principles of KV cache compression through Multi-head Latent Attention (MLA) proposed by DeepSeek-V3, and the linear scalability brought by the hybrid combination of Mamba (State Space Model) and Transformer in Jamba 1.5. Additionally, we highlight the gap between theory and practice through observed limitations and failure cases in actual community benchmarks.</p>
+
+      <h2>2. Theoretical Background of LLM Inference and Core Bottlenecks</h2>
+      <p>Before analyzing the specific mechanisms of each model, it is necessary to understand the fundamental computational and memory dynamics that modern LLM inference systems must resolve. LLM inference is largely divided into two stages: the <strong>Prefill</strong> stage, which processes the input prompt, and the <strong>Decoding</strong> stage, which generates tokens one by one.</p>
+
+      <h3>2.1 Autoregressive Decoding and Memory Bandwidth Constraints</h3>
+      <p>The decoding stage of Transformer-based models is inherently a <strong>memory-bound</strong> task. To generate a new token $x_t$ at time $t$, all model weights (Parameters) must be moved from the GPU memory to the compute units (e.g., Tensor Cores). When the batch size is small, the GPU's computational capacity (FLOPS) remains underutilized because the speed of fetching data from memory cannot keep up, resulting in latency.</p>
+      <p>Mathematically, for a model with $P$ parameters performing inference with a batch size of $B$, the <strong>Arithmetic Intensity</strong> at each token generation step is very low. To overcome this, the batch size must be increased; however, doing so causes the KV cache for each sequence to occupy more memory, thereby limiting the maximum possible batch size.</p>
+
+      <h3>2.2 Explosive Growth of KV Cache</h3>
+      <p>The attention mechanism consists of the interaction between Query ($Q$), Key ($K$), and Value ($V$):</p>
+      $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
+      <p>While $Q$ is a vector for the token currently being generated, $K$ and $V$ must contain information for all past tokens. Recomputing $K$ and $V$ for past tokens at every step is inefficient, so they are cached in VRAM.</p>
+      <p>With context windows expanding from 4K in the Llama 2 era to 128K–256K in Llama 3.1 and Jamba 1.5, the size of the KV cache now often requires more memory than the model weights themselves. For example, storing 128K tokens at FP16 precision can require hundreds of gigabytes of memory, making it impossible to process on a single GPU.</p>
+
+      <h3>2.3 Evolution of Attention Mechanisms: From MHA to MLA</h3>
+      <p>To resolve these memory bottlenecks, attention architectures have evolved as follows:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Architecture</th>
+            <th>Description</th>
+            <th>Memory Efficiency</th>
+            <th>Representative Models</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>MHA (Multi-Head Attention)</td>
+            <td>Every head has its own unique KV.</td>
+            <td>Low (Max memory usage)</td>
+            <td>GPT-3, Llama 1</td>
+          </tr>
+          <tr>
+            <td>MQA (Multi-Query Attention)</td>
+            <td>All heads share a single KV.</td>
+            <td>Very High (Risk of performance loss)</td>
+            <td>Falcon, Gemini 1.0</td>
+          </tr>
+          <tr>
+            <td>GQA (Grouped-Query Attention)</td>
+            <td>Heads are grouped to share KVs.</td>
+            <td>Medium (Balance of performance and efficiency)</td>
+            <td>Llama 2, Llama 3.1</td>
+          </tr>
+          <tr>
+            <td>MLA (Multi-Head Latent Attention)</td>
+            <td>KVs are compressed into low-rank latent vectors.</td>
+            <td>Very High (Maintains performance)</td>
+            <td>DeepSeek-V2, V3</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>3. Llama 3.1 405B: Limits and Engineering of Dense Transformers</h2>
+      <p>Meta's Llama 3.1 405B, released in July 2024, is the largest among open-weight models. While it inherits the traditional Transformer structure, its 405 billion parameters and 128K context length place an extreme load on inference systems.</p>
+
+      <h3>3.1 Inference Architecture and GQA (Grouped-Query Attention)</h3>
+      <p>Llama 3.1 405B is based on a standard Decoder-only Transformer structure and adopts <strong>GQA</strong> for inference efficiency. GQA sits between MHA and MQA.</p>
+      <ul>
+        <li><strong>Mechanism</strong>: The total number of Query Heads is divided into $G$ groups, and query heads within each group share a single KV Head.</li>
+        <li><strong>Effect</strong>: This reduces the KV cache size by a factor of $G$. In the case of Llama 3.1 405B, GQA attempts to keep KV cache memory requirements manageable even at 128K context. However, due to the sheer size of the 405B model, simply loading it in FP16 precision requires approximately 810GB of VRAM, exceeding the 640GB capacity of a single node equipped with 8x 80GB H100 GPUs.</li>
+      </ul>
+
+      <h3>3.2 FP8 Quantization: Overcoming Physical Limits</h3>
+      <p>To practically serve Llama 3.1 405B, <strong>FP8 (8-bit Floating Point)</strong> quantization is essential. Meta and the community have adopted FP8 quantization as the standard to halve memory usage, allowing the model to fit into a single 8xH100 node.</p>
+
+      <h4>3.2.1 Mathematical Principles of FP8 Inference</h4>
+      <p>FP8 uses formats like E4M3 (4-bit exponent, 3-bit mantissa) or E5M2. During inference, the following occurs:</p>
+      <ol>
+        <li><strong>Weight Scaling</strong>: Layer weight tensors are converted to FP8, with scaling factors calculated to preserve dynamic range.</li>
+        <li><strong>Activation Quantization</strong>: Input token activation values are also converted to FP8 in real-time.</li>
+        <li><strong>GEMM Operations</strong>: H100 Tensor Cores perform multiplication of two FP8 matrices, accumulating results in FP16 or FP32 to minimize precision loss.</li>
+      </ol>
+      <p>According to engineering blogs from Dell and Snowflake, even with FP8, utilizing the full 128K context of Llama 3.1 405B can quickly consume remaining VRAM for the KV cache, leading to Out of Memory (OOM) errors. Therefore, in addition to 8-way Tensor Parallelism (TP), Pipeline Parallelism (PP) across multiple nodes or KV cache offloading techniques must be employed.</p>
+
+      <h3>3.3 Code Verification: generate.py and Distributed Inference</h3>
+      <p>Analyzing the official Llama 3.1 repository and vLLM implementations reveals how this massive model is loaded and executed.</p>
+      <pre><code># Llama 3.1 Distributed Inference Pseudo-code (PyTorch/FairScale based)
+import torch.distributed as dist
+from llama.model import Transformer
+
+def main():
+    # Initialize process group (using NCCL backend)
+    dist.init_process_group("nccl")
+    rank = dist.get_rank()
+    world_size = dist.get_world_size()
+
+    # Load model (each GPU loads only a 'Shard' of the model)
+    # Tensor Parallelism is applied to split layer weights
+    model = Transformer(params).to(local_rank)
+    
+    # Generation loop
+    for cur_pos in range(seq_len):
+        # Perform partial computation on each GPU
+        logits = model(tokens[:, cur_pos])
+        # Synchronize results (All-Reduce communication occurs)
+        # This communication overhead is a key variable in inference speed
+        dist.all_reduce(logits)</code></pre>
+
+      <h2>4. DeepSeek-V3: Innovations in Architectural Compression and Sparsity</h2>
+      <p>DeepSeek-V3 (671B) has a larger total parameter count than Llama 3.1 405B, but it utilizes a Mixture-of-Experts (MoE) structure where only 37B parameters are active per token. However, its true innovation lies in <strong>Multi-head Latent Attention (MLA)</strong>, a mathematical approach to fundamentally solving the KV cache bottleneck.</p>
+
+      <h3>4.1 Multi-head Latent Attention (MLA): KV Cache Compression</h3>
+      <p>Unlike MHA or GQA, MLA does not cache Keys and Values directly. Instead, it compresses them into low-dimensional <strong>Latent Vectors</strong>. This drastically reduces KV cache memory usage while minimizing performance degradation.</p>
+
+      <h4>4.1.1 Mathematical Structure of MLA and "Matrix Absorption"</h4>
+      <p>In standard attention, Key $k$ and Value $v$ are generated by multiplying input $x$ by projection matrices $W_K, W_V$. MLA splits this into two steps:</p>
+      <ol>
+        <li><strong>Down-projection</strong>: Input $h_t$ is compressed into latent vector $c_{KV}$ via low-rank matrix $W_{DKV}$:
+          $$c_{KV} = W_{DKV} h_t$$
+        </li>
+        <li><strong>Up-projection</strong>: During attention, the latent vector is restored to original dimensions via $W_{UK}, W_{UV}$:
+          $$k = W_{UK} c_{KV}, \quad v = W_{UV} c_{KV}$$
+        </li>
+      </ol>
+      <p>The key optimization technique, <strong>Matrix Absorption</strong>, occurs here. Looking at the attention score calculation:</p>
+      $$q^T k = (W_Q x)^T (W_{UK} c_{KV}) = x^T W_Q^T W_{UK} c_{KV}$$
+      <p>If $W_Q^T W_{UK}$ can be pre-calculated and merged into a single matrix ("absorbed"), then during inference, there is no need to restore $c_{KV}$; operations can be performed directly on the compressed state. Thus, only the small $c_{KV}$ is stored in the KV cache instead of the massive $k, v$.</p>
+
+      <h4>4.1.2 Decoupled RoPE: Separation of Positional Information</h4>
+      <p>When <strong>RoPE (Rotary Positional Embedding)</strong> is introduced, it complicates things. RoPE multiplies the Key vector by a rotation matrix $R_m$ based on position $m$. Since $R_m$ changes per token, $W_{UK}$ cannot be pre-absorbed into the query side matrix. DeepSeek-V3 solves this with a <strong>Decoupled RoPE</strong> strategy:</p>
+      <ul>
+        <li><strong>Content Key ($k_{content}$)</strong>: Pure content without positional info is compressed via MLA using matrix absorption.</li>
+        <li><strong>RoPE Key ($k_{rope}$)</strong>: The part requiring RoPE is separated into a small dimension (e.g., 64) and stored in the cache without compression.</li>
+      </ul>
+      <p>This reduces the KV cache size by approximately 93.3% compared to MHA, enabling long-context inference with minimal memory.</p>
+
+      <h3>4.2 DeepSeekMoE: Load Balancing and Computational Efficiency</h3>
+      <p>DeepSeek-V3 uses advanced MoE routing:</p>
+      <ul>
+        <li><strong>Fine-grained Experts</strong>: Experts are split into smaller units (e.g., 64) to increase specialization.</li>
+        <li><strong>Shared Experts</strong>: "Common knowledge" experts that every token must pass through are used to allow routed experts to focus on specific tasks.</li>
+        <li><strong>Auxiliary-loss-free Balancing</strong>: A new load balancing strategy that avoids the performance degradation often caused by standard auxiliary losses.</li>
+      </ul>
+
+      <h2>5. Jamba 1.5: Hybrid Architecture and Linear Scalability</h2>
+      <p>AI21 Labs' Jamba 1.5 introduces <strong>SSM (State Space Model)</strong>, specifically the Mamba architecture, to a Transformer-dominated market. Jamba uses a hybrid structure to process "near-infinite context" efficiently.</p>
+
+      <h3>5.1 Inference Mechanism: Interleaving Mamba and Transformer</h3>
+      <p>Jamba 1.5 Large (398B) uses a 1:7 interleaving ratio—placing one Transformer attention layer for every eight layers, with the remaining seven being Mamba layers.</p>
+
+      <h4>5.1.1 Mamba Layer Inference Dynamics</h4>
+      <p>Mamba layers do not use a KV cache for past tokens. Instead, they update a fixed-size state variable $h_t$:</p>
+      $$h_t = A h_{t-1} + B x_t$$
+      $$y_t = C h_t$$
+      <p>Memory and computation required to generate the next token are constant ($O(1)$) regardless of context length $L$, offering a massive advantage over the $O(L)$ or $O(L^2)$ scaling of Transformers.</p>
+
+      <h4>5.1.2 The Role of Transformer Layers: Correcting "Memory"</h4>
+      <p>Pure SSMs suffer from a "forgetting" problem where they fail to recall fine-grained details in long contexts. Jamba compensates for this by including Transformer layers every 8th layer to explicitly reference the entire context. Consequently, the total KV cache is reduced to 1/8th that of a pure Transformer.</p>
+
+      <h3>5.2 ExpertsInt8: Quantization for Hybrid MoE</h3>
+      <p>With 398B parameters, Jamba 1.5 employs <strong>ExpertsInt8</strong>. Expert weights and MLP layers are stored in INT8 and dequantized to BF16 just before computation, allowing the model to fit on a single 8x80GB node while handling a 256K context.</p>
+
+      <h2>6. Advanced Analysis: Speculative Decoding and the Future of Inference</h2>
+      <p>Beyond architectural improvements, system-level techniques are being specialized for each model.</p>
+      <ul>
+        <li><strong>Llama 3.1</strong>: Uses traditional <strong>Draft Model</strong> strategies. Llama 3.1 8B acts as a draft model to predict tokens quickly, which the 405B model then verifies, achieving over 2x speedup.</li>
+        <li><strong>DeepSeek-V3</strong>: Implements <strong>MTP (Multi-Token Prediction)</strong>. The model is trained to predict multiple future tokens in a single forward pass. This "built-in draft model" provides speculative decoding effects without additional memory overhead.</li>
+        <li><strong>MoE Challenges</strong>: MoE models face lower acceptance rates in speculative decoding due to architecture mismatches between draft and target models. Research like <em>SpecMoEOff</em> proposes specialized offloading to mitigate this.</li>
+      </ul>
+
+      <h2>7. Comparative Analysis and Conclusion: Solving the Trilemma</h2>
+      <p>These models address the LLM inference trilemma—<strong>Quality, Speed, and Memory</strong>—in different ways.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Llama 3.1 405B</th>
+            <th>DeepSeek-V3 (671B)</th>
+            <th>Jamba 1.5 Large (398B)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Core Philosophy</td>
+            <td>Scale & Quality</td>
+            <td>Efficiency & Compression</td>
+            <td>Long Context & Hybrid</td>
+          </tr>
+          <tr>
+            <td>Inference Architecture</td>
+            <td>Dense Transformer + GQA</td>
+            <td>MoE + MLA (KV Compression)</td>
+            <td>Hybrid (Mamba + Attn)</td>
+          </tr>
+          <tr>
+            <td>Memory Solution</td>
+            <td>FP8 Quantization</td>
+            <td>MLA (93% KV reduction)</td>
+            <td>SSM State (8x reduction)</td>
+          </tr>
+          <tr>
+            <td>Pros</td>
+            <td>Best general performance</td>
+            <td>Unbeatable cost efficiency</td>
+            <td>Best for 256K+ context</td>
+          </tr>
+          <tr>
+            <td>Cons</td>
+            <td>Extreme operating cost</td>
+            <td>Complex implementation</td>
+            <td>Low ecosystem maturity</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>As of 2025, LLM inference technology is moving from "Brute Force" to "Intelligent Compression." Engineers must now look beyond parameter counts and prioritize <strong>KV cache size</strong> and <strong>memory bandwidth per token</strong> as the most critical metrics for deployment.</p>
+    </div>
+
+    <div class="mt-12 pt-4 border-t border-[#a2a9b1] text-xs text-[#444] font-medium italic">
+       This page was last edited on Dec 30, 2025.
+    </div>
+  </article>
+</body>
+</html>

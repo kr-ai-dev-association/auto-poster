@@ -143,6 +143,22 @@ class MDToHTMLConverter:
             print(f"Warning: Could not read styles from template.html: {e}")
         return ""
 
+    def _post_process_math_spacing(self, html_content):
+        """Remove unnatural line breaks and block tags around inline math formulas."""
+        # 1. Remove <p>, <div>, or <br> tags that isolate an inline formula
+        html_content = re.sub(r'<(p|div|span)[^>]*>\s*(\$[^\$]+\$)\s*</\1>', r' \2 ', html_content)
+        html_content = re.sub(r'<br\s*/?>\s*(\$[^\$]+\$)', r' \1', html_content)
+        html_content = re.sub(r'(\$[^\$]+\$)\s*<br\s*/?>', r'\1 ', html_content)
+        
+        # 2. Remove newlines and multiple spaces immediately before or after inline formulas
+        html_content = re.sub(r'\s*\n\s*(\$[^\$]+\$)\s*', r' \1 ', html_content)
+        html_content = re.sub(r'\s*(\$[^\$]+\$)\s*\n\s*', r' \1 ', html_content)
+        
+        # 3. Clean up leading/trailing spaces inside parent tags if they surround math
+        html_content = re.sub(r'>\s*(\$[^\$]+\$)\s*<', r'>\1<', html_content)
+
+        return html_content
+
     def convert_file(self, md_file_path, output_dir="html"):
         """Convert a single MD file to both KO and EN HTML versions using a single shared summary image."""
         if not self.client:
@@ -194,10 +210,10 @@ class MDToHTMLConverter:
             translation_instruction = ""
             
             if lang == "ko":
-                target_filename = f"{base_name}.html"
+                target_filename = f"{base_name}_ko.html"
                 target_path = os.path.join(ko_dir, target_filename)
             else:
-                target_filename = f"{en_base_name}.html"
+                target_filename = f"{en_base_name}_en.html"
                 target_path = os.path.join(en_dir, target_filename)
                 translation_instruction = "IMPORTANT: First, translate the entire content into natural, professional technical English."
             
@@ -244,7 +260,48 @@ Convert the following Markdown content into a clean, professional, and responsiv
    - Any LaTeX formulas in the Markdown (e.g., $...$ or $$...$$) MUST be preserved exactly in the HTML.
    - **IMPORTANT**: Single dollar sign formulas (e.g., $x$) are INLINE math. DO NOT put them on a new line or wrap them in block elements like <div> or <p>. They must remain part of the surrounding text line to prevent unnatural line breaks.
    - Only double dollar sign formulas (e.g., $$...$$) should be treated as display/block math.
-   - Include the following MathJax configuration and script in the <head>:
+   - Include the following MathJax configuration, style, and script in the <head>:
+     <style>
+       mjx-container {{
+         display: inline !important;
+         margin: 0 !important;
+         vertical-align: middle;
+         white-space: nowrap !important;
+       }}
+       mjx-container[display="true"] {{
+         display: block !important;
+         margin: 1.5em 0 !important;
+         text-align: center;
+         white-space: normal !important;
+       }}
+       /* Prevent Tailwind prose from breaking math */
+       .prose mjx-container {{
+         display: inline-block !important;
+       }}
+       /* Force text color to black and code block styles */
+       .wiki-html-content {{
+         color: #000 !important;
+       }}
+       .wiki-html-content pre {{
+         background-color: #000 !important;
+         color: #fff !important;
+         padding: 1.5em !important;
+         border-radius: 0.5rem !important;
+         overflow-x: auto !important;
+       }}
+       .wiki-html-content code {{
+         background-color: #000 !important;
+         color: #fff !important;
+         padding: 0.2em 0.4em !important;
+         border-radius: 0.25rem !important;
+         font-size: 0.9em !important;
+       }}
+       /* Keep inline code blocks from looking weird inside paragraphs */
+       p code, li code {{
+         display: inline !important;
+         vertical-align: baseline !important;
+       }}
+     </style>
      <script>
        window.MathJax = {{
          tex: {{
@@ -253,7 +310,7 @@ Convert the following Markdown content into a clean, professional, and responsiv
            processEscapes: true,
            packages: {{'[+]': ['base', 'ams', 'noerrors', 'noundefined']}}
          }},
-         svg: {{ fontCache: 'global', scale: 1.0, displayAlign: 'center' }},
+         svg: {{ fontCache: 'global', scale: 1.0 }},
          startup: {{ typeset: true }}
        }};
      </script>
@@ -279,6 +336,9 @@ Convert the following Markdown content into a clean, professional, and responsiv
                 # Remove any accidental markdown formatting from the response
                 html_output = re.sub(r'^```html\s*', '', html_output)
                 html_output = re.sub(r'\s*```$', '', html_output)
+
+                # Post-process to fix math spacing issue
+                html_output = self._post_process_math_spacing(html_output)
 
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 with open(target_path, 'w', encoding='utf-8') as f:
