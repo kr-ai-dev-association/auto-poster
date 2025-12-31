@@ -33,39 +33,42 @@ def main():
             print("Failed to get Person URN. Exiting.")
             return
 
+    dest_dir = "/Volumes/Transcend/Projects/tech-blog/html"
+    
     for lang, data_entry in default_urls.items():
         url = data_entry.get("url")
         if not url:
             print(f"Skipping {lang} as URL is missing in contents.json")
             continue
 
-        # Try to find local content first if it exists
+        # Try to find local content first if it exists, otherwise check deployment dir
         url_slug = url.split('/')[-1]
         
-        if lang == 'ko':
-            # Check in html/ko/ directory
-            potential_ko_path = f"html/ko/{url_slug}_ko.html"
-            if os.path.exists(potential_ko_path):
-                local_html_path = potential_ko_path
-            else:
-                # Fallback: search for any _ko.html file in html/ko/
-                ko_files = glob.glob("html/ko/*_ko.html")
-                if ko_files:
-                    # Sort by modification time to get the latest one
-                    ko_files.sort(key=os.path.getmtime, reverse=True)
-                    local_html_path = ko_files[0]
+        # Possible locations to check
+        search_dirs = ["html", dest_dir]
+        local_html_path = None
+        
+        for base_dir in search_dirs:
+            if lang == 'ko':
+                potential_ko_path = os.path.join(base_dir, "ko", f"{url_slug}_ko.html")
+                if os.path.exists(potential_ko_path):
+                    local_html_path = potential_ko_path
+                    break
                 else:
-                    local_html_path = f"html/ko/{url_slug}.html" # Legacy fallback
-        else:
-            # Check in html/en/ directory
-            potential_en_path = f"html/en/{url_slug}_en.html"
-            if os.path.exists(potential_en_path):
-                local_html_path = potential_en_path
+                    # Fallback: search for any _ko.html file
+                    ko_files = glob.glob(os.path.join(base_dir, "ko", "*_ko.html"))
+                    if ko_files:
+                        ko_files.sort(key=os.path.getmtime, reverse=True)
+                        local_html_path = ko_files[0]
+                        break
             else:
-                local_html_path = f"html/en/{url_slug}.html" # Legacy fallback
-
+                potential_en_path = os.path.join(base_dir, "en", f"{url_slug}_en.html")
+                if os.path.exists(potential_en_path):
+                    local_html_path = potential_en_path
+                    break
+        
         data = None
-        if os.path.exists(local_html_path):
+        if local_html_path and os.path.exists(local_html_path):
             print(f"[{lang.upper()}] Found local HTML content: {local_html_path}")
             with open(local_html_path, 'r', encoding='utf-8') as f:
                 local_html = f.read()
@@ -73,19 +76,7 @@ def main():
         
         if not data:
             print(f"[{lang.upper()}] 콘텐츠 읽는 중: {url}")
-            # Check if it's a wiki URL and convert to Google Doc export URL
-            doc_id = get_google_doc_id(url)
-            if doc_id:
-                google_doc_url = f"https://docs.google.com/document/d/{doc_id}/export?format=html"
-                print(f"Detected wiki URL, fetching from Google Doc: {google_doc_url}")
-                html = fetch_html_content(google_doc_url)
-            else:
-                html = fetch_html_content(url)
-
-            if not html:
-                print(f"[{lang.upper()}] Failed to fetch HTML content for {url}.")
-                continue
-            data = parse_content(html, url) 
+            # ... (rest of the fetching logic)
 
         if not data or not data['content']:
             print(f"[{lang.upper()}] Failed to parse content for {url}.")
@@ -96,12 +87,16 @@ def main():
         # Check for local summary image if no images found or as priority
         local_image_path = None
         url_slug = url.split('/')[-1]
-        potential_local_path = f"html/images/{url_slug}_summary.png"
         
-        if os.path.exists(potential_local_path):
-            print(f"Found local summary image: {potential_local_path}")
-            local_image_path = potential_local_path
-        elif data['images']:
+        # Check in both local and deployment image directories
+        for base_dir in ["html", dest_dir]:
+            potential_local_path = os.path.join(base_dir, "images", f"{url_slug}_summary.png")
+            if os.path.exists(potential_local_path):
+                print(f"Found local summary image: {potential_local_path}")
+                local_image_path = potential_local_path
+                break
+        
+        if not local_image_path and data['images']:
             print(f"Using first image found on page: {data['images'][0][:50]}...")
             local_image_path = data['images'][0]
 

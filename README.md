@@ -13,7 +13,7 @@
 ### 2. 마크다운-HTML 위키 변환
 -   **다국어 동시 변환**: 하나의 마크다운 파일을 국문과 영문 버전으로 동시 변환하며, 각각 `html/ko/`, `html/en/` 디렉토리에 저장합니다.
 -   **AI 요약 이미지 생성**: **Gemini 2.5 Flash Image** 모델을 사용하여 기술 일러스트를 생성하고 `html/images/`에 저장합니다. (두 버전 공용 사용)
--   **구조적 자동 배포**: 변환 완료 후 `html/` 디렉토리의 전체 구조(ko, en, images)를 `/Volumes/Transcend/Projects/tech-blog/html`로 복사합니다.
+-   **구조적 자동 배포 및 정리**: 변환 완료 후 `html/` 디렉토리의 전체 구조를 `/Volumes/Transcend/Projects/tech-blog/html`로 복사하고, 로컬의 임시 `html/` 디렉토리는 자동으로 삭제하여 공간을 최적화합니다.
 -   **진행 상태 시각화**: `tqdm` 프로그레스 바를 통해 다량의 파일 변환 과정을 실시간으로 모니터링할 수 있습니다.
 
 ## 🛠 설치 및 설정
@@ -41,9 +41,9 @@ GEMINI_API_KEY=your_gemini_api_key
 ```bash
 python md_to_html_converter.py
 ```
-- `source/` 폴더의 모든 `.md` 파일을 변환하여 `html/` 폴더에 저장합니다.
+- `source/` 폴더의 모든 `.md` 파일을 변환하여 `html/` 폴더에 임시 저장합니다.
 - 변환 시 **Gemini 2.5 Flash Image** 모델을 통해 본문 내용을 요약한 16:9 비율의 기술 일러스트를 자동 생성합니다.
-- 생성된 결과물은 자동으로 절대 경로 `/Volumes/Transcend/Projects/tech-blog/html`로 복사됩니다.
+- 생성된 결과물은 자동으로 절대 경로 `/Volumes/Transcend/Projects/tech-blog/html`로 복사된 후, 로컬의 `html/` 폴더는 삭제됩니다.
 
 ### 2. LinkedIn 포스팅 실행
 ```bash

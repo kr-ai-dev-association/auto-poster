@@ -379,10 +379,18 @@ def main():
                 shutil.copytree(output_dir, dest_dir, dirs_exist_ok=True)
             else:
                 shutil.copytree(output_dir, dest_dir)
+            
+            print(f"✅ Successfully copied all files to {dest_dir}")
+            
+            # Clean up: Delete local html/ directory after successful deployment
+            print(f"🧹 Cleaning up local {output_dir} directory...")
+            shutil.rmtree(output_dir)
+            print(f"✅ Cleanup complete.")
+        else:
+            print(f"⚠️ No files were generated in {output_dir} to copy.")
         
-        print(f"✅ Successfully copied all files to {dest_dir}")
     except Exception as e:
-        print(f"❌ Error during file copy: {e}")
+        print(f"❌ Error during file copy or cleanup: {e}")
 
     print("\n✨ All tasks completed!")
 
