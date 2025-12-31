@@ -88,17 +88,57 @@ def main():
         local_image_path = None
         url_slug = url.split('/')[-1]
         
-        # Check in both local and deployment image directories
+        # 1. Try to find local summary image using the slug
         for base_dir in ["html", dest_dir]:
+            # Exact match first
             potential_local_path = os.path.join(base_dir, "images", f"{url_slug}_summary.png")
             if os.path.exists(potential_local_path):
-                print(f"Found local summary image: {potential_local_path}")
                 local_image_path = potential_local_path
                 break
-        
+            
+            # Smart match: look for any image starting with the slug
+            img_dir = os.path.join(base_dir, "images")
+            if os.path.exists(img_dir):
+                patterns = [f"{url_slug}*_summary.png", f"*{url_slug}*_summary.png"]
+                for pattern in patterns:
+                    matches = glob.glob(os.path.join(img_dir, pattern))
+                    if matches:
+                        # Use the latest modified one
+                        matches.sort(key=os.path.getmtime, reverse=True)
+                        local_image_path = matches[0]
+                        break
+            if local_image_path: break
+
+        # 2. If no local summary image, check extracted images from HTML
         if not local_image_path and data['images']:
-            print(f"Using first image found on page: {data['images'][0][:50]}...")
-            local_image_path = data['images'][0]
+            for img_src in data['images']:
+                if img_src.startswith('http') or img_src.startswith('data:image'):
+                    local_image_path = img_src
+                    break
+                else:
+                    # Resolve relative path found in HTML
+                    # If we found local HTML, the image might be relative to it
+                    if local_html_path:
+                        html_dir = os.path.dirname(local_html_path)
+                        # Remove leading '../' if present as we are resolving relative to html_dir
+                        clean_src = img_src
+                        if clean_src.startswith('../'):
+                            # Go up one level from html_dir (e.g., from html/ko to html)
+                            parent_dir = os.path.dirname(html_dir)
+                            resolved_path = os.path.join(parent_dir, clean_src.replace('../', '', 1))
+                        else:
+                            resolved_path = os.path.join(html_dir, clean_src)
+                        
+                        if os.path.exists(resolved_path):
+                            local_image_path = resolved_path
+                            break
+
+        if local_image_path:
+            if os.path.exists(local_image_path) if isinstance(local_image_path, str) and not local_image_path.startswith(('http', 'data')) else True:
+                print(f"Found image to upload: {local_image_path}")
+            else:
+                print(f"Image source identified but path not found: {local_image_path}")
+                local_image_path = None
 
         print(f"Generating {lang} summary with Gemini...")
         summarizer = GeminiSummarizer()

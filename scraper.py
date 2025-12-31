@@ -54,12 +54,21 @@ def parse_content(html, original_url):
     # Extract images
     for img_tag in soup.find_all('img'):
         img_src = img_tag.get('src')
-        if img_src:
-            # Handle base64 encoded images
-            if img_src.startswith('data:image'):
-                images.append(img_src)
-            elif img_src.startswith('http') or img_src.startswith('https'):
-                images.append(img_src)
+        if not img_src:
+            continue
+            
+        # Handle base64 encoded images
+        if img_src.startswith('data:image'):
+            images.append(img_src)
+        elif img_src.startswith('http') or img_src.startswith('https'):
+            images.append(img_src)
+        else:
+            # Handle relative paths (e.g., images/summary.png or ../images/summary.png)
+            # If we are parsing a local file, we need to know its directory to resolve correctly.
+            # However, for LinkedIn posting, if it's a relative path in our deployment,
+            # we can try to resolve it relative to the deployment root or the HTML file location.
+            # For now, let's just collect it and handle resolution in main.py if needed.
+            images.append(img_src)
     
     return {
         "title": title.strip(),

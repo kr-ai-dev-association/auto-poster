@@ -226,7 +226,8 @@ You are an expert web developer, technical writer, and translator.
 Convert the following Markdown content into a clean, professional, and responsive HTML document in {lang_label}.
 
 [CRITICAL REQUIREMENTS]
-1. **Structure**: Use the following HTML structure for the <body>:
+1. **Structure**: Use the exact HTML structure provided below for the <body>. 
+   - **DO NOT CHANGE** the <img> tag's `src` attribute. Use the provided {image_html} as-is.
    <article class="wiki-content">
      <div class="flex justify-between items-start border-b border-[#a2a9b1] pb-2 mb-6">
        <h1 class="text-3xl font-sans font-bold text-[#000] leading-tight">{{{{TITLE_IN_{lang.upper()}}}}}</h1>
