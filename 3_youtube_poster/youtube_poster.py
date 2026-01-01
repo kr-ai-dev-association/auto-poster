@@ -228,7 +228,7 @@ class YouTubeAutoPoster:
             return None
 
     def add_logo_and_subs_to_video(self, video_input, logo_input, srt_input, video_output, margin=30, logo_width=180):
-        """Adds static logo, outro animation, and burns in subtitles with simplified relative path and fixed escaping."""
+        """Adds static logo, outro animation, and burns in subtitles with perfected escaping for macOS."""
         import time
         if not os.path.exists(video_input):
             print(f"Error: Video file not found: {video_input}")
@@ -239,34 +239,43 @@ class YouTubeAutoPoster:
             return False
         
         outro_start = max(0, duration - 3)
-        # Use simple escaping for font path
         font_path = "/System/Library/Fonts/Supplemental/Arial Italic.ttf"
-        font_path_esc = font_path.replace(" ", "\\ ")
         
         print(f"\n🎬 Processing video (Logo + Animation + Subtitles)...")
         
         sub_filter = ""
         overlay_input = "[0:v]"
-        temp_srt = "sub.srt" # ASCII filename in CWD is safest
         
+        # FFmpeg filter-specific escaping helper
+        def ffmpeg_filter_escape(path):
+            # 1. Backslash becomes double backslash
+            # 2. Single quote becomes escaped quote
+            # 3. Colon becomes escaped colon
+            return path.replace("\\", "/").replace("'", "'\\\\''").replace(":", "\\\\:")
+
         if srt_input and os.path.exists(srt_input):
             try:
+                # Use a temp srt file in the same directory as the video to keep it simple
+                v_dir = os.path.dirname(os.path.abspath(video_input))
+                temp_srt = os.path.join(v_dir, "sub.srt")
+                
                 if os.path.exists(temp_srt):
                     os.remove(temp_srt)
                 shutil.copy2(srt_input, temp_srt)
                 time.sleep(0.5)
                 
                 if os.path.exists(temp_srt) and os.path.getsize(temp_srt) > 0:
-                    # Escape the path for the subtitles filter string
-                    srt_esc = temp_srt.replace("'", "'\\\\''").replace(":", "\\:")
-                    sub_filter = f"subtitles='{srt_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
+                    # On macOS, the path in subtitles filter needs extreme escaping
+                    srt_path_esc = ffmpeg_filter_escape(temp_srt)
+                    sub_filter = f"subtitles=filename='{srt_path_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
                     overlay_input = "[v_sub]"
                 else:
                     print("⚠️ Temp subtitle file is empty or missing.")
             except Exception as e:
                 print(f"⚠️ Could not prepare temp subtitles: {e}")
         
-        # Escape colon for drawtext filter text
+        # Escape for drawtext
+        font_path_esc = font_path.replace("'", "'\\\\''") # Simplified for drawtext
         url_text = "https\\://banya.ai"
         
         filter_complex = (
