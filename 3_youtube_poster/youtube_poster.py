@@ -4,9 +4,10 @@ import json
 import pickle
 import subprocess
 import re
-import tempfile
 import shutil
-from PyPDF2 import PdfReader
+import time
+import stat
+import tempfile
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -41,7 +42,6 @@ class YouTubeAutoPoster:
             else:
                 if not os.path.exists(self.client_secrets_file):
                     print(f"Error: {self.client_secrets_file} not found.")
-                    print("Please download your client_secrets.json from Google Cloud Console.")
                     sys.exit(1)
                 flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, self.scopes)
                 creds = flow.run_local_server(port=0)
@@ -52,76 +52,50 @@ class YouTubeAutoPoster:
         return build('youtube', 'v3', credentials=creds)
 
     def generate_youtube_metadata(self, pdf_path, lang='ko', desc_template=""):
-        """Upload PDF to Gemini and generate Title, Description, and Tags with marketing focus."""
-        print(f"Uploading PDF to Gemini for analysis (Language: {lang}): {pdf_path}")
-        
+        print(f"🎙️ Analyzing PDF for marketing-focused metadata (Language: {lang})...")
         try:
-            # 1. Upload the file to Gemini
             with open(pdf_path, 'rb') as f:
                 pdf_data = f.read()
-            
             lang_str = "Korean" if lang == 'ko' else "English"
             
+            # Enhanced prompt to use desc.md as a template
             prompt = f"""
-            You are a world-class YouTube Marketing Specialist and SEO expert. 
-            Analyze the attached PDF document and generate a highly engaging, viral-ready YouTube metadata in {lang_str}.
+            Analyze the attached PDF and generate YouTube-optimized metadata in {lang_str}.
             
-            [Requirements]
-            1. Title: Create a high-CTR, curiosity-inducing, and benefit-driven title (under 100 characters). Use powerful words.
-            2. Description: 
-               - **IMPORTANT: DO NOT USE MARKDOWN SYMBOLS like **, __, #, or [text](url). YouTube does not support them.**
-               - **Marketing Hook**: Start with a provocative question or a shocking insight from the PDF.
-               - **Deep Insight**: Provide a structured summary using emojis for bullet points.
-               - **Emphasis**: For highlighting important keywords, use Unicode Bold characters (e.g., 𝗔𝗜, 𝗞𝗼𝗿𝗲𝗮) instead of markdown.
-               - **Call to Action (CTA)**: Encourage viewers to like, subscribe, and check out the links below.
-               - **Hashtags**: Include 20+ trending hashtags at the bottom.
-               - **MANDATORY - Links & Info**: Convert any markdown links from the following template into a simple 'Name: URL' format so they become clickable on YouTube:
-               
-               {desc_template}
-               
-            3. Tags: 20-30 highly relevant SEO keywords.
+            [CRITICAL INSTRUCTIONS]
+            1. Title: Create a click-worthy, dramatic title.
+            2. Description: Use the provided [TEMPLATE] below as a reference for style, tone, and structure.
+               - Keep the dramatic storytelling opening.
+               - Integrate the CORE findings and value propositions from the PDF into the middle section.
+               - Keep the 'Service & Contact' information at the bottom exactly as in the template.
+               - Use Emojis and Unicode bold characters for emphasis (YouTube doesn't support markdown bold).
+               - Ensure URLs are plain text so they become clickable on YouTube.
+            3. Tags: Generate 20+ highly relevant hashtags and keywords.
             
-            IMPORTANT: Return ONLY a valid JSON object. No other text.
-            The values in the JSON MUST be in {lang_str}.
+            [TEMPLATE]
+            {desc_template}
+            
+            Return ONLY a valid JSON object:
+            {{
+              "title": "...",
+              "description": "...",
+              "tags": ["tag1", "tag2", ...]
+            }}
             """
-            
-            # Use the SDK to send the PDF file along with the prompt
             response = self.summarizer.client.models.generate_content(
                 model=self.summarizer.model_id,
-                contents=[
-                    prompt,
-                    types.Part.from_bytes(data=pdf_data, mime_type='application/pdf')
-                ]
+                contents=[prompt, types.Part.from_bytes(data=pdf_data, mime_type='application/pdf')]
             )
-            
-            metadata_text = response.text.strip()
-            # More robust JSON extraction
-            match = re.search(r'\{.*\}', metadata_text, re.DOTALL)
-            if match:
-                metadata_text = match.group(0)
-            
-            metadata = json.loads(metadata_text)
-            print(f"Successfully analyzed PDF and generated marketing metadata in {lang_str}.")
+            # Remove any markdown code block wrappers if present
+            clean_text = re.sub(r'```json\s*|\s*```', '', response.text.strip())
+            metadata = json.loads(clean_text)
             return metadata
-            
         except Exception as e:
-            print(f"Error analyzing PDF with Gemini: {e}")
-            if lang == 'ko':
-                return {
-                    "title": "AI 기술 심층 분석: 프로메테우스의 불",
-                    "description": "제공된 분석 보고서를 바탕으로 한 AI 기술의 발전과 지능의 진화에 대한 심층 분석입니다.",
-                    "tags": ["AI", "인공지능", "기술", "딥러닝", "미래기술"]
-                }
-            else:
-                return {
-                    "title": "AI Technical Deep Dive: The Stolen Fire",
-                    "description": "An in-depth analysis of AI technologies and the evolution of intelligence based on the provided synthesis.",
-                    "tags": ["AI", "Technology", "Deep Learning", "Artificial Intelligence"]
-                }
+            print(f"❌ Error generating metadata: {e}")
+            return {"title": "Default Title", "description": desc_template, "tags": []}
 
     def upload_video(self, video_path, metadata):
-        """Upload video to YouTube."""
-        print(f"Uploading video: {video_path}")
+        print(f"Uploading video to YouTube: {video_path}")
         body = {
             'snippet': {
                 'title': metadata['title'],
@@ -130,110 +104,143 @@ class YouTubeAutoPoster:
                 'categoryId': '28'  # Science & Technology
             },
             'status': {
-                'privacyStatus': 'public',  # or 'unlisted'
+                'privacyStatus': 'public',
                 'selfDeclaredMadeForKids': False
             }
         }
-
         media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
-        request = self.youtube.videos().insert(
-            part=','.join(body.keys()),
-            body=body,
-            media_body=media
-        )
-
+        request = self.youtube.videos().insert(part=','.join(body.keys()), body=body, media_body=media)
         response = None
         while response is None:
             status, response = request.next_chunk()
             if status:
                 print(f"Uploaded {int(status.progress() * 100)}%")
-        
-        print(f"Video uploaded successfully! Video ID: {response['id']}")
+        print(f"✅ Video uploaded successfully! ID: {response['id']}")
         return response['id']
 
     def get_video_info(self, video_path):
-        """Returns the duration and resolution of a video."""
-        cmd = [
-            'ffprobe', '-v', 'error', '-select_streams', 'v:0',
-            '-show_entries', 'format=duration:stream=width,height',
-            '-of', 'json', video_path
-        ]
+        cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'format=duration:stream=width,height', '-of', 'json', video_path]
         try:
             output = subprocess.check_output(cmd, text=True).strip()
             data = json.loads(output)
-            duration = float(data['format']['duration'])
-            width = int(data['streams'][0]['width'])
-            height = int(data['streams'][0]['height'])
-            return duration, width, height
-        except Exception as e:
-            print(f"Error getting video info: {e}")
+            return float(data['format']['duration']), int(data['streams'][0]['width']), int(data['streams'][0]['height'])
+        except Exception:
             return 0, 1280, 720
 
     def generate_subtitles(self, video_path, lang='ko'):
-        """Upload video to Gemini and generate SRT subtitles."""
-        print(f"\n🎙️ Generating subtitles using Gemini (Language: {lang})...")
-        print(f"   Analyzing video (this may take a minute): {video_path}")
-        
+        print(f"🎙️ Generating keyword-focused subtitles using Gemini (Language: {lang})...")
         try:
-            # 1. Upload the video file to Gemini
             with open(video_path, 'rb') as f:
                 video_data = f.read()
-            
             lang_str = "Korean" if lang == 'ko' else "English"
-            
-            prompt = f"""
-            Analyze the audio and visual content of this video and generate professional SRT subtitles in {lang_str}.
-            
-            [Requirements]
-            1. Format: Standard SRT format with sequence numbers and timestamps (00:00:00,000 --> 00:00:00,000).
-            2. Accuracy: Ensure the timing matches the speech perfectly.
-            3. Style: Clear, concise, and professional.
-            4. Language: Translate or transcribe everything into {lang_str}.
-            
-            IMPORTANT: Return ONLY the raw SRT content. No other text or markdown code blocks.
-            """
-            
-            response = self.summarizer.client.models.generate_content(
-                model=self.summarizer.model_id,
-                contents=[
-                    prompt,
-                    types.Part.from_bytes(data=video_data, mime_type='video/mp4')
-                ]
+            examples = (
+                '"AGI 시대의 새로운 패러다임 분석", "혁신적인 AI 아키텍처의 도약", "한국형 소브린 AI의 전략적 가치"'
+                if lang == 'ko' else
+                '"Analyzing the New Paradigm of AGI", "The Leap of Innovative AI Architecture", "Strategic Value of Sovereign AI"'
             )
             
+            prompt = f"""
+            Analyze the video and generate professional SRT subtitles in {lang_str}.
+            
+            [CRITICAL Subtitling Rules]
+            - Identify the most important educational or marketing points throughout the entire video.
+            - Generate AT LEAST 15-20 subtitle entries to cover the whole video duration.
+            - Summarize the core message into concise, punchy phrases (max 8-10 words per entry).
+            - Avoid long sentences; focus on immediate understanding.
+            - Each subtitle entry MUST be a single line.
+            - Timing MUST follow standard SRT: HH:MM:SS,mmm --> HH:MM:SS,mmm.
+            - Ensure subtitles stay on screen for a readable duration (at least 2.5 - 3 seconds).
+            
+            Examples of good concise phrases in {lang_str}:
+            {examples}
+            
+            Return ONLY the raw SRT content.
+            """
+            response = self.summarizer.client.models.generate_content(
+                model=self.summarizer.model_id,
+                contents=[prompt, types.Part.from_bytes(data=video_data, mime_type='video/mp4')]
+            )
             srt_content = response.text.strip()
-            # Clean up potential markdown formatting
-            srt_content = re.sub(r'^```(srt)?\s*', '', srt_content)
-            srt_content = re.sub(r'\s*```$', '', srt_content)
             
-            if not srt_content or "1" not in srt_content:
-                print("⚠️ Subtitles generated by AI seem invalid or empty.")
-                return None
-
-            # Always use a safe ASCII filename for the subtitle file
+            # Remove markdown code blocks and any leading/trailing text
+            srt_content = re.sub(r'^.*?```(?:srt)?\s*\n?', '', srt_content, flags=re.DOTALL)
+            srt_content = re.sub(r'\n?\s*```.*?$', '', srt_content, flags=re.DOTALL)
+            
+            # Remove any explanatory text before the first subtitle number
+            lines = srt_content.split('\n')
+            start_idx = 0
+            for i, line in enumerate(lines):
+                if line.strip().isdigit():
+                    start_idx = i
+                    break
+            srt_content = '\n'.join(lines[start_idx:]).strip()
+            
             v_dir = os.path.dirname(video_path)
-            srt_filename = f"subtitles_{lang}.srt"
-            srt_path = os.path.join(v_dir, srt_filename)
+            srt_path = os.path.join(v_dir, f"subtitles_{lang}.srt")
             
+            # Standardize format
+            srt_content = srt_content.replace('\r\n', '\n').replace('\r', '\n')
+            
+            # Robust Regex to find all SRT blocks: Index \n Timing \n Content
+            # Support content spanning multiple lines if necessary before joining
+            blocks = re.findall(r'(\d+)\n(\d{1,2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{1,2}:\d{2}:\d{2},\d{3})\n(.*?)(?=\n\d+\n|$)', srt_content, re.DOTALL)
+            
+            # If standard regex fails, try a more flexible one for messy input
+            if not blocks:
+                blocks = re.findall(r'(\d+)\s+(\d{1,2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{1,2}:\d{2}:\d{2},\d{3})\s+(.*?)(?=\s+\d+\s+|$)', srt_content, re.DOTALL)
+
+            final_srt = ""
+            for i, (idx, timing, content) in enumerate(blocks):
+                # Clean content: remove any embedded timing or indices
+                clean_content = re.sub(r'\d{1,2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{1,2}:\d{2}:\d{2},\d{3}', '', content)
+                clean_content = " ".join(clean_content.split()).strip()
+                
+                # Ensure minimum duration (2.5s)
+                try:
+                    parts = timing.split('-->')
+                    def to_ms(s_str):
+                        h, m, s_ms = s_str.strip().split(':')
+                        sec, ms = s_ms.split(',')
+                        return (int(h)*3600 + int(m)*60 + int(sec))*1000 + int(ms)
+                    
+                    def from_ms(ms_val):
+                        h = ms_val // 3600000
+                        ms_val %= 3600000
+                        m = ms_val // 60000
+                        ms_val %= 60000
+                        s = ms_val // 1000
+                        ms_val %= 1000
+                        return f"{h:02d}:{m:02d}:{s:02d},{ms_val:03d}"
+                    
+                    start_ms = to_ms(parts[0])
+                    end_ms = to_ms(parts[1])
+                    if (end_ms - start_ms) < 2500:
+                        end_ms = start_ms + 2500
+                    timing = f"{from_ms(start_ms)} --> {from_ms(end_ms)}"
+                except:
+                    pass
+                
+                final_srt += f"{i+1}\n{timing}\n{clean_content}\n\n"
+            
+            srt_content = final_srt.strip()
             with open(srt_path, 'w', encoding='utf-8') as f:
                 f.write(srt_content)
                 f.flush()
-                os.fsync(f.fileno()) # Force write to disk
-                
-            print(f"✅ Subtitles generated and saved to: {srt_path}")
-            return srt_path
+                os.fsync(f.fileno())
             
+            print(f"✅ Subtitle file generated: {srt_path} ({os.path.getsize(srt_path)} bytes)")
+            return srt_path
         except Exception as e:
             print(f"❌ Error generating subtitles: {e}")
             return None
 
+    def ffmpeg_filter_escape(self, path):
+        """Robustly escapes a file path for use in FFmpeg filters on macOS."""
+        # On macOS, colons in absolute paths (/Volumes/...) must be escaped as \\:
+        # Also need to escape backslashes and single quotes.
+        return path.replace('\\', '\\\\').replace(':', '\\\\:').replace("'", "'\\\\''")
+
     def add_logo_and_subs_to_video(self, video_input, logo_input, srt_input, video_output, margin=30, logo_width=180):
-        """Adds static logo, outro animation, and burns in subtitles with perfected escaping for macOS."""
-        import time
-        if not os.path.exists(video_input):
-            print(f"Error: Video file not found: {video_input}")
-            return False
-        
         duration, width, height = self.get_video_info(video_input)
         if duration == 0:
             return False
@@ -241,43 +248,51 @@ class YouTubeAutoPoster:
         outro_start = max(0, duration - 3)
         font_path = "/System/Library/Fonts/Supplemental/Arial Italic.ttf"
         
-        print(f"\n🎬 Processing video (Logo + Animation + Subtitles)...")
-        
         sub_filter = ""
         overlay_input = "[0:v]"
+        temp_srt_name = "sub.srt"
+        video_dir = os.path.dirname(os.path.abspath(video_input))
+        temp_srt_path = os.path.join(video_dir, temp_srt_name)
         
-        # FFmpeg filter-specific escaping helper
-        def ffmpeg_filter_escape(path):
-            # 1. Backslash becomes double backslash
-            # 2. Single quote becomes escaped quote
-            # 3. Colon becomes escaped colon
-            return path.replace("\\", "/").replace("'", "'\\\\''").replace(":", "\\\\:")
-
         if srt_input and os.path.exists(srt_input):
             try:
-                # Use a temp srt file in the same directory as the video to keep it simple
-                v_dir = os.path.dirname(os.path.abspath(video_input))
-                temp_srt = os.path.join(v_dir, "sub.srt")
+                # Copy SRT to video directory with simple name
+                if os.path.exists(temp_srt_path):
+                    os.remove(temp_srt_path)
+                shutil.copy2(srt_input, temp_srt_path)
                 
-                if os.path.exists(temp_srt):
-                    os.remove(temp_srt)
-                shutil.copy2(srt_input, temp_srt)
+                # Ensure write is finished
+                with open(temp_srt_path, 'r', encoding='utf-8') as f: f.read(1)
+                os.fsync(os.open(temp_srt_path, os.O_RDONLY))
                 time.sleep(0.5)
                 
-                if os.path.exists(temp_srt) and os.path.getsize(temp_srt) > 0:
-                    # On macOS, the path in subtitles filter needs extreme escaping
-                    srt_path_esc = ffmpeg_filter_escape(temp_srt)
-                    sub_filter = f"subtitles=filename='{srt_path_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
-                    overlay_input = "[v_sub]"
-                else:
-                    print("⚠️ Temp subtitle file is empty or missing.")
+                # Stylish styling: White text on Semi-transparent Black Box
+                # In BorderStyle=3, OutlineColour controls the box background color.
+                # &H80000000: 80 is alpha (approx 50%), 000000 is Black.
+                sub_style = (
+                    "FontName=Apple SD Gothic Neo,"
+                    "FontSize=18,"
+                    "Alignment=2,"
+                    "Outline=2,"                # Minimal padding
+                    "Shadow=0,"
+                    "BorderStyle=3,"            # Opaque/Transparent box background
+                    "PrimaryColour=&H00FFFFFF," # White Text
+                    "OutlineColour=&H80000000," # Semi-transparent Black Box
+                    "BackColour=&H00000000,"    # Shadow (not used)
+                    "MarginV=40"                # Closer to bottom
+                )
+                
+                # Use ONLY the filename 'sub.srt' here, as we will chdir to video_dir
+                # We still need to escape any special chars in the filename itself (unlikely for 'sub.srt')
+                srt_name_esc = temp_srt_name.replace("'", "'\\''")
+                sub_filter = f"[0:v]subtitles='{srt_name_esc}':force_style='{sub_style}'[v_sub];"
+                overlay_input = "[v_sub]"
+                
+                print(f"✅ Prepared subtitles: {temp_srt_path}")
             except Exception as e:
-                print(f"⚠️ Could not prepare temp subtitles: {e}")
-        
-        # Escape for drawtext
-        font_path_esc = font_path.replace("'", "'\\\\''") # Simplified for drawtext
-        url_text = "https\\://banya.ai"
-        
+                print(f"⚠️ Subtitle preparation error: {e}")
+
+        font_path_esc = self.ffmpeg_filter_escape(font_path)
         filter_complex = (
             f"[1:v]split[static][animated];"
             f"[static]scale={logo_width}:-1[st_logo];"
@@ -287,136 +302,89 @@ class YouTubeAutoPoster:
             f"{sub_filter}"
             f"{overlay_input}[st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
             f"[v1][white_bg]overlay=enable='gte(t,{outro_start})'[v2];"
-            f"[v2]drawtext=text='{url_text}':fontfile='{font_path_esc}':fontsize=45:fontcolor=black:x=(w-tw)/2:y=(h/2)+130:enable='gte(t,{outro_start})'[v3];"
+            f"[v2]drawtext=text='https\\://banya.ai':fontfile='{font_path_esc}':fontsize=45:fontcolor=black:x=(w-tw)/2:y=(h/2)+130:enable='gte(t,{outro_start})'[v3];"
             f"[v3][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
         )
         
         cmd = [
             'ffmpeg', '-y',
-            '-i', video_input,
-            '-i', logo_input,
+            '-i', os.path.basename(video_input), # Use basename
+            '-i', os.path.abspath(logo_input),    # Logo can be absolute
             '-filter_complex', filter_complex,
             '-c:a', 'copy',
-            video_output
+            os.path.abspath(video_output)
         ]
         
+        print(f"🎬 Processing video...")
+        original_cwd = os.getcwd()
         try:
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            stdout, stderr = process.communicate()
-            
-            if process.returncode == 0:
-                print(f"✅ Successfully created final video: {video_output}")
+            os.chdir(video_dir) # Change CWD to video directory
+            print(f"   Working directory: {os.getcwd()}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                print("✅ Done!")
                 return True
             else:
-                print(f"❌ Error in ffmpeg processing: {stderr}")
+                print(f"❌ FFmpeg Error (code {result.returncode}):")
+                print(result.stderr)
                 return False
         except Exception as e:
-            print(f"❌ Exception during video editing: {e}")
+            print(f"❌ Exception: {e}")
             return False
         finally:
-            # Clean up the very temporary sub file
-            if os.path.exists(temp_srt):
-                os.remove(temp_srt)
-        
-        cmd = [
-            'ffmpeg', '-y',
-            '-i', video_input,
-            '-i', logo_input,
-            '-filter_complex', filter_complex,
-            '-c:a', 'copy',
-            video_output
-        ]
-        
-        try:
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            stdout, stderr = process.communicate()
-            
-            if process.returncode == 0:
-                print(f"✅ Successfully created final video: {video_output}")
-                return True
-            else:
-                print(f"❌ Error in ffmpeg processing: {stderr}")
-                return False
-        except Exception as e:
-            print(f"❌ Exception during video editing: {e}")
-            return False
-        finally:
-            if temp_srt and os.path.exists(temp_srt):
-                os.remove(temp_srt)
+            os.chdir(original_cwd) # Restore CWD
 
 def main():
     poster = YouTubeAutoPoster()
+    v_dir = os.path.join(os.path.dirname(__file__), 'v_source')
     
-    # Path settings
-    v_source_dir = os.path.join(os.path.dirname(__file__), 'v_source')
-    pdf_files = sorted([f for f in os.listdir(v_source_dir) if f.endswith('.pdf')], reverse=True)
-    # Filter out already processed videos to avoid ffmpeg in-place error
-    mp4_files = sorted([f for f in os.listdir(v_source_dir) if f.endswith('.mp4') and 'preview' not in f and 'final_video' not in f], reverse=True)
-    logo_files = [f for f in os.listdir(v_source_dir) if f.endswith('.png') and 'logo' in f.lower()]
-    
-    if not pdf_files or not mp4_files:
-        print("Error: Missing PDF or MP4 file in v_source directory.")
+    try:
+        pdf_file = sorted([f for f in os.listdir(v_dir) if f.endswith('.pdf')], reverse=True)[0]
+        mp4_file = sorted([f for f in os.listdir(v_dir) if f.endswith('.mp4') and 'final' not in f], reverse=True)[0]
+        logo_file = [f for f in os.listdir(v_dir) if f.endswith('.png') and 'logo' in f.lower()][0]
+    except IndexError:
+        print("❌ Missing PDF, MP4, or Logo in v_source.")
         return
-
-    pdf_path = os.path.join(v_source_dir, pdf_files[0])
-    video_path = os.path.join(v_source_dir, mp4_files[0])
-    logo_path = os.path.join(v_source_dir, logo_files[0]) if logo_files else None
     
-    # Read desc.md for marketing template
+    pdf_path = os.path.join(v_dir, pdf_file)
+    video_path = os.path.join(v_dir, mp4_file)
+    logo_path = os.path.join(v_dir, logo_file)
+    desc_path = os.path.join(v_dir, 'desc.md')
+    
+    # Read description template
     desc_template = ""
-    desc_md_path = os.path.join(v_source_dir, "desc.md")
-    if os.path.exists(desc_md_path):
-        with open(desc_md_path, 'r', encoding='utf-8') as f:
+    if os.path.exists(desc_path):
+        with open(desc_path, 'r', encoding='utf-8') as f:
             desc_template = f.read()
-
-    # 0. Select Language
-    print("\nSelect language for YouTube metadata:")
-    print("1. Korean (ko)")
-    print("2. English (en)")
-    choice = input("Enter choice (1 or 2, default is 1): ").strip()
-    lang = 'en' if choice == '2' else 'ko'
-
-    # 1. Generate Metadata by uploading PDF to Gemini
-    metadata = poster.generate_youtube_metadata(pdf_path, lang=lang, desc_template=desc_template)
-    print(f"\n--- Generated Metadata ({lang}) ---")
-    print(f"Title: {metadata['title']}")
-    print(f"Description: {metadata['description'][:100]}...")
-    print(f"Tags: {', '.join(metadata['tags'])}")
     
-    # 2. Generate Subtitles
+    print("\n1. ko / 2. en")
+    choice = input("Choice (default 1): ").strip()
+    lang = 'en' if choice == '2' else 'ko'
+    
+    metadata = poster.generate_youtube_metadata(pdf_path, lang=lang, desc_template=desc_template)
     srt_path = poster.generate_subtitles(video_path, lang=lang)
     
-    # 3. Add Logo and Subtitles if logo exists
-    final_video_path = video_path
-    
-    if logo_path:
-        # Create final video in v_source so user can check it
-        final_video_name = f"final_{os.path.basename(video_path).replace('.mp4', '')}_with_logo_subs.mp4"
-        processed_video_path = os.path.join(v_source_dir, final_video_name)
+    final_video = os.path.join(v_dir, f"final_youtube_post_{lang}.mp4")
+    if poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, final_video):
+        print(f"✅ Created: {final_video}")
+        if input("\nUpload? (y/n): ").lower() == 'y':
+            poster.upload_video(final_video, metadata)
+            print("\n🚀 Process completed successfully!")
         
-        # If subtitles exist, use the combined method
-        if srt_path:
-            if poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, processed_video_path):
-                final_video_path = processed_video_path
-            else:
-                print("❌ Failed to process video with subtitles. Falling back to original.")
-        else:
-            print("⚠️ Subtitles missing, trying to process with only logo...")
-            if poster.add_logo_and_subs_to_video(video_path, logo_path, "", processed_video_path):
-                final_video_path = processed_video_path
-            else:
-                print("❌ Failed to process video with logo. Falling back to original.")
-
-    try:
-        print(f"\n✅ Final video ready for review: {final_video_path}")
-        confirm = input("\nDo you want to upload this video to YouTube? (y/n): ")
-        if confirm.lower() == 'y':
-            poster.upload_video(final_video_path, metadata)
-        else:
-            print("Upload cancelled.")
-    finally:
-        # We don't delete the final video anymore so user can check it
-        pass
+        # Cleanup intermediate files
+        print("\n🧹 Cleaning up intermediate files...")
+        temp_srt = os.path.join(v_dir, "sub.srt")
+        files_to_delete = [srt_path, temp_srt, final_video]
+        
+        for f in files_to_delete:
+            if f and os.path.exists(f):
+                try:
+                    os.remove(f)
+                    print(f"   - Deleted: {os.path.basename(f)}")
+                except Exception as e:
+                    print(f"   - Failed to delete {os.path.basename(f)}: {e}")
+    else:
+        print("❌ Video processing failed.")
 
 if __name__ == "__main__":
     main()
