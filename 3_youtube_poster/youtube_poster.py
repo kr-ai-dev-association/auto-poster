@@ -234,9 +234,12 @@ class YouTubeAutoPoster:
         
         print(f"\n🎬 Processing video (Logo + Animation + Subtitles)...")
         
-        # Subtitles filter: we need to escape path for ffmpeg
+        # Subtitles filter: handle path carefully for FFmpeg on macOS
         if srt_input and os.path.exists(srt_input):
-            srt_esc = srt_input.replace(":", "\\:").replace("'", "'\\''")
+            # FFmpeg subtitles filter needs special escaping for paths
+            # On macOS/Unix, we need to escape colons and use absolute path
+            abs_srt_path = os.path.abspath(srt_input)
+            srt_esc = abs_srt_path.replace(":", "\\:").replace("'", "'\\''")
             sub_filter = f"subtitles='{srt_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
             overlay_input = "[v_sub]"
         else:
@@ -323,36 +326,31 @@ def main():
     
     # 3. Add Logo and Subtitles if logo exists
     final_video_path = video_path
-    temp_dir = None
     
     if logo_path:
-        temp_dir = tempfile.mkdtemp()
-        processed_video_path = os.path.join(temp_dir, "final_video_with_logo_subs.mp4")
+        # Create final video in v_source so user can check it
+        final_video_name = f"final_{os.path.basename(video_path).replace('.mp4', '')}_with_logo_subs.mp4"
+        processed_video_path = os.path.join(v_source_dir, final_video_name)
+        
         # If subtitles exist, use the combined method
         if srt_path:
             if poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, processed_video_path):
                 final_video_path = processed_video_path
         else:
-            # Fallback to just logo if subtitles failed
-            # We need to temporarily define add_logo_to_video back or modify current
-            # For simplicity, let's assume subtitles are needed for the preview
-            print("⚠️ Subtitles missing, trying to process without subtitles...")
-            # We'll re-add the old method or handle it in the new one
+            print("⚠️ Subtitles missing, trying to process with only logo...")
             if poster.add_logo_and_subs_to_video(video_path, logo_path, "", processed_video_path):
                 final_video_path = processed_video_path
 
     try:
+        print(f"\n✅ Final video ready for review: {final_video_path}")
         confirm = input("\nDo you want to upload this video to YouTube? (y/n): ")
         if confirm.lower() == 'y':
             poster.upload_video(final_video_path, metadata)
         else:
             print("Upload cancelled.")
     finally:
-        # Cleanup temporary directory
-        if temp_dir and os.path.exists(temp_dir):
-            print(f"\n🧹 Cleaning up temporary files in {temp_dir}...")
-            shutil.rmtree(temp_dir)
-            print("✅ Cleanup complete.")
+        # We don't delete the final video anymore so user can check it
+        pass
 
 if __name__ == "__main__":
     main()
