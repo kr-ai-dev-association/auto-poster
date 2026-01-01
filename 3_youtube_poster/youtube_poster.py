@@ -62,18 +62,20 @@ class YouTubeAutoPoster:
             
             prompt = f"""
             You are a world-class YouTube Marketing Specialist and SEO expert. 
-            Analyze the attached PDF document and generate a highly engaging, click-worthy YouTube metadata in {lang_str}.
+            Analyze the attached PDF document and generate a highly engaging, viral-ready YouTube metadata in {lang_str}.
             
             [Requirements]
-            1. Title: Create a high-CTR, curiosity-inducing title (under 100 characters).
+            1. Title: Create a high-CTR, curiosity-inducing, and benefit-driven title (under 100 characters). Use powerful words.
             2. Description: 
-               - Start with a powerful "Marketing Hook" that tempts viewers to watch the video.
-               - Provide a structured summary of the key insights from the PDF.
-               - **MANDATORY**: You MUST append the following contact and promotional information at the VERY END of the description exactly as provided:
-               ---
+               - **Marketing Hook**: Start with a provocative question or a shocking insight from the PDF that stops the scroll.
+               - **Deep Insight**: Provide a structured, emoji-rich summary of the most valuable insights from the PDF. Make it look professional yet exciting.
+               - **Call to Action (CTA)**: Encourage viewers to like, subscribe, and check out the links below.
+               - **Hashtags**: Include 20+ highly trending and relevant hashtags (e.g., #AI #Technology #DeepLearning...).
+               - **MANDATORY - Links & Info**: You MUST append the following contact and promotional information at the VERY END. Ensure the URLs are kept as plain text so YouTube can automatically make them clickable:
+               
                {desc_template}
-               ---
-            3. Tags: 15-20 highly relevant SEO keywords.
+               
+            3. Tags: 20-30 highly relevant SEO keywords for maximum reach.
             
             IMPORTANT: Return ONLY a valid JSON object. No other text.
             The values in the JSON MUST be in {lang_str}.
