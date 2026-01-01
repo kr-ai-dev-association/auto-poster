@@ -218,7 +218,7 @@ class YouTubeAutoPoster:
             return None
 
     def add_logo_and_subs_to_video(self, video_input, logo_input, srt_input, video_output, margin=30, logo_width=180):
-        """Adds static logo, outro animation, and burns in subtitles with robust escaping."""
+        """Adds static logo, outro animation, and burns in subtitles with ultra-robust escaping."""
         if not os.path.exists(video_input):
             print(f"Error: Video file not found: {video_input}")
             return False
@@ -228,22 +228,24 @@ class YouTubeAutoPoster:
             return False
         
         outro_start = max(0, duration - 3)
-        # Use a more robust font path escaping for macOS
+        # Standard system font path for macOS
         font_path = "/System/Library/Fonts/Supplemental/Arial Italic.ttf"
-        font_path_esc = font_path.replace(" ", "\\ ").replace("'", "'\\\\''")
         
         print(f"\n🎬 Processing video (Logo + Animation + Subtitles)...")
         
         sub_filter = ""
         overlay_input = "[0:v]"
-        temp_srt = "temp_subtitles.srt" # Use a simple name in CWD to avoid path issues
+        # Create temp SRT in current directory with absolute path
+        abs_temp_srt = os.path.abspath("temp_subtitles.srt")
         
         if srt_input and os.path.exists(srt_input):
             try:
-                shutil.copy2(srt_input, temp_srt)
-                # For subtitles filter, we need to escape the filename carefully
-                srt_esc = temp_srt.replace("'", "'\\\\''").replace(":", "\\:")
-                sub_filter = f"subtitles='{srt_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
+                shutil.copy2(srt_input, abs_temp_srt)
+                # FFmpeg subtitles filter on macOS/Unix needs very specific escaping
+                # 1. Escape backslashes for the filter string
+                # 2. Escape colons for the filter string
+                srt_path_esc = abs_temp_srt.replace("\\", "/").replace(":", "\\:")
+                sub_filter = f"subtitles='{srt_path_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
                 overlay_input = "[v_sub]"
             except Exception as e:
                 print(f"⚠️ Could not prepare temp subtitles: {e}")
@@ -260,7 +262,7 @@ class YouTubeAutoPoster:
             f"{sub_filter}"
             f"{overlay_input}[st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
             f"[v1][white_bg]overlay=enable='gte(t,{outro_start})'[v2];"
-            f"[v2]drawtext=text='{url_text}':fontfile='{font_path_esc}':fontsize=45:fontcolor=black:x=(w-tw)/2:y=(h/2)+130:enable='gte(t,{outro_start})'[v3];"
+            f"[v2]drawtext=text='{url_text}':fontfile='{font_path}':fontsize=45:fontcolor=black:x=(w-tw)/2:y=(h/2)+130:enable='gte(t,{outro_start})'[v3];"
             f"[v3][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
         )
         
