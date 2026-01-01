@@ -95,7 +95,7 @@ class YouTubeAutoPoster:
             return {"title": "Default Title", "description": desc_template, "tags": []}
 
     def upload_video(self, video_path, metadata):
-        print(f"Uploading video to YouTube: {video_path}")
+        print(f"🚀 Uploading video to YouTube: {video_path}")
         body = {
             'snippet': {
                 'title': metadata['title'],
@@ -110,13 +110,23 @@ class YouTubeAutoPoster:
         }
         media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
         request = self.youtube.videos().insert(part=','.join(body.keys()), body=body, media_body=media)
-        response = None
-        while response is None:
-            status, response = request.next_chunk()
-            if status:
-                print(f"Uploaded {int(status.progress() * 100)}%")
-        print(f"✅ Video uploaded successfully! ID: {response['id']}")
-        return response['id']
+        
+        try:
+            response = None
+            while response is None:
+                status, response = request.next_chunk()
+                if status:
+                    print(f"   - Uploaded {int(status.progress() * 100)}%")
+            print(f"✅ Video uploaded successfully! ID: {response['id']}")
+            return response['id']
+        except Exception as e:
+            if "uploadLimitExceeded" in str(e):
+                print("\n❌ YouTube Upload Limit Exceeded!")
+                print("   - 일일 업로드 한도를 초과했습니다. 유튜브 정책에 따라 약 24시간 후 다시 시도해 주세요.")
+                print("   - 채널 인증을 완료하면 한도가 늘어날 수 있습니다.")
+            else:
+                print(f"\n❌ YouTube Upload Error: {e}")
+            return None
 
     def get_video_info(self, video_path):
         cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'format=duration:stream=width,height', '-of', 'json', video_path]
