@@ -169,25 +169,79 @@ class YouTubeAutoPoster:
             print(f"Error getting video info: {e}")
             return 0, 1280, 720
 
-    def add_logo_to_video(self, video_input, logo_input, video_output, margin=30, logo_width=180):
-        """Adds a static logo and an animated zoom-in logo at the end with white fade and URL."""
+    def generate_subtitles(self, video_path, lang='ko'):
+        """Upload video to Gemini and generate SRT subtitles."""
+        print(f"\n🎙️ Generating subtitles using Gemini (Language: {lang})...")
+        print(f"   Analyzing video: {video_path}")
+        
+        try:
+            # 1. Upload the video file to Gemini
+            with open(video_path, 'rb') as f:
+                video_data = f.read()
+            
+            lang_str = "Korean" if lang == 'ko' else "English"
+            
+            prompt = f"""
+            Analyze the audio and visual content of this video and generate professional SRT subtitles in {lang_str}.
+            
+            [Requirements]
+            1. Format: Standard SRT format with sequence numbers and timestamps (00:00:00,000 --> 00:00:00,000).
+            2. Accuracy: Ensure the timing matches the speech perfectly.
+            3. Style: Clear, concise, and professional.
+            4. Language: Translate or transcribe everything into {lang_str}.
+            
+            IMPORTANT: Return ONLY the raw SRT content. No other text or markdown code blocks.
+            """
+            
+            response = self.summarizer.client.models.generate_content(
+                model=self.summarizer.model_id,
+                contents=[
+                    prompt,
+                    types.Part.from_bytes(data=video_data, mime_type='video/mp4')
+                ]
+            )
+            
+            srt_content = response.text.strip()
+            # Clean up potential markdown formatting
+            srt_content = re.sub(r'^```(srt)?\s*', '', srt_content)
+            srt_content = re.sub(r'\s*```$', '', srt_content)
+            
+            srt_path = video_path.rsplit('.', 1)[0] + f"_{lang}.srt"
+            with open(srt_path, 'w', encoding='utf-8') as f:
+                f.write(srt_content)
+                
+            print(f"✅ Subtitles generated and saved to: {srt_path}")
+            return srt_path
+            
+        except Exception as e:
+            print(f"❌ Error generating subtitles: {e}")
+            return None
+
+    def add_logo_and_subs_to_video(self, video_input, logo_input, srt_input, video_output, margin=30, logo_width=180):
+        """Adds static logo, outro animation, and burns in subtitles."""
         if not os.path.exists(video_input):
             print(f"Error: Video file not found: {video_input}")
             return False
-        if not os.path.exists(logo_input):
-            print(f"Error: Logo file not found: {logo_input}")
-            return False
-
+        
         duration, width, height = self.get_video_info(video_input)
         if duration == 0:
             return False
         
         outro_start = max(0, duration - 3)
-        print(f"\n🎬 Adding logo, white fade, and URL animation to video...")
-        print(f"   Input: {video_input}")
-        print(f"   Video Duration: {duration}s (Outro starts at {outro_start}s)")
-        
         font_path = "/System/Library/Fonts/Supplemental/Arial Italic.ttf"
+        # For subtitles, we'll use a standard font
+        sub_font_path = "/System/Library/Fonts/AppleSDGothicNeo.ttc"
+        
+        print(f"\n🎬 Processing video (Logo + Animation + Subtitles)...")
+        
+        # Subtitles filter: we need to escape path for ffmpeg
+        if srt_input and os.path.exists(srt_input):
+            srt_esc = srt_input.replace(":", "\\:").replace("'", "'\\''")
+            sub_filter = f"subtitles='{srt_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
+            overlay_input = "[v_sub]"
+        else:
+            sub_filter = ""
+            overlay_input = "[0:v]"
         
         filter_complex = (
             f"[1:v]split[static][animated];"
@@ -195,7 +249,8 @@ class YouTubeAutoPoster:
             f"[animated]scale='if(gte(t,{outro_start}), min(800, 800*(t-{outro_start})/2.0), 0)':-1:eval=frame[out_logo];"
             f"color=c=white:s={width}x{height}:d=3[white_src];"
             f"[white_src]fade=t=in:st=0:d=1.5:alpha=1[white_bg];"
-            f"[0:v][st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
+            f"{sub_filter}"
+            f"{overlay_input}[st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
             f"[v1][white_bg]overlay=enable='gte(t,{outro_start})'[v2];"
             f"[v2]drawtext=text='https\\://banya.ai':fontfile='{font_path}':fontsize=45:fontcolor=black:x=(w-tw)/2:y=(h/2)+130:enable='gte(t,{outro_start})'[v3];"
             f"[v3][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
@@ -215,7 +270,7 @@ class YouTubeAutoPoster:
             stdout, stderr = process.communicate()
             
             if process.returncode == 0:
-                print(f"✅ Successfully created video with logo and animation: {video_output}")
+                print(f"✅ Successfully created final video: {video_output}")
                 return True
             else:
                 print(f"❌ Error in ffmpeg processing: {stderr}")
@@ -263,17 +318,28 @@ def main():
     print(f"Description: {metadata['description'][:100]}...")
     print(f"Tags: {', '.join(metadata['tags'])}")
     
-    # 2. Add Logo if exists
+    # 2. Generate Subtitles
+    srt_path = poster.generate_subtitles(video_path, lang=lang)
+    
+    # 3. Add Logo and Subtitles if logo exists
     final_video_path = video_path
     temp_dir = None
     
     if logo_path:
         temp_dir = tempfile.mkdtemp()
-        processed_video_path = os.path.join(temp_dir, "final_video_with_logo.mp4")
-        if poster.add_logo_to_video(video_path, logo_path, processed_video_path):
-            final_video_path = processed_video_path
+        processed_video_path = os.path.join(temp_dir, "final_video_with_logo_subs.mp4")
+        # If subtitles exist, use the combined method
+        if srt_path:
+            if poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, processed_video_path):
+                final_video_path = processed_video_path
         else:
-            print("⚠️ Proceeding with original video without logo due to error.")
+            # Fallback to just logo if subtitles failed
+            # We need to temporarily define add_logo_to_video back or modify current
+            # For simplicity, let's assume subtitles are needed for the preview
+            print("⚠️ Subtitles missing, trying to process without subtitles...")
+            # We'll re-add the old method or handle it in the new one
+            if poster.add_logo_and_subs_to_video(video_path, logo_path, "", processed_video_path):
+                final_video_path = processed_video_path
 
     try:
         confirm = input("\nDo you want to upload this video to YouTube? (y/n): ")
