@@ -2,6 +2,8 @@ import os
 import sys
 import json
 import pickle
+import subprocess
+import re
 from PyPDF2 import PdfReader
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -144,15 +146,50 @@ class YouTubeAutoPoster:
         print(f"Video uploaded successfully! Video ID: {response['id']}")
         return response['id']
 
-import re
+    def add_logo_to_video(self, video_input, logo_input, video_output, margin=30, logo_width=150):
+        """Adds a logo to the bottom-right corner of a video using ffmpeg."""
+        if not os.path.exists(video_input):
+            print(f"Error: Video file not found: {video_input}")
+            return False
+        if not os.path.exists(logo_input):
+            print(f"Error: Logo file not found: {logo_input}")
+            return False
+
+        print(f"\n🎬 Adding logo to video...")
+        print(f"   Input: {video_input}")
+        print(f"   Logo: {logo_input}")
+        
+        cmd = [
+            'ffmpeg', '-y',
+            '-i', video_input,
+            '-i', logo_input,
+            '-filter_complex', f"[1:v]scale={logo_width}:-1 [logo]; [0:v][logo]overlay=W-w-{margin}:H-h-{margin}",
+            '-c:a', 'copy',
+            video_output
+        ]
+        
+        try:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, stderr = process.communicate()
+            
+            if process.returncode == 0:
+                print(f"✅ Successfully created video with logo: {video_output}")
+                return True
+            else:
+                print(f"❌ Error in ffmpeg processing: {stderr}")
+                return False
+        except Exception as e:
+            print(f"❌ Exception during video editing: {e}")
+            return False
 
 def main():
     poster = YouTubeAutoPoster()
     
     # Path settings
     v_source_dir = os.path.join(os.path.dirname(__file__), 'v_source')
-    pdf_files = [f for f in os.listdir(v_source_dir) if f.endswith('.pdf')]
-    mp4_files = [f for f in os.listdir(v_source_dir) if f.endswith('.mp4')]
+    pdf_files = sorted([f for f in os.listdir(v_source_dir) if f.endswith('.pdf')], reverse=True)
+    mp4_files = sorted([f for f in os.listdir(v_source_dir) if f.endswith('.mp4') and 'preview' not in f], reverse=True)
+    logo_files = [f for f in os.listdir(v_source_dir) if f.endswith('.png') and 'logo' in f.lower()]
     
     if not pdf_files or not mp4_files:
         print("Error: Missing PDF or MP4 file in v_source directory.")
@@ -160,6 +197,7 @@ def main():
 
     pdf_path = os.path.join(v_source_dir, pdf_files[0])
     video_path = os.path.join(v_source_dir, mp4_files[0])
+    logo_path = os.path.join(v_source_dir, logo_files[0]) if logo_files else None
 
     # 0. Select Language
     print("\nSelect language for YouTube metadata:")
@@ -175,9 +213,18 @@ def main():
     print(f"Description: {metadata['description'][:100]}...")
     print(f"Tags: {', '.join(metadata['tags'])}")
     
+    # 2. Add Logo if exists
+    final_video_path = video_path
+    if logo_path:
+        processed_video_path = os.path.join(v_source_dir, "final_video_with_logo.mp4")
+        if poster.add_logo_to_video(video_path, logo_path, processed_video_path):
+            final_video_path = processed_video_path
+        else:
+            print("⚠️ Proceeding with original video without logo due to error.")
+
     confirm = input("\nDo you want to upload this video to YouTube? (y/n): ")
     if confirm.lower() == 'y':
-        poster.upload_video(video_path, metadata)
+        poster.upload_video(final_video_path, metadata)
     else:
         print("Upload cancelled.")
 
