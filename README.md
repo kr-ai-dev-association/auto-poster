@@ -1,72 +1,93 @@
-# 🚀 LinkedIn Auto-Poster & Wiki Converter (AI Tech Curator)
+# 🚀 AI Auto-Poster & Content Automation System
 
-이 프로젝트는 웹 콘텐츠를 분석하여 전문적인 LinkedIn 포스트를 자동 생성하고, 마크다운 파일을 고품질 HTML 위키 페이지로 변환하는 AI 기반 자동화 도구입니다. **Gemini 3 Flash Preview** 모델로 텍스트를 처리하고, **Gemini 2.5 Flash Image** 모델로 요약 이미지를 생성하여 최신 AI 기술을 통합적으로 활용합니다.
+이 프로젝트는 마크다운 위키 변환, 테크 블로그 자동 포스팅, 유투브 콘텐츠 자동 포스팅의 세 가지 주요 기능을 제공하는 통합 콘텐츠 자동화 시스템입니다.
 
-## 🌟 주요 기능
+## 📂 프로젝트 구조
 
-### 1. LinkedIn 자동 포스팅 (AI Tech Curator)
--   **멀티 플랫폼 스크레이핑**: 일반 HTML 및 Google Docs 기반 콘텐츠에서 제목, 본문, 이미지를 정확하게 추출합니다.
--   **AI 전문 요약 (Tech Curator Persona)**: 전문 기술 큐레이터의 시각에서 독자의 호기심을 유발하는 깊이 있는 기술 리포트 스타일의 포스트를 생성합니다.
--   **LinkedIn 최적화 포맷팅**: 유니코드 볼드체 변환, 가독성 높은 여백 처리, 자동 해시태그 생성을 수행합니다.
--   **이미지 및 링크 연동**: 본문 내 이미지를 LinkedIn 자산으로 자동 등록하고 원문 블로그 링크를 삽입합니다.
+```text
+.
+├── core/                   # 공용 코어 모듈
+│   ├── auth_helper.py      # LinkedIn OAuth 인증 도구
+│   ├── linkedin_poster.py  # LinkedIn API 연동 엔진
+│   └── summarizer.py       # Gemini AI 요약 엔진
+├── 1_md_converter/         # 기능 1: 마크다운 위키 변환기
+│   ├── md_to_html_converter.py
+│   └── template.html
+├── 2_blog_poster/          # 기능 2: 테크 블로그 자동 포스팅기
+│   ├── linkedin_blog_poster.py
+│   ├── scraper.py
+│   └── contents.json
+├── 3_youtube_poster/       # 기능 3: 유투브 동영상 자동 포스팅기 (개발 중)
+│   └── youtube_poster.py
+├── source/                 # 변환할 마크다운 원본 파일 저장소
+├── requirements.txt        # 의존성 패키지 목록
+└── .env                    # 환경 변수 및 API 키 설정
+```
 
-### 2. 마크다운-HTML 위키 변환
--   **다국어 동시 변환**: 하나의 마크다운 파일을 국문과 영문 버전으로 동시 변환하며, 각각 `html/ko/`, `html/en/` 디렉토리에 저장합니다.
--   **파일명 동기화**: 국문과 영문 버전의 파일명을 동일한 영문 슬러그(Slug)로 통일하여 배포 경로 및 인코딩 문제를 해결합니다.
--   **AI 요약 이미지 생성**: **Gemini 2.5 Flash Image** 모델을 사용하여 기술 일러스트를 생성하고 `html/images/`에 저장합니다.
--   **구조적 자동 배포 및 정리**: 변환 완료 후 `html/` 디렉토리의 전체 구조를 `/Volumes/Transcend/Projects/tech-blog/html`로 복사하고, 로컬의 임시 `html/` 디렉토리는 자동으로 삭제하여 공간을 최적화합니다.
--   **고품질 렌더링**: MathJax v3를 이용한 수식 줄바꿈 방지 처리 및 코드 블록 다크 모드 스타일이 적용됩니다.
+---
+
+## 🌟 주요 기능 및 사용법
+
+### 1. 마크다운 위키 변환기 (`1_md_converter`)
+마크다운 파일을 고품질 HTML 위키 페이지로 변환하고 AI 요약 이미지를 자동 생성합니다.
+
+- **실행 방법**:
+  ```bash
+  python 1_md_converter/md_to_html_converter.py
+  ```
+- **주요 기능**:
+  - `source/` 내 마크다운 파일을 분석하여 국문/영문 HTML 동시 생성.
+  - **Gemini 2.5 Flash Image** 기반의 16:9 기술 일러스트 자동 생성.
+  - 배포 경로(`/Volumes/Transcend/Projects/tech-blog/html`)로 자동 복사 및 로컬 정리.
+  - MathJax 수식 및 코드 블록 다크 모드 최적화.
+
+### 2. 테크 블로그 자동 포스팅기 (`2_blog_poster`)
+생성된 위키 페이지 또는 외부 블로그 URL을 분석하여 LinkedIn에 전문적인 기술 포스트를 작성합니다.
+
+- **실행 방법**:
+  ```bash
+  python 2_blog_poster/linkedin_blog_poster.py
+  ```
+- **주요 기능**:
+  - `contents.json`의 URL을 기반으로 로컬/배포된 HTML 콘텐츠 우선 분석.
+  - 전문 기술 큐레이터 스타일의 AI 요약문 생성.
+  - 유니코드 볼드체 및 LinkedIn 글자 수 제한(3,000자) 자동 관리.
+  - 이미지 자동 업로드 및 원문 링크 삽입.
+
+### 3. 유투브 동영상 자동 포스팅기 (`3_youtube_poster`)
+유투브 영상의 내용을 분석하여 LinkedIn에 요약 포스팅을 수행합니다. (현재 개발 중)
+
+- **실행 방법**:
+  ```bash
+  python 3_youtube_poster/youtube_poster.py
+  ```
+- **개발 계획**:
+  - 유투브 자막(Transcript) 및 영상 정보 추출.
+  - Gemini AI를 활용한 핵심 내용 요약 및 인사이트 도출.
+  - 관련 이미지/썸네일과 함께 LinkedIn 자동 포스팅.
+
+---
 
 ## 🛠 설치 및 설정
 
-### 1. 가상환경 구축 (Python 3.12 권장)
+### 1. 가상환경 및 패키지 설치
 ```bash
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 환경 변수 설정 (.env)
+### 2. 환경 변수 설정 (`.env`)
+프로젝트 루트에 `.env` 파일을 생성하고 다음 정보를 입력합니다.
 ```env
-LINKEDIN_CLIENT_ID=your_client_id
-LINKEDIN_CLIENT_SECRET=your_client_secret
-LINKEDIN_REDIRECT_URI=https://tony.bany.ai
-LINKEDIN_ACCESS_TOKEN=your_access_token
+LINKEDIN_CLIENT_ID=your_id
+LINKEDIN_CLIENT_SECRET=your_secret
+LINKEDIN_ACCESS_TOKEN=your_token
 LINKEDIN_PERSON_URN=urn:li:person:your_urn
-GEMINI_API_KEY=your_gemini_api_key
+GEMINI_API_KEY=your_key
 ```
 
-## 🚀 실행 방법
-
-### 1. 마크다운 위키 변환 및 이미지 생성
-```bash
-python md_to_html_converter.py
-```
-- `source/` 폴더의 모든 `.md` 파일을 변환하여 `html/` 폴더에 임시 저장합니다.
-- 변환 시 **Gemini 2.5 Flash Image** 모델을 통해 본문 내용을 요약한 16:9 비율의 기술 일러스트를 자동 생성합니다.
-- 생성된 결과물은 자동으로 절대 경로 `/Volumes/Transcend/Projects/tech-blog/html`로 복사된 후, 로컬의 `html/` 폴더는 삭제됩니다.
-
-### 2. LinkedIn 포스팅 실행
-```bash
-python main.py
-```
--   **스마트 콘텐츠 참조**: `contents.json`의 URL 슬러그를 기반으로 배포 디렉토리(`/Volumes/Transcend/Projects/tech-blog/html`)에서 HTML과 이미지를 자동으로 찾아냅니다.
--   **지능형 이미지 매칭**: 패턴 매칭을 통해 관련 요약 이미지를 찾아내고, HTML 내의 상대 경로 이미지까지 분석하여 LinkedIn에 업로드합니다.
--   **글자 수 자동 관리**: 유니코드 볼드체 사용 시의 바이트 증가를 고려하여 LinkedIn 제한(3,000자) 내로 요약문을 자동 조절합니다.
--   실행 후 생성된 포스트 프리뷰와 첨부된 이미지를 확인하고 `y`를 입력하면 LinkedIn에 게시됩니다.
-
-## 📂 프로젝트 구조
-
--   `main.py`: LinkedIn 포스팅 프로세스 제어
--   `md_to_html_converter.py`: 마크다운-HTML 위키 변환 엔진
--   `scraper.py`: 웹 콘텐츠 및 이미지 추출 엔진
--   `summarizer.py`: Gemini AI 기반 요약 및 텍스트 처리
--   `linkedin_poster.py`: LinkedIn API 연동 및 자산 관리
--   `source/`: 변환할 마크다운 파일 저장소
--   `html/`: 변환된 HTML 파일 저장소
--   `template.html`: 위키 페이지 디자인 템플릿
--   `auth_helper.py`: LinkedIn OAuth 인증 도구
+---
 
 ## 📝 라이선스
-
 이 프로젝트는 MIT 라이선스를 따릅니다.

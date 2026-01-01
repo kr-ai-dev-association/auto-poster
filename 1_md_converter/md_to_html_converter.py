@@ -34,11 +34,18 @@ class MDToHTMLConverter:
         # 1. Get a visual prompt from Gemini based on content
         try:
             visual_prompt_query = f"""
-            Based on the following technical content, create a concise, artistic, and professional image generation prompt (in English) 
-            that summarizes the key concept visually. The image should be suitable for a tech wiki header.
+            Analyze the following technical content and provide a highly detailed, professional image generation prompt.
+            The goal is to create a hero image for a technical wiki page.
+            
+            [Requirements for the prompt]
+            - Style: Clean, modern, 3D isometric or high-tech digital illustration.
+            - Subject: Abstract representation of the technical concepts mentioned in the content.
+            - Composition: Professional, suitable for 16:9 aspect ratio.
+            - Mood: Trustworthy, innovative, futuristic.
+            - IMPORTANT: Exclude any text, labels, or UI elements from the image.
             
             Content:
-            {md_content[:2000]} 
+            {md_content[:3000]} 
             """
             
             prompt_res = self.client.models.generate_content(
@@ -46,85 +53,79 @@ class MDToHTMLConverter:
                 contents=visual_prompt_query
             )
             visual_prompt = prompt_res.text.strip()
+            # Clean up the visual prompt in case Gemini added extra fluff
+            visual_prompt = visual_prompt.split('\n')[0] if len(visual_prompt) > 500 else visual_prompt
         except Exception as e:
             tqdm.write(f"    - Failed to generate visual prompt: {e}")
             return None
 
         # 2. Generate the image
-        try:
-            image_data = None
-            if "gemini-2.5-flash-image" in self.image_model_id:
-                response = self.client.models.generate_content(
-                    model=self.image_model_id,
-                    contents=f"Generate a professional technical illustration in 16:9 aspect ratio for: {visual_prompt}"
-                )
-                
-                if not response.candidates:
-                    tqdm.write(f"    - Image generation response has no candidates. Response: {response}")
-                
-                for candidate in response.candidates:
-                    if candidate.finish_reason and candidate.finish_reason != "STOP":
-                        tqdm.write(f"    - Image generation finished with reason: {candidate.finish_reason}")
-                    
-                    if not candidate.content or not candidate.content.parts:
-                        continue
-                        
-                    for part in candidate.content.parts:
-                        if part.inline_data and "image" in part.inline_data.mime_type:
-                            image_data = part.inline_data.data
-                            break
-                    if image_data: break
-            else:
-                # Standard image models (like Imagen) use generate_images
-                # Requested 16:9 aspect ratio
-                image_response = self.client.models.generate_images(
-                    model=self.image_model_id,
-                    prompt=visual_prompt,
-                    config=types.GenerateImagesConfig(
-                        number_of_images=1,
-                        aspect_ratio="16:9",
-                        include_rai_reason=True
-                    )
-                )
-                if image_response.generated_images:
-                    image_data = image_response.generated_images[0].image_bytes
-            
-            if not image_data:
-                tqdm.write("    - No image was generated.")
-                return None
-
-            # 3. Process and crop image to 16:9
+        image_data = None
+        # Adding a simple retry loop for image generation
+        for attempt in range(2):
             try:
-                img = Image.open(io.BytesIO(image_data))
-                width, height = img.size
-                target_ratio = 16 / 9
-                current_ratio = width / height
-
-                if current_ratio > target_ratio:
-                    # Too wide, crop sides
-                    new_width = height * target_ratio
-                    left = (width - new_width) / 2
-                    right = (width + new_width) / 2
-                    top = 0
-                    bottom = height
-                    img = img.crop((left, top, right, bottom))
-                elif current_ratio < target_ratio:
-                    # Too tall, crop top and bottom
-                    new_height = width / target_ratio
-                    left = 0
-                    right = width
-                    top = (height - new_height) / 2
-                    bottom = (height + new_height) / 2
-                    img = img.crop((left, top, right, bottom))
+                if "gemini-2.5-flash-image" in self.image_model_id:
+                    # Specialized instruction for the image model
+                    image_query = f"Create a professional, high-resolution 16:9 technical illustration with NO TEXT based on this description: {visual_prompt}"
+                    
+                    response = self.client.models.generate_content(
+                        model=self.image_model_id,
+                        contents=image_query
+                    )
+                    
+                    if response.candidates:
+                        for candidate in response.candidates:
+                            if candidate.content and candidate.content.parts:
+                                for part in candidate.content.parts:
+                                    if part.inline_data and "image" in part.inline_data.mime_type:
+                                        image_data = part.inline_data.data
+                                        break
+                            if image_data: break
                 
-                # Convert back to bytes for saving
-                img_byte_arr = io.BytesIO()
-                img.save(img_byte_arr, format='PNG')
-                image_data = img_byte_arr.getvalue()
+                if image_data:
+                    break # Success!
+                else:
+                    tqdm.write(f"    - Image generation attempt {attempt + 1} failed. Retrying...")
             except Exception as e:
-                tqdm.write(f"    - Image cropping failed: {e}")
+                tqdm.write(f"    - Error during image generation attempt {attempt + 1}: {e}")
+        
+        if not image_data:
+            tqdm.write("    - No image was generated after retries.")
+            return None
 
-            # 4. Save the image
+        # 3. Process and crop image to 16:9
+        try:
+            img = Image.open(io.BytesIO(image_data))
+            width, height = img.size
+            target_ratio = 16 / 9
+            current_ratio = width / height
+
+            if current_ratio > target_ratio:
+                # Too wide, crop sides
+                new_width = height * target_ratio
+                left = (width - new_width) / 2
+                right = (width + new_width) / 2
+                top = 0
+                bottom = height
+                img = img.crop((left, top, right, bottom))
+            elif current_ratio < target_ratio:
+                # Too tall, crop top and bottom
+                new_height = width / target_ratio
+                left = 0
+                right = width
+                top = (height - new_height) / 2
+                bottom = (height + new_height) / 2
+                img = img.crop((left, top, right, bottom))
+            
+            # Convert back to bytes for saving
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            image_data = img_byte_arr.getvalue()
+        except Exception as e:
+            tqdm.write(f"    - Image cropping failed: {e}")
+
+        # 4. Save the image
+        try:
             images_dir = os.path.join(output_dir, "images")
             os.makedirs(images_dir, exist_ok=True)
             
@@ -137,7 +138,7 @@ class MDToHTMLConverter:
             tqdm.write(f"    - Successfully generated summary image: {image_path}")
             return f"images/{image_filename}"
         except Exception as e:
-            tqdm.write(f"    - Error during image generation with {self.image_model_id}: {e}")
+            tqdm.write(f"    - Error saving image: {e}")
             return None
 
     def _get_template_styles(self):
@@ -407,4 +408,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

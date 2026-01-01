@@ -3,15 +3,20 @@ import json
 import os
 import glob
 from dotenv import load_dotenv
+
+# Add project root to path to import from core
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from scraper import fetch_html_content, parse_content, get_google_doc_id
-from linkedin_poster import LinkedInPoster
-from summarizer import GeminiSummarizer
+from core.linkedin_poster import LinkedInPoster
+from core.summarizer import GeminiSummarizer
 
 load_dotenv()
 
 def main():
     default_urls = {}
-    contents_path = '/Volumes/Transcend/Projects/auto-poster/contents.json'
+    # Find contents.json in the same directory
+    contents_path = os.path.join(os.path.dirname(__file__), 'contents.json')
     try:
         print(f"Loading URLs from {contents_path}...")
         with open(contents_path, 'r', encoding='utf-8') as f:
