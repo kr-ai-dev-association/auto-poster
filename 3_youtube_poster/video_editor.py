@@ -55,7 +55,7 @@ if __name__ == "__main__":
     v_source_dir = os.path.join(base_dir, 'v_source')
     
     # Find mp4 and png
-    video_files = [f for f in os.listdir(v_source_dir) if f.endswith('.mp4')]
+    video_files = [f for f in os.listdir(v_source_dir) if f.endswith('.mp4') and 'preview' not in f and 'final_video' not in f]
     logo_files = [f for f in os.listdir(v_source_dir) if f.endswith('.png')]
     
     if not video_files or not logo_files:

@@ -196,7 +196,8 @@ def main():
     # Path settings
     v_source_dir = os.path.join(os.path.dirname(__file__), 'v_source')
     pdf_files = sorted([f for f in os.listdir(v_source_dir) if f.endswith('.pdf')], reverse=True)
-    mp4_files = sorted([f for f in os.listdir(v_source_dir) if f.endswith('.mp4') and 'preview' not in f], reverse=True)
+    # Filter out already processed videos to avoid ffmpeg in-place error
+    mp4_files = sorted([f for f in os.listdir(v_source_dir) if f.endswith('.mp4') and 'preview' not in f and 'final_video' not in f], reverse=True)
     logo_files = [f for f in os.listdir(v_source_dir) if f.endswith('.png') and 'logo' in f.lower()]
     
     if not pdf_files or not mp4_files:
