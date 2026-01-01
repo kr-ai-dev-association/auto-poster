@@ -7,6 +7,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google.genai import types
 from dotenv import load_dotenv
 
 # Add project root to path to import from core
@@ -46,55 +47,58 @@ class YouTubeAutoPoster:
         
         return build('youtube', 'v3', credentials=creds)
 
-    def extract_text_from_pdf(self, pdf_path):
-        """Extract text content from a PDF file."""
-        print(f"Extracting text from PDF: {pdf_path}")
-        reader = PdfReader(pdf_path)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() or ""
-        return text
-
-    def generate_youtube_metadata(self, pdf_text):
-        """Use Gemini to generate Title, Description, and Tags."""
-        print("Generating YouTube metadata using Gemini...")
-        prompt = f"""
-        You are a YouTube SEO expert. Based on the following technical content from a PDF, 
-        generate professional YouTube metadata.
-        
-        [Requirements]
-        1. Title: Catchy but professional (under 100 characters).
-        2. Description: Detailed summary of the video content, including key points.
-        3. Tags: 10-15 relevant keywords.
-        
-        Format the output as a JSON object:
-        {{
-            "title": "...",
-            "description": "...",
-            "tags": ["tag1", "tag2", ...]
-        }}
-        
-        Content:
-        {pdf_text[:5000]}
-        """
+    def generate_youtube_metadata(self, pdf_path):
+        """Upload PDF to Gemini and generate Title, Description, and Tags."""
+        print(f"Uploading PDF to Gemini for analysis: {pdf_path}")
         
         try:
-            # Using the existing summarizer's client to generate content
+            # 1. Upload the file to Gemini
+            with open(pdf_path, 'rb') as f:
+                pdf_data = f.read()
+            
+            prompt = """
+            You are a YouTube SEO expert. Analyze the attached PDF document and 
+            generate professional YouTube metadata.
+            
+            [Requirements]
+            1. Title: Catchy but professional (under 100 characters).
+            2. Description: Detailed summary of the video content, including key points.
+            3. Tags: 10-15 relevant keywords.
+            
+            IMPORTANT: Return ONLY a valid JSON object. No other text.
+            Format:
+            {
+                "title": "...",
+                "description": "...",
+                "tags": ["tag1", "tag2", ...]
+            }
+            """
+            
+            # Use the SDK to send the PDF file along with the prompt
             response = self.summarizer.client.models.generate_content(
                 model=self.summarizer.model_id,
-                contents=prompt
+                contents=[
+                    prompt,
+                    types.Part.from_bytes(data=pdf_data, mime_type='application/pdf')
+                ]
             )
+            
             metadata_text = response.text.strip()
-            # Clean up potential markdown formatting
-            metadata_text = re.sub(r'^```json\s*', '', metadata_text)
-            metadata_text = re.sub(r'\s*```$', '', metadata_text)
-            return json.loads(metadata_text)
+            # More robust JSON extraction
+            match = re.search(r'\{.*\}', metadata_text, re.DOTALL)
+            if match:
+                metadata_text = match.group(0)
+            
+            metadata = json.loads(metadata_text)
+            print("Successfully analyzed PDF and generated metadata.")
+            return metadata
+            
         except Exception as e:
-            print(f"Error generating metadata: {e}")
+            print(f"Error analyzing PDF with Gemini: {e}")
             return {
-                "title": "AI Technical Deep Dive",
-                "description": "An in-depth analysis of AI technologies.",
-                "tags": ["AI", "Technology", "Deep Learning"]
+                "title": "AI Technical Deep Dive: The Stolen Fire",
+                "description": "An in-depth analysis of AI technologies and the evolution of intelligence based on the provided synthesis.",
+                "tags": ["AI", "Technology", "Deep Learning", "Artificial Intelligence"]
             }
 
     def upload_video(self, video_path, metadata):
@@ -146,11 +150,8 @@ def main():
     pdf_path = os.path.join(v_source_dir, pdf_files[0])
     video_path = os.path.join(v_source_dir, mp4_files[0])
 
-    # 1. Extract info from PDF
-    pdf_text = poster.extract_text_from_pdf(pdf_path)
-    
-    # 2. Generate Metadata
-    metadata = poster.generate_youtube_metadata(pdf_text)
+    # 1. Generate Metadata by uploading PDF to Gemini
+    metadata = poster.generate_youtube_metadata(pdf_path)
     print(f"\n--- Generated Metadata ---")
     print(f"Title: {metadata['title']}")
     print(f"Description: {metadata['description'][:100]}...")

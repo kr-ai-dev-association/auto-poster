@@ -7,3 +7,7 @@ clear_license.js
 
 
 
+3_youtube_poster/client_secrets.json
+3_youtube_poster/token.pickle
+exchange_auth.py
+test_pdf.py

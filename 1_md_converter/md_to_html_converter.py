@@ -361,16 +361,19 @@ Convert the following Markdown content into a clean, professional, and responsiv
                 tqdm.write(f"    - Error during Gemini API call for {lang}: {e}")
 
 def main():
-    # Ensure source directory exists
-    if not os.path.exists("source"):
-        print("Error: 'source' directory not found.")
+    # Set source directory relative to the script location
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    source_dir = os.path.join(script_dir, "source")
+    
+    if not os.path.exists(source_dir):
+        print(f"Error: '{source_dir}' directory not found.")
         return
 
     converter = MDToHTMLConverter()
-    md_files = glob.glob("source/*.md")
+    md_files = glob.glob(os.path.join(source_dir, "*.md"))
     
     if not md_files:
-        print("No markdown files found in 'source/' directory.")
+        print(f"No markdown files found in '{source_dir}' directory.")
         return
 
     output_dir = "html"

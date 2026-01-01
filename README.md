@@ -12,14 +12,14 @@
 │   └── summarizer.py       # Gemini AI 요약 엔진
 ├── 1_md_converter/         # 기능 1: 마크다운 위키 변환기
 │   ├── md_to_html_converter.py
-│   └── template.html
+│   ├── template.html
+│   └── source/             # 변환할 마크다운 원본 파일 저장소
 ├── 2_blog_poster/          # 기능 2: 테크 블로그 자동 포스팅기
 │   ├── linkedin_blog_poster.py
 │   ├── scraper.py
 │   └── contents.json
 ├── 3_youtube_poster/       # 기능 3: 유투브 동영상 자동 포스팅기 (개발 중)
 │   └── youtube_poster.py
-├── source/                 # 변환할 마크다운 원본 파일 저장소
 ├── requirements.txt        # 의존성 패키지 목록
 └── .env                    # 환경 변수 및 API 키 설정
 ```
@@ -36,7 +36,7 @@
   python 1_md_converter/md_to_html_converter.py
   ```
 - **주요 기능**:
-  - `source/` 내 마크다운 파일을 분석하여 국문/영문 HTML 동시 생성.
+  - `1_md_converter/source/` 내 마크다운 파일을 분석하여 국문/영문 HTML 동시 생성.
   - **Gemini 2.5 Flash Image** 기반의 16:9 기술 일러스트 자동 생성.
   - 배포 경로(`/Volumes/Transcend/Projects/tech-blog/html`)로 자동 복사 및 로컬 정리.
   - MathJax 수식 및 코드 블록 다크 모드 최적화.
