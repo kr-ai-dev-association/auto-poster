@@ -22,11 +22,12 @@ def main():
         with open(contents_path, 'r', encoding='utf-8') as f:
             default_urls = json.load(f)
     except FileNotFoundError:
-        print("contents.json not found. Using hardcoded default URL.")
-        default_urls = {
-            "ko": {"url": "https://tony.banya.ai/wiki/1lPawlS0GR_sU1uAGlOYZkTloAljWCNARZS83OhPoBhY"},
-            "en": {"url": "https://tony.banya.ai/wiki/1q4JBTP0H1mp0EkK-b0mA-hBda2xbmPJebhvB8GEQyew"}
-        }
+        print(f"Error: {contents_path} not found. Please provide a valid contents.json file.")
+        return
+
+    if not default_urls:
+        print(f"Error: No URLs found in {contents_path}. Please check the file content.")
+        return
 
     poster = LinkedInPoster()
     if not poster.person_urn:
@@ -43,8 +44,8 @@ def main():
     for lang, data_entry in default_urls.items():
         url = data_entry.get("url")
         if not url:
-            print(f"Skipping {lang} as URL is missing in contents.json")
-            continue
+            print(f"Error: URL for {lang} is missing in {contents_path}. Exiting.")
+            return
 
         # Try to find local content first if it exists, otherwise check deployment dir
         url_slug = url.split('/')[-1]
