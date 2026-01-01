@@ -170,7 +170,7 @@ class YouTubeAutoPoster:
             return 0, 1280, 720
 
     def add_logo_to_video(self, video_input, logo_input, video_output, margin=30, logo_width=180):
-        """Adds a static logo and an animated zoom-in logo at the end with white fade."""
+        """Adds a static logo and an animated zoom-in logo at the end with white fade and URL."""
         if not os.path.exists(video_input):
             print(f"Error: Video file not found: {video_input}")
             return False
@@ -183,9 +183,11 @@ class YouTubeAutoPoster:
             return False
         
         outro_start = max(0, duration - 3)
-        print(f"\n🎬 Adding logo and white fade animation to video...")
+        print(f"\n🎬 Adding logo, white fade, and URL animation to video...")
         print(f"   Input: {video_input}")
         print(f"   Video Duration: {duration}s (Outro starts at {outro_start}s)")
+        
+        font_path = "/System/Library/Fonts/Supplemental/Arial Italic.ttf"
         
         filter_complex = (
             f"[1:v]split[static][animated];"
@@ -195,7 +197,8 @@ class YouTubeAutoPoster:
             f"[white_src]fade=t=in:st=0:d=1.5:alpha=1[white_bg];"
             f"[0:v][st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
             f"[v1][white_bg]overlay=enable='gte(t,{outro_start})'[v2];"
-            f"[v2][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
+            f"[v2]drawtext=text='https\\://banya.ai':fontfile='{font_path}':fontsize=45:fontcolor=black:x=(w-tw)/2:y=(h/2)+130:enable='gte(t,{outro_start})'[v3];"
+            f"[v3][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
         )
         
         cmd = [

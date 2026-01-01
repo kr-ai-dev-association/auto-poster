@@ -55,7 +55,9 @@ def add_logo_to_video(video_input, logo_input, video_output, margin=30, logo_wid
     # 1. Split logo for static and animated versions.
     # 2. Create a white background that fades in over 1.5 seconds.
     # 3. Scale animated logo from 0 to 800px over 2 seconds.
-    # 4. Overlay static logo and then the white fade and animated center logo.
+    # 4. Overlay static logo, white fade-in, draw italic URL, and then the animated center logo.
+    
+    font_path = "/System/Library/Fonts/Supplemental/Arial Italic.ttf"
     
     filter_complex = (
         f"[1:v]split[static][animated];"
@@ -65,7 +67,8 @@ def add_logo_to_video(video_input, logo_input, video_output, margin=30, logo_wid
         f"[white_src]fade=t=in:st=0:d=1.5:alpha=1[white_bg];"
         f"[0:v][st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
         f"[v1][white_bg]overlay=enable='gte(t,{outro_start})'[v2];"
-        f"[v2][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
+        f"[v2]drawtext=text='https\\://banya.ai':fontfile='{font_path}':fontsize=45:fontcolor=black:x=(w-tw)/2:y=(h/2)+130:enable='gte(t,{outro_start})'[v3];"
+        f"[v3][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
     )
     
     cmd = [
