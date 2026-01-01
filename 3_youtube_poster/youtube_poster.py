@@ -120,23 +120,57 @@ class YouTubeAutoPoster:
                 }
 
     def upload_video(self, video_path, metadata):
-        # ... (unchanged)
+        """Upload video to YouTube."""
+        print(f"Uploading video: {video_path}")
+        body = {
+            'snippet': {
+                'title': metadata['title'],
+                'description': metadata['description'],
+                'tags': metadata['tags'],
+                'categoryId': '28'  # Science & Technology
+            },
+            'status': {
+                'privacyStatus': 'public',  # or 'unlisted'
+                'selfDeclaredMadeForKids': False
+            }
+        }
 
-    def get_video_duration(self, video_path):
-        """Returns the duration of a video in seconds."""
+        media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
+        request = self.youtube.videos().insert(
+            part=','.join(body.keys()),
+            body=body,
+            media_body=media
+        )
+
+        response = None
+        while response is None:
+            status, response = request.next_chunk()
+            if status:
+                print(f"Uploaded {int(status.progress() * 100)}%")
+        
+        print(f"Video uploaded successfully! Video ID: {response['id']}")
+        return response['id']
+
+    def get_video_info(self, video_path):
+        """Returns the duration and resolution of a video."""
         cmd = [
-            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1', video_path
+            'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+            '-show_entries', 'format=duration:stream=width,height',
+            '-of', 'json', video_path
         ]
         try:
             output = subprocess.check_output(cmd, text=True).strip()
-            return float(output)
+            data = json.loads(output)
+            duration = float(data['format']['duration'])
+            width = int(data['streams'][0]['width'])
+            height = int(data['streams'][0]['height'])
+            return duration, width, height
         except Exception as e:
-            print(f"Error getting duration: {e}")
-            return 0
+            print(f"Error getting video info: {e}")
+            return 0, 1280, 720
 
     def add_logo_to_video(self, video_input, logo_input, video_output, margin=30, logo_width=180):
-        """Adds a static logo and an animated zoom-in logo at the end."""
+        """Adds a static logo and an animated zoom-in logo at the end with white fade."""
         if not os.path.exists(video_input):
             print(f"Error: Video file not found: {video_input}")
             return False
@@ -144,21 +178,24 @@ class YouTubeAutoPoster:
             print(f"Error: Logo file not found: {logo_input}")
             return False
 
-        duration = self.get_video_duration(video_input)
+        duration, width, height = self.get_video_info(video_input)
         if duration == 0:
             return False
         
-        outro_start = max(0, duration - 2)
-        print(f"\n🎬 Adding logo and outro animation to video...")
+        outro_start = max(0, duration - 3)
+        print(f"\n🎬 Adding logo and white fade animation to video...")
         print(f"   Input: {video_input}")
         print(f"   Video Duration: {duration}s (Outro starts at {outro_start}s)")
         
         filter_complex = (
             f"[1:v]split[static][animated];"
             f"[static]scale={logo_width}:-1[st_logo];"
-            f"[animated]scale='if(gte(t,{outro_start}), min(800, 800*(t-{outro_start})/1.5), 0)':-1:eval=frame[out_logo];"
+            f"[animated]scale='if(gte(t,{outro_start}), min(800, 800*(t-{outro_start})/2.0), 0)':-1:eval=frame[out_logo];"
+            f"color=c=white:s={width}x{height}:d=3[white_src];"
+            f"[white_src]fade=t=in:st=0:d=1.5:alpha=1[white_bg];"
             f"[0:v][st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
-            f"[v1][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
+            f"[v1][white_bg]overlay=enable='gte(t,{outro_start})'[v2];"
+            f"[v2][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
         )
         
         cmd = [

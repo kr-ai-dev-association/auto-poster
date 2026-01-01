@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+import json
 
 def get_video_duration(video_path):
     """Returns the duration of a video in seconds."""
@@ -15,36 +16,56 @@ def get_video_duration(video_path):
         print(f"Error getting duration: {e}")
         return 0
 
+def get_video_info(video_path):
+    """Returns the duration and resolution of a video."""
+    cmd = [
+        'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+        '-show_entries', 'format=duration:stream=width,height',
+        '-of', 'json', video_path
+    ]
+    try:
+        output = subprocess.check_output(cmd, text=True).strip()
+        data = json.loads(output)
+        duration = float(data['format']['duration'])
+        width = int(data['streams'][0]['width'])
+        height = int(data['streams'][0]['height'])
+        return duration, width, height
+    except Exception as e:
+        print(f"Error getting video info: {e}")
+        return 0, 1280, 720
+
 def add_logo_to_video(video_input, logo_input, video_output, margin=30, logo_width=180):
     """
-    Adds a static logo (bottom-right) and an animated outro logo (center zoom).
+    Adds a static logo (bottom-right) and an animated outro logo with white fade-in.
     """
     if not os.path.exists(video_input):
         print(f"Error: Video file not found: {video_input}")
         return False
     
-    duration = get_video_duration(video_input)
+    duration, width, height = get_video_info(video_input)
     if duration == 0:
         return False
         
-    outro_start = max(0, duration - 2)
-    print(f"Adding logo and outro animation to {video_input}...")
+    # Animation starts 3 seconds before the end
+    outro_start = max(0, duration - 3)
+    print(f"Adding white fade and logo animation to {video_input}...")
     print(f"Video duration: {duration}s, Outro starts at: {outro_start}s")
     
     # Filter Explanation:
-    # [1:v] - Logo input
-    # split[static][animated] - Split logo for two uses
-    # [static]scale=180:-1[st_logo] - Static watermark logo
-    # [animated]scale='if(gte(t,OUTRO_START), min(800, 800*(t-OUTRO_START)/1.5), 0)':-1:eval=frame[out_logo] - Expanding logo
-    # overlay=W-w-30:H-h-30 - Place static logo
-    # overlay=(W-w)/2:(H-h)/2:enable='gte(t,OUTRO_START)' - Place animated logo at center
+    # 1. Split logo for static and animated versions.
+    # 2. Create a white background that fades in over 1.5 seconds.
+    # 3. Scale animated logo from 0 to 800px over 2 seconds.
+    # 4. Overlay static logo and then the white fade and animated center logo.
     
     filter_complex = (
         f"[1:v]split[static][animated];"
         f"[static]scale={logo_width}:-1[st_logo];"
-        f"[animated]scale='if(gte(t,{outro_start}), min(800, 800*(t-{outro_start})/1.5), 0)':-1:eval=frame[out_logo];"
+        f"[animated]scale='if(gte(t,{outro_start}), min(800, 800*(t-{outro_start})/2.0), 0)':-1:eval=frame[out_logo];"
+        f"color=c=white:s={width}x{height}:d=3[white_src];"
+        f"[white_src]fade=t=in:st=0:d=1.5:alpha=1[white_bg];"
         f"[0:v][st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
-        f"[v1][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
+        f"[v1][white_bg]overlay=enable='gte(t,{outro_start})'[v2];"
+        f"[v2][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
     )
     
     cmd = [
