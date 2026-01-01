@@ -3,4 +3,9 @@ beautifulsoup4
 python-dotenv
 Pillow
 tqdm
+google-genai
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+PyPDF2
 

@@ -55,16 +55,21 @@
   - 이미지 자동 업로드 및 원문 링크 삽입.
 
 ### 3. 유투브 동영상 자동 포스팅기 (`3_youtube_poster`)
-유투브 영상의 내용을 분석하여 LinkedIn에 요약 포스팅을 수행합니다. (현재 개발 중)
+유투브 영상과 관련 PDF 문서를 분석하여 자동으로 영상을 업로드하고 SEO에 최적화된 메타데이터를 작성합니다.
 
+- **사전 준비**:
+  1. Google Cloud Console에서 YouTube Data API v3를 활성화합니다.
+  2. OAuth 2.0 클라이언트 ID를 생성하고 `client_secrets.json` 파일을 다운로드하여 `3_youtube_poster/` 폴더에 넣습니다.
+  3. 업로드할 PDF와 MP4 파일을 `3_youtube_poster/v_source/` 폴더에 넣습니다.
 - **실행 방법**:
   ```bash
   python 3_youtube_poster/youtube_poster.py
   ```
-- **개발 계획**:
-  - 유투브 자막(Transcript) 및 영상 정보 추출.
-  - Gemini AI를 활용한 핵심 내용 요약 및 인사이트 도출.
-  - 관련 이미지/썸네일과 함께 LinkedIn 자동 포스팅.
+- **주요 기능**:
+  - `v_source/` 내 PDF 파일을 읽어 핵심 내용을 추출.
+  - Gemini AI를 활용하여 제목, 설명, 태그 등 YouTube SEO 메타데이터 자동 생성.
+  - YouTube API를 통해 지정된 계정(`tony@banya.ai`)으로 영상 자동 업로드.
+  - 업로드 전 프리뷰 및 사용자 확인 단계 포함.
 
 ---
 
