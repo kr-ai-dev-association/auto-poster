@@ -4,6 +4,8 @@ import json
 import pickle
 import subprocess
 import re
+import tempfile
+import shutil
 from PyPDF2 import PdfReader
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -231,18 +233,28 @@ def main():
     
     # 2. Add Logo if exists
     final_video_path = video_path
+    temp_dir = None
+    
     if logo_path:
-        processed_video_path = os.path.join(v_source_dir, "final_video_with_logo.mp4")
+        temp_dir = tempfile.mkdtemp()
+        processed_video_path = os.path.join(temp_dir, "final_video_with_logo.mp4")
         if poster.add_logo_to_video(video_path, logo_path, processed_video_path):
             final_video_path = processed_video_path
         else:
             print("⚠️ Proceeding with original video without logo due to error.")
 
-    confirm = input("\nDo you want to upload this video to YouTube? (y/n): ")
-    if confirm.lower() == 'y':
-        poster.upload_video(final_video_path, metadata)
-    else:
-        print("Upload cancelled.")
+    try:
+        confirm = input("\nDo you want to upload this video to YouTube? (y/n): ")
+        if confirm.lower() == 'y':
+            poster.upload_video(final_video_path, metadata)
+        else:
+            print("Upload cancelled.")
+    finally:
+        # Cleanup temporary directory
+        if temp_dir and os.path.exists(temp_dir):
+            print(f"\n🧹 Cleaning up temporary files in {temp_dir}...")
+            shutil.rmtree(temp_dir)
+            print("✅ Cleanup complete.")
 
 if __name__ == "__main__":
     main()
