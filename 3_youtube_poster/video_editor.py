@@ -2,7 +2,7 @@ import subprocess
 import os
 import sys
 
-def add_logo_to_video(video_input, logo_input, video_output, margin=30, logo_width=150):
+def add_logo_to_video(video_input, logo_input, video_output, margin=30, logo_width=180):
     """
     Adds a logo to the bottom-right corner of a video using ffmpeg.
     

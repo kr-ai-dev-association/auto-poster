@@ -146,7 +146,7 @@ class YouTubeAutoPoster:
         print(f"Video uploaded successfully! Video ID: {response['id']}")
         return response['id']
 
-    def add_logo_to_video(self, video_input, logo_input, video_output, margin=30, logo_width=150):
+    def add_logo_to_video(self, video_input, logo_input, video_output, margin=30, logo_width=180):
         """Adds a logo to the bottom-right corner of a video using ffmpeg."""
         if not os.path.exists(video_input):
             print(f"Error: Video file not found: {video_input}")
