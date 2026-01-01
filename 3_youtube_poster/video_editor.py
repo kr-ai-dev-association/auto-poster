@@ -2,35 +2,56 @@ import subprocess
 import os
 import sys
 
+def get_video_duration(video_path):
+    """Returns the duration of a video in seconds."""
+    cmd = [
+        'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+        '-of', 'default=noprint_wrappers=1:nokey=1', video_path
+    ]
+    try:
+        output = subprocess.check_output(cmd, text=True).strip()
+        return float(output)
+    except Exception as e:
+        print(f"Error getting duration: {e}")
+        return 0
+
 def add_logo_to_video(video_input, logo_input, video_output, margin=30, logo_width=180):
     """
-    Adds a logo to the bottom-right corner of a video using ffmpeg.
-    
-    Args:
-        video_input (str): Path to input video.
-        logo_input (str): Path to logo image.
-        video_output (str): Path to output video.
-        margin (int): Margin from the edges in pixels.
-        logo_width (int): Target width for the logo in pixels (maintains aspect ratio).
+    Adds a static logo (bottom-right) and an animated outro logo (center zoom).
     """
     if not os.path.exists(video_input):
         print(f"Error: Video file not found: {video_input}")
         return False
-    if not os.path.exists(logo_input):
-        print(f"Error: Logo file not found: {logo_input}")
-        return False
-
-    print(f"Adding logo to {video_input}...")
     
-    # FFmpeg command:
-    # 1. Resize logo to specified width
-    # 2. Overlay it in the bottom-right corner with margin
-    # We use -c:a copy to avoid re-encoding audio
+    duration = get_video_duration(video_input)
+    if duration == 0:
+        return False
+        
+    outro_start = max(0, duration - 2)
+    print(f"Adding logo and outro animation to {video_input}...")
+    print(f"Video duration: {duration}s, Outro starts at: {outro_start}s")
+    
+    # Filter Explanation:
+    # [1:v] - Logo input
+    # split[static][animated] - Split logo for two uses
+    # [static]scale=180:-1[st_logo] - Static watermark logo
+    # [animated]scale='if(gte(t,OUTRO_START), min(800, 800*(t-OUTRO_START)/1.5), 0)':-1:eval=frame[out_logo] - Expanding logo
+    # overlay=W-w-30:H-h-30 - Place static logo
+    # overlay=(W-w)/2:(H-h)/2:enable='gte(t,OUTRO_START)' - Place animated logo at center
+    
+    filter_complex = (
+        f"[1:v]split[static][animated];"
+        f"[static]scale={logo_width}:-1[st_logo];"
+        f"[animated]scale='if(gte(t,{outro_start}), min(800, 800*(t-{outro_start})/1.5), 0)':-1:eval=frame[out_logo];"
+        f"[0:v][st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
+        f"[v1][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
+    )
+    
     cmd = [
         'ffmpeg', '-y',
         '-i', video_input,
         '-i', logo_input,
-        '-filter_complex', f"[1:v]scale={logo_width}:-1 [logo]; [0:v][logo]overlay=W-w-{margin}:H-h-{margin}",
+        '-filter_complex', filter_complex,
         '-c:a', 'copy',
         video_output
     ]

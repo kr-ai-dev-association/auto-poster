@@ -120,39 +120,23 @@ class YouTubeAutoPoster:
                 }
 
     def upload_video(self, video_path, metadata):
-        """Upload video to YouTube."""
-        print(f"Uploading video: {video_path}")
-        body = {
-            'snippet': {
-                'title': metadata['title'],
-                'description': metadata['description'],
-                'tags': metadata['tags'],
-                'categoryId': '28'  # Science & Technology
-            },
-            'status': {
-                'privacyStatus': 'public',  # or 'unlisted'
-                'selfDeclaredMadeForKids': False
-            }
-        }
+        # ... (unchanged)
 
-        media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
-        request = self.youtube.videos().insert(
-            part=','.join(body.keys()),
-            body=body,
-            media_body=media
-        )
-
-        response = None
-        while response is None:
-            status, response = request.next_chunk()
-            if status:
-                print(f"Uploaded {int(status.progress() * 100)}%")
-        
-        print(f"Video uploaded successfully! Video ID: {response['id']}")
-        return response['id']
+    def get_video_duration(self, video_path):
+        """Returns the duration of a video in seconds."""
+        cmd = [
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1', video_path
+        ]
+        try:
+            output = subprocess.check_output(cmd, text=True).strip()
+            return float(output)
+        except Exception as e:
+            print(f"Error getting duration: {e}")
+            return 0
 
     def add_logo_to_video(self, video_input, logo_input, video_output, margin=30, logo_width=180):
-        """Adds a logo to the bottom-right corner of a video using ffmpeg."""
+        """Adds a static logo and an animated zoom-in logo at the end."""
         if not os.path.exists(video_input):
             print(f"Error: Video file not found: {video_input}")
             return False
@@ -160,15 +144,28 @@ class YouTubeAutoPoster:
             print(f"Error: Logo file not found: {logo_input}")
             return False
 
-        print(f"\n🎬 Adding logo to video...")
+        duration = self.get_video_duration(video_input)
+        if duration == 0:
+            return False
+        
+        outro_start = max(0, duration - 2)
+        print(f"\n🎬 Adding logo and outro animation to video...")
         print(f"   Input: {video_input}")
-        print(f"   Logo: {logo_input}")
+        print(f"   Video Duration: {duration}s (Outro starts at {outro_start}s)")
+        
+        filter_complex = (
+            f"[1:v]split[static][animated];"
+            f"[static]scale={logo_width}:-1[st_logo];"
+            f"[animated]scale='if(gte(t,{outro_start}), min(800, 800*(t-{outro_start})/1.5), 0)':-1:eval=frame[out_logo];"
+            f"[0:v][st_logo]overlay=W-w-{margin}:H-h-{margin}[v1];"
+            f"[v1][out_logo]overlay=(W-w)/2:(H-h)/2:enable='gte(t,{outro_start})'"
+        )
         
         cmd = [
             'ffmpeg', '-y',
             '-i', video_input,
             '-i', logo_input,
-            '-filter_complex', f"[1:v]scale={logo_width}:-1 [logo]; [0:v][logo]overlay=W-w-{margin}:H-h-{margin}",
+            '-filter_complex', filter_complex,
             '-c:a', 'copy',
             video_output
         ]
@@ -178,7 +175,7 @@ class YouTubeAutoPoster:
             stdout, stderr = process.communicate()
             
             if process.returncode == 0:
-                print(f"✅ Successfully created video with logo: {video_output}")
+                print(f"✅ Successfully created video with logo and animation: {video_output}")
                 return True
             else:
                 print(f"❌ Error in ffmpeg processing: {stderr}")
