@@ -66,6 +66,21 @@
   ```bash
   python 3_youtube_poster/youtube_poster.py
   ```
+
+### 4. 유튜브 재업로드 전용기 (`3_youtube_poster/upload_only.py`)
+유튜브 업로드 중 한도 초과나 네트워크 오류로 실패했을 때, 이미 렌더링된 영상과 메타데이터를 사용하여 업로드만 다시 수행합니다.
+
+- **사용 시점**:
+  - `youtube_poster.py` 실행 중 업로드 단계에서 에러가 발생했을 때.
+  - 이미 생성된 `final_youtube_post_*.mp4`와 `metadata_*.json` 파일이 `v_source/`에 남아있을 때.
+- **실행 방법**:
+  ```bash
+  python 3_youtube_poster/upload_only.py
+  ```
+- **주요 기능**:
+  - `v_source/` 내의 가공된 영상 목록을 보여주고 선택 가능.
+  - 별도의 AI 분석이나 영상 편집 과정 없이 즉시 업로드 세션 시작.
+  - 업로드 성공 후 선택적 파일 정리 기능 제공.
 - **주요 기능**:
   - **지능형 자막 생성 및 합성**:
     - **핵심 문장 요약**: Gemini AI가 영상을 분석하여 8-10단어 내외의 핵심 구문 위주 자막 생성.

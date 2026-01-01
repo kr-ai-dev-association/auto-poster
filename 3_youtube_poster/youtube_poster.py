@@ -372,6 +372,13 @@ def main():
     lang = 'en' if choice == '2' else 'ko'
     
     metadata = poster.generate_youtube_metadata(pdf_path, lang=lang, desc_template=desc_template)
+    
+    # Save metadata for re-upload if needed
+    metadata_path = os.path.join(v_dir, f"metadata_{lang}.json")
+    with open(metadata_path, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+    print(f"📄 Metadata saved for backup: {metadata_path}")
+    
     srt_path = poster.generate_subtitles(video_path, lang=lang)
     
     final_video = os.path.join(v_dir, f"final_youtube_post_{lang}.mp4")
