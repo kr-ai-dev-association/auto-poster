@@ -229,22 +229,22 @@ class YouTubeAutoPoster:
         
         outro_start = max(0, duration - 3)
         font_path = "/System/Library/Fonts/Supplemental/Arial Italic.ttf"
-        # For subtitles, we'll use a standard font
-        sub_font_path = "/System/Library/Fonts/AppleSDGothicNeo.ttc"
         
         print(f"\n🎬 Processing video (Logo + Animation + Subtitles)...")
         
-        # Subtitles filter: handle path carefully for FFmpeg on macOS
+        # Robust handling for subtitles path (FFmpeg filter is picky)
+        sub_filter = ""
+        overlay_input = "[0:v]"
+        temp_srt = None
+        
         if srt_input and os.path.exists(srt_input):
-            # FFmpeg subtitles filter needs special escaping for paths
-            # On macOS/Unix, we need to escape colons and use absolute path
-            abs_srt_path = os.path.abspath(srt_input)
-            srt_esc = abs_srt_path.replace(":", "\\:").replace("'", "'\\''")
+            # Copy to a simple temp file to avoid path encoding issues with FFmpeg filter
+            temp_srt = os.path.join(os.getcwd(), "temp_subtitles.srt")
+            shutil.copy2(srt_input, temp_srt)
+            # Escape only the single quotes for the filter
+            srt_esc = temp_srt.replace("'", "'\\\\''").replace(":", "\\:")
             sub_filter = f"subtitles='{srt_esc}':force_style='FontSize=20,Alignment=2,Outline=1'[v_sub];"
             overlay_input = "[v_sub]"
-        else:
-            sub_filter = ""
-            overlay_input = "[0:v]"
         
         filter_complex = (
             f"[1:v]split[static][animated];"
@@ -281,6 +281,9 @@ class YouTubeAutoPoster:
         except Exception as e:
             print(f"❌ Exception during video editing: {e}")
             return False
+        finally:
+            if temp_srt and os.path.exists(temp_srt):
+                os.remove(temp_srt)
 
 def main():
     poster = YouTubeAutoPoster()
@@ -336,10 +339,14 @@ def main():
         if srt_path:
             if poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, processed_video_path):
                 final_video_path = processed_video_path
+            else:
+                print("❌ Failed to process video with subtitles. Falling back to original.")
         else:
             print("⚠️ Subtitles missing, trying to process with only logo...")
             if poster.add_logo_and_subs_to_video(video_path, logo_path, "", processed_video_path):
                 final_video_path = processed_video_path
+            else:
+                print("❌ Failed to process video with logo. Falling back to original.")
 
     try:
         print(f"\n✅ Final video ready for review: {final_video_path}")
