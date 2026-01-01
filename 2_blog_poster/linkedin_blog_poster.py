@@ -14,19 +14,20 @@ from core.summarizer import GeminiSummarizer
 load_dotenv()
 
 def main():
-    default_urls = {}
+    config = {}
     # Find contents.json in the same directory
     contents_path = os.path.join(os.path.dirname(__file__), 'contents.json')
     try:
-        print(f"Loading URLs from {contents_path}...")
+        print(f"Loading URL from {contents_path}...")
         with open(contents_path, 'r', encoding='utf-8') as f:
-            default_urls = json.load(f)
+            config = json.load(f)
     except FileNotFoundError:
         print(f"Error: {contents_path} not found. Please provide a valid contents.json file.")
         return
 
-    if not default_urls:
-        print(f"Error: No URLs found in {contents_path}. Please check the file content.")
+    url = config.get("url")
+    if not url:
+        print(f"Error: 'url' is missing in {contents_path}. Exiting.")
         return
 
     poster = LinkedInPoster()
@@ -41,12 +42,8 @@ def main():
 
     dest_dir = "/Volumes/Transcend/Projects/tech-blog/html"
     
-    for lang, data_entry in default_urls.items():
-        url = data_entry.get("url")
-        if not url:
-            print(f"Error: URL for {lang} is missing in {contents_path}. Exiting.")
-            return
-
+    # Process both Korean and English versions for the single URL
+    for lang in ["en", "ko"]:
         # Try to find local content first if it exists, otherwise check deployment dir
         url_slug = url.split('/')[-1]
         
