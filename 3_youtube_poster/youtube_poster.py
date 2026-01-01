@@ -49,8 +49,8 @@ class YouTubeAutoPoster:
         
         return build('youtube', 'v3', credentials=creds)
 
-    def generate_youtube_metadata(self, pdf_path, lang='ko'):
-        """Upload PDF to Gemini and generate Title, Description, and Tags."""
+    def generate_youtube_metadata(self, pdf_path, lang='ko', desc_template=""):
+        """Upload PDF to Gemini and generate Title, Description, and Tags with marketing focus."""
         print(f"Uploading PDF to Gemini for analysis (Language: {lang}): {pdf_path}")
         
         try:
@@ -61,13 +61,19 @@ class YouTubeAutoPoster:
             lang_str = "Korean" if lang == 'ko' else "English"
             
             prompt = f"""
-            You are a YouTube SEO expert. Analyze the attached PDF document and 
-            generate professional YouTube metadata in {lang_str}.
+            You are a world-class YouTube Marketing Specialist and SEO expert. 
+            Analyze the attached PDF document and generate a highly engaging, click-worthy YouTube metadata in {lang_str}.
             
             [Requirements]
-            1. Title: Catchy but professional (under 100 characters).
-            2. Description: Detailed summary of the video content, including key points.
-            3. Tags: 10-15 relevant keywords.
+            1. Title: Create a high-CTR, curiosity-inducing title (under 100 characters).
+            2. Description: 
+               - Start with a powerful "Marketing Hook" that tempts viewers to watch the video.
+               - Provide a structured summary of the key insights from the PDF.
+               - **MANDATORY**: You MUST append the following contact and promotional information at the VERY END of the description exactly as provided:
+               ---
+               {desc_template}
+               ---
+            3. Tags: 15-20 highly relevant SEO keywords.
             
             IMPORTANT: Return ONLY a valid JSON object. No other text.
             The values in the JSON MUST be in {lang_str}.
@@ -96,7 +102,7 @@ class YouTubeAutoPoster:
                 metadata_text = match.group(0)
             
             metadata = json.loads(metadata_text)
-            print(f"Successfully analyzed PDF and generated metadata in {lang_str}.")
+            print(f"Successfully analyzed PDF and generated marketing metadata in {lang_str}.")
             return metadata
             
         except Exception as e:
@@ -198,6 +204,13 @@ def main():
     pdf_path = os.path.join(v_source_dir, pdf_files[0])
     video_path = os.path.join(v_source_dir, mp4_files[0])
     logo_path = os.path.join(v_source_dir, logo_files[0]) if logo_files else None
+    
+    # Read desc.md for marketing template
+    desc_template = ""
+    desc_md_path = os.path.join(v_source_dir, "desc.md")
+    if os.path.exists(desc_md_path):
+        with open(desc_md_path, 'r', encoding='utf-8') as f:
+            desc_template = f.read()
 
     # 0. Select Language
     print("\nSelect language for YouTube metadata:")
@@ -207,7 +220,7 @@ def main():
     lang = 'en' if choice == '2' else 'ko'
 
     # 1. Generate Metadata by uploading PDF to Gemini
-    metadata = poster.generate_youtube_metadata(pdf_path, lang=lang)
+    metadata = poster.generate_youtube_metadata(pdf_path, lang=lang, desc_template=desc_template)
     print(f"\n--- Generated Metadata ({lang}) ---")
     print(f"Title: {metadata['title']}")
     print(f"Description: {metadata['description'][:100]}...")
