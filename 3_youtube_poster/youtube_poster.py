@@ -69,25 +69,20 @@ class YouTubeAutoPoster:
             [Requirements]
             1. Title: Create a high-CTR, curiosity-inducing, and benefit-driven title (under 100 characters). Use powerful words.
             2. Description: 
-               - **Marketing Hook**: Start with a provocative question or a shocking insight from the PDF that stops the scroll.
-               - **Deep Insight**: Provide a structured, emoji-rich summary of the most valuable insights from the PDF. Make it look professional yet exciting.
+               - **IMPORTANT: DO NOT USE MARKDOWN SYMBOLS like **, __, #, or [text](url). YouTube does not support them.**
+               - **Marketing Hook**: Start with a provocative question or a shocking insight from the PDF.
+               - **Deep Insight**: Provide a structured summary using emojis for bullet points.
+               - **Emphasis**: For highlighting important keywords, use Unicode Bold characters (e.g., 𝗔𝗜, 𝗞𝗼𝗿𝗲𝗮) instead of markdown.
                - **Call to Action (CTA)**: Encourage viewers to like, subscribe, and check out the links below.
-               - **Hashtags**: Include 20+ highly trending and relevant hashtags (e.g., #AI #Technology #DeepLearning...).
-               - **MANDATORY - Links & Info**: You MUST append the following contact and promotional information at the VERY END. Ensure the URLs are kept as plain text so YouTube can automatically make them clickable:
+               - **Hashtags**: Include 20+ trending hashtags at the bottom.
+               - **MANDATORY - Links & Info**: Convert any markdown links from the following template into a simple 'Name: URL' format so they become clickable on YouTube:
                
                {desc_template}
                
-            3. Tags: 20-30 highly relevant SEO keywords for maximum reach.
+            3. Tags: 20-30 highly relevant SEO keywords.
             
             IMPORTANT: Return ONLY a valid JSON object. No other text.
             The values in the JSON MUST be in {lang_str}.
-            
-            Format:
-            {{
-                "title": "...",
-                "description": "...",
-                "tags": ["tag1", "tag2", ...]
-            }}
             """
             
             # Use the SDK to send the PDF file along with the prompt
