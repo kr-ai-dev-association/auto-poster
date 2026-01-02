@@ -21,7 +21,7 @@
 ├── 3_youtube_poster/       # 기능 3: 유투브 동영상 자동 포스팅기
 │   ├── youtube_poster.py   # 메인 실행 스크립트
 │   ├── video_editor.py     # 로고 삽입 및 비디오 편집 도구
-│   └── v_source/           # 업로드할 MP4, 분석용 PDF, 로고, 설명(desc.md) 저장소
+│   └── v_source/           # 업로드할 MP4, 분석용 PDF, 로고, 다국어 설명(desc_ko.md, desc_en.md) 저장소
 ├── requirements.txt        # 의존성 패키지 목록
 └── .env                    # 환경 변수 및 API 키 설정
 ```
@@ -61,7 +61,7 @@
 - **사전 준비**:
   1. Google Cloud Console에서 **YouTube Data API v3** 활성화 및 OAuth 클라이언트 ID(JSON) 다운로드.
   2. `3_youtube_poster/client_secrets.json`으로 저장.
-  3. `v_source/` 폴더에 MP4, PDF, 로고 이미지, 고정 설명(`desc.md`) 준비.
+  3. `v_source/` 폴더에 MP4, PDF, 로고 이미지, 다국어 고정 설명(`desc_ko.md`, `desc_en.md`) 준비.
 - **실행 방법**:
   ```bash
   python 3_youtube_poster/youtube_poster.py
@@ -71,7 +71,7 @@
     - **핵심 문장 요약**: Gemini AI가 영상을 분석하여 핵심 구문 위주 자막 생성 및 2.5초 이상 노출 보정.
     - **스타일 최적화**: 반투명 검정 배경 박스 + 흰색 글자, 정규표현식 기반의 안정적인 파싱.
   - **동영상 로고 및 효과**: 우측 하단 로고 삽입 및 마지막 3초 애니메이션 아웃로 효과.
-  - **마케팅 메타데이터**: `desc.md` 템플릿 기반 스토리텔링 설명, SEO 해시태그, 클릭 가능 링크 생성.
+  - **마케팅 메타데이터**: 다국어 템플릿(`desc_ko.md`, `desc_en.md`) 기반 스토리텔링 설명, SEO 해시태그, 클릭 가능 링크 생성.
   - **자동 정리**: 업로드 완료 후 임시 파일(SRT, 중간 영상 등) 자동 삭제.
 
 ### 4. 유튜브 재업로드 전용기 (`3_youtube_poster/upload_only.py`)

@@ -58,7 +58,7 @@ class YouTubeAutoPoster:
                 pdf_data = f.read()
             lang_str = "Korean" if lang == 'ko' else "English"
             
-            # Enhanced prompt to use desc.md as a template
+            # Enhanced prompt to use the description template
             prompt = f"""
             Analyze the attached PDF and generate YouTube-optimized metadata in {lang_str}.
             
@@ -359,17 +359,26 @@ def main():
     pdf_path = os.path.join(v_dir, pdf_file)
     video_path = os.path.join(v_dir, mp4_file)
     logo_path = os.path.join(v_dir, logo_file)
-    desc_path = os.path.join(v_dir, 'desc.md')
-    
-    # Read description template
-    desc_template = ""
-    if os.path.exists(desc_path):
-        with open(desc_path, 'r', encoding='utf-8') as f:
-            desc_template = f.read()
     
     print("\n1. ko / 2. en")
     choice = input("Choice (default 1): ").strip()
     lang = 'en' if choice == '2' else 'ko'
+    
+    # Read language-specific description template
+    desc_filename = f'desc_{lang}.md'
+    desc_path = os.path.join(v_dir, desc_filename)
+    
+    # Fallback to desc.md if language-specific one doesn't exist
+    if not os.path.exists(desc_path):
+        desc_path = os.path.join(v_dir, 'desc.md')
+        
+    desc_template = ""
+    if os.path.exists(desc_path):
+        with open(desc_path, 'r', encoding='utf-8') as f:
+            desc_template = f.read()
+        print(f"📖 Using template: {os.path.basename(desc_path)}")
+    else:
+        print(f"⚠️ No description template found ({desc_filename} or desc.md)")
     
     metadata = poster.generate_youtube_metadata(pdf_path, lang=lang, desc_template=desc_template)
     
