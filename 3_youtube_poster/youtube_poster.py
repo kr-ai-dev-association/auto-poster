@@ -88,7 +88,15 @@ class YouTubeAutoPoster:
             )
             # Remove any markdown code block wrappers if present
             clean_text = re.sub(r'```json\s*|\s*```', '', response.text.strip())
-            metadata = json.loads(clean_text)
+            
+            # Remove potential control characters that break json.loads
+            # Especially actual newlines inside string values
+            try:
+                metadata = json.loads(clean_text)
+            except json.JSONDecodeError:
+                # Fallback: strict=False allows some control characters
+                metadata = json.loads(clean_text, strict=False)
+            
             return metadata
         except Exception as e:
             print(f"❌ Error generating metadata: {e}")
