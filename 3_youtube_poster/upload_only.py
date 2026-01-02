@@ -9,7 +9,18 @@ from youtube_poster import YouTubeAutoPoster
 
 def main():
     poster = YouTubeAutoPoster()
-    v_dir = os.path.join(os.path.dirname(__file__), 'v_source')
+    base_v_dir = os.path.join(os.path.dirname(__file__), 'v_source')
+    
+    print("\nSelect Category for Upload:")
+    print("1. tech (Default)")
+    print("2. entertainment")
+    cat_choice = input("Choice: ").strip()
+    category = 'entertainment' if cat_choice == '2' else 'tech'
+    
+    v_dir = os.path.join(base_v_dir, category)
+    if not os.path.exists(v_dir):
+        print(f"❌ Category directory not found: {v_dir}")
+        return
     
     # Find already processed video files
     video_files = [f for f in os.listdir(v_dir) if f.startswith('final_youtube_post_') and f.endswith('.mp4')]

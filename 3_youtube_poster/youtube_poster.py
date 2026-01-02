@@ -346,14 +346,30 @@ class YouTubeAutoPoster:
 
 def main():
     poster = YouTubeAutoPoster()
-    v_dir = os.path.join(os.path.dirname(__file__), 'v_source')
+    base_v_dir = os.path.join(os.path.dirname(__file__), 'v_source')
     
+    print("\nSelect Category:")
+    print("1. tech (Default)")
+    print("2. entertainment")
+    cat_choice = input("Choice: ").strip()
+    category = 'entertainment' if cat_choice == '2' else 'tech'
+    
+    v_dir = os.path.join(base_v_dir, category)
+    if not os.path.exists(v_dir):
+        print(f"❌ Category directory not found: {v_dir}")
+        return
+
     try:
         pdf_file = sorted([f for f in os.listdir(v_dir) if f.endswith('.pdf')], reverse=True)[0]
         mp4_file = sorted([f for f in os.listdir(v_dir) if f.endswith('.mp4') and 'final' not in f], reverse=True)[0]
-        logo_file = [f for f in os.listdir(v_dir) if f.endswith('.png') and 'logo' in f.lower()][0]
-    except IndexError:
-        print("❌ Missing PDF, MP4, or Logo in v_source.")
+        # Look for logo file - case insensitive and specifically checking for PNG
+        logo_files = [f for f in os.listdir(v_dir) if f.lower().endswith('.png') and 'logo' in f.lower()]
+        if not logo_files:
+            # Fallback to search any png if "logo" isn't in name
+            logo_files = [f for f in os.listdir(v_dir) if f.lower().endswith('.png')]
+        logo_file = logo_files[0]
+    except (IndexError, FileNotFoundError):
+        print(f"❌ Missing PDF, MP4, or Logo in {v_dir}.")
         return
     
     pdf_path = os.path.join(v_dir, pdf_file)

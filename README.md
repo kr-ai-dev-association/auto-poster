@@ -61,12 +61,13 @@
 - **사전 준비**:
   1. Google Cloud Console에서 **YouTube Data API v3** 활성화 및 OAuth 클라이언트 ID(JSON) 다운로드.
   2. `3_youtube_poster/client_secrets.json`으로 저장.
-  3. `v_source/` 폴더에 MP4, PDF, 로고 이미지, 다국어 고정 설명(`desc_ko.md`, `desc_en.md`) 준비.
+  3. `v_source/` 폴더 내 카테고리별(`tech`, `entertainment`)로 MP4, PDF, 로고 이미지, 다국어 고정 설명(`desc_ko.md`, `desc_en.md`) 준비.
 - **실행 방법**:
   ```bash
   python 3_youtube_poster/youtube_poster.py
   ```
 - **주요 기능**:
+  - **카테고리 선택**: 실행 시 `tech` 또는 `entertainment`를 선택하여 해당 경로의 리소스를 사용.
   - **지능형 자막 생성 및 합성**:
     - **핵심 문장 요약**: Gemini AI가 영상을 분석하여 핵심 구문 위주 자막 생성 및 2.5초 이상 노출 보정.
     - **스타일 최적화**: 반투명 검정 배경 박스 + 흰색 글자, 정규표현식 기반의 안정적인 파싱.
