@@ -70,8 +70,7 @@ class YouTubeAutoPoster:
                - Keep the 'Service & Contact' information at the bottom exactly as in the template.
                - Use Emojis and Unicode bold characters for emphasis (YouTube doesn't support markdown bold).
                - Ensure URLs are plain text so they become clickable on YouTube.
-            3. Tags: Generate 20+ highly relevant hashtags and keywords.
-               - **IMPORTANT: All tags and keywords MUST be in English regardless of the output language.**
+            3. Tags: Generate 20+ highly relevant hashtags and keywords in {lang_str}.
             
             [TEMPLATE]
             {desc_template}
@@ -144,22 +143,26 @@ class YouTubeAutoPoster:
             with open(video_path, 'rb') as f:
                 video_data = f.read()
             lang_str = "Korean" if lang == 'ko' else "English"
+            examples = (
+                '"AGI 시대의 새로운 패러다임 분석", "혁신적인 AI 아키텍처의 도약", "한국형 소브린 AI의 전략적 가치"'
+                if lang == 'ko' else
+                '"Analyzing the New Paradigm of AGI", "The Leap of Innovative AI Architecture", "Strategic Value of Sovereign AI"'
+            )
             
             prompt = f"""
-            Analyze the video and generate professional SRT subtitles. 
-            The output language should be {lang_str}, but the **keywords/phrases themselves should be in English** to maintain a professional tech feel.
+            Analyze the video and generate professional SRT subtitles in {lang_str}.
             
             [CRITICAL Subtitling Rules]
             - Identify the most important educational or marketing points throughout the entire video.
             - Generate AT LEAST 15-20 subtitle entries to cover the whole video duration.
-            - Summarize the core message into concise, punchy **English phrases** (max 8-10 words per entry).
+            - Summarize the core message into concise, punchy phrases (max 8-10 words per entry) in {lang_str}.
             - Avoid long sentences; focus on immediate understanding.
             - Each subtitle entry MUST be a single line.
             - Timing MUST follow standard SRT: HH:MM:SS,mmm --> HH:MM:SS,mmm.
             - Ensure subtitles stay on screen for a readable duration (at least 2.5 - 3 seconds).
             
-            Examples of good concise English phrases:
-            "Analyzing the New Paradigm of AGI", "The Leap of Innovative AI Architecture", "Strategic Value of Sovereign AI"
+            Examples of good concise phrases in {lang_str}:
+            {examples}
             
             Return ONLY the raw SRT content.
             """
