@@ -412,7 +412,15 @@ def main():
         json.dump(metadata, f, ensure_ascii=False, indent=2)
     print(f"📄 Metadata saved for backup: {metadata_path}")
     
-    srt_path = poster.generate_subtitles(video_path, lang=lang)
+    # Subtitle selection (Default: No)
+    print("\nGenerate AI subtitles? (y/N)")
+    sub_choice = input("Choice (default N): ").lower().strip()
+    
+    srt_path = None
+    if sub_choice == 'y':
+        srt_path = poster.generate_subtitles(video_path, lang=lang)
+    else:
+        print("⏭️ Skipping subtitle generation.")
     
     final_video = os.path.join(v_dir, f"final_youtube_post_{lang}.mp4")
     if poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, final_video):

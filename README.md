@@ -14,10 +14,12 @@
 │   ├── md_to_html_converter.py
 │   ├── template.html
 │   └── source/             # 변환할 마크다운 원본 파일 저장소
-├── 2_blog_poster/          # 기능 2: 테크 블로그 자동 포스팅기
-│   ├── linkedin_blog_poster.py
+├── 2_blog_poster/          # 기능 2: 링크드인 자동 포스팅기
+│   ├── linkedin_blog_poster.py    # 테크 블로그 포스팅 스크립트
+│   ├── linkedin_youtube_poster.py # 유튜브 영상 포스팅 스크립트
 │   ├── scraper.py
-│   └── contents.json       # 포스팅할 URL 설정 (단일 URL 방식)
+│   ├── blog.json           # 포스팅할 블로그 URL 설정
+│   └── youtube.json        # 포스팅할 유튜브 URL 설정
 ├── 3_youtube_poster/       # 기능 3: 유투브 동영상 자동 포스팅기
 │   ├── youtube_poster.py   # 메인 실행 스크립트
 │   ├── video_editor.py     # 로고 삽입 및 비디오 편집 도구
@@ -43,17 +45,28 @@
   - 영문 슬러그 기반의 파일명 동기화 (`filename_ko.html`, `filename_en.html`).
   - 배포 경로(`/Volumes/Transcend/Projects/tech-blog/html`)로 자동 복사 및 로컬 정리.
 
-### 2. 테크 블로그 자동 포스팅기 (`2_blog_poster`)
-생성된 위키 페이지 또는 외부 블로그 URL을 분석하여 LinkedIn에 전문적인 기술 포스트를 작성합니다.
+### 2. 링크드인 자동 포스팅기 (`2_blog_poster`)
+기술 블로그 포스트나 유튜브 영상을 분석하여 LinkedIn에 전문적인 기술 포스트를 작성합니다.
 
+#### 2.1. 테크 블로그 포스팅
 - **실행 방법**:
   ```bash
   python 2_blog_poster/linkedin_blog_poster.py
   ```
 - **주요 기능**:
-  - `contents.json`의 단일 URL을 기반으로 국문/영문 포스트 순차 생성.
+  - `blog.json`의 단일 URL을 기반으로 국문/영문 포스트 순차 생성.
   - 로컬/배포된 HTML 콘텐츠를 우선 분석하여 정확한 요약 수행.
   - 유니코드 볼드체 및 LinkedIn UTF-16 글자 수 제한(3,000자) 자동 관리.
+
+#### 2.2. 테크 유튜브 포스팅
+- **실행 방법**:
+  ```bash
+  python 2_blog_poster/linkedin_youtube_poster.py
+  ```
+- **주요 기능**:
+  - `youtube.json`의 유튜브 URL을 기반으로 메타데이터(제목, 설명, 썸네일) 추출.
+  - Gemini AI를 사용하여 영상 내용을 분석하고 LinkedIn용 요약문 생성.
+  - 영상 썸네일을 자동으로 다운로드하여 LinkedIn 포스트에 첨부.
 
 ### 3. 유투브 동영상 자동 포스팅기 (`3_youtube_poster`)
 유투브 영상 분석, 로고 및 자막 합성, 마케팅 최적화 설명 생성 및 자동 업로드를 수행합니다.
@@ -68,6 +81,7 @@
   ```
 - **주요 기능**:
   - **카테고리 선택**: 실행 시 `tech` 또는 `entertainment`를 선택하여 해당 경로의 리소스를 사용.
+  - **선택적 자막 생성**: 실행 시 자막 생성 여부를 선택 가능 (기본값: 생성 안 함).
   - **지능형 자막 생성 및 합성**:
     - **핵심 문장 요약**: Gemini AI가 영상을 분석하여 핵심 구문 위주 자막 생성 및 2.5초 이상 노출 보정.
     - **스타일 최적화**: 반투명 검정 배경 박스 + 흰색 글자, 정규표현식 기반의 안정적인 파싱.
@@ -109,6 +123,7 @@ LINKEDIN_CLIENT_SECRET=your_secret
 LINKEDIN_ACCESS_TOKEN=your_token
 LINKEDIN_PERSON_URN=urn:li:person:your_urn
 GEMINI_API_KEY=your_key
+YOUTUBE_API_KEY=your_youtube_api_key
 ```
 
 ---

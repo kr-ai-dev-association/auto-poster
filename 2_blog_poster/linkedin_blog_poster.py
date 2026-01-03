@@ -15,14 +15,14 @@ load_dotenv()
 
 def main():
     config = {}
-    # Find contents.json in the same directory
-    contents_path = os.path.join(os.path.dirname(__file__), 'contents.json')
+    # Find blog.json in the same directory
+    contents_path = os.path.join(os.path.dirname(__file__), 'blog.json')
     try:
         print(f"Loading URL from {contents_path}...")
         with open(contents_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
     except FileNotFoundError:
-        print(f"Error: {contents_path} not found. Please provide a valid contents.json file.")
+        print(f"Error: {contents_path} not found. Please provide a valid blog.json file.")
         return
 
     url = config.get("url")
