@@ -42,6 +42,7 @@
 - **주요 기능**:
   - `1_md_converter/source/` 내 마크다운 파일을 분석하여 국문/영문 HTML 동시 생성.
   - **Gemini 2.0 Flash** 기반의 16:9 기술 일러스트 자동 생성 및 2회 재시도 로직.
+  - **콘텐츠 복사 도구**: HTML 페이지 상단 및 각 섹션(h2, h3)별로 즉시 복사 가능한 아이콘 삽입.
   - 영문 슬러그 기반의 파일명 동기화 (`filename_ko.html`, `filename_en.html`).
   - 배포 경로(`/Volumes/Transcend/Projects/tech-blog/html`)로 자동 복사 및 로컬 정리.
 
