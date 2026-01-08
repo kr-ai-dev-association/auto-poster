@@ -242,8 +242,8 @@ class NewService:
 #### 1단계: 로컬 파일 확인
 ```bash
 # 현재 사용 중인 보안 파일 확인
-ls -la 1_md_converter/serviceAccountKey.json
-ls -la 3_youtube_poster/client_secrets.json
+ls -la secrets/serviceAccountKey.json
+ls -la secrets/client_secrets.json
 ```
 
 #### 2단계: 웹 UI에서 업로드
@@ -263,12 +263,12 @@ ls -la 3_youtube_poster/client_secrets.json
 ```bash
 # 백업
 mkdir -p ~/secure_backup
-cp 1_md_converter/serviceAccountKey.json ~/secure_backup/
-cp 3_youtube_poster/client_secrets.json ~/secure_backup/
+cp secrets/serviceAccountKey.json ~/secure_backup/
+cp secrets/client_secrets.json ~/secure_backup/
 
 # 제거 (DB 로드 확인 후)
-rm 1_md_converter/serviceAccountKey.json
-rm 3_youtube_poster/client_secrets.json
+rm secrets/serviceAccountKey.json
+rm secrets/client_secrets.json
 ```
 
 ## 문제 해결

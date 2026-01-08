@@ -68,7 +68,7 @@ class YouTubeAutoPoster:
                 return self.client_secrets_file
             else:
                 print(f"❌ Error: client_secrets.json not found in DB or locally")
-                print("💡 Tip: Upload via /admin/secure-files or place file in 3_youtube_poster/")
+                print("💡 Tip: Upload via /admin/secure-files or place file in secrets/")
                 sys.exit(1)
 
     def _get_authenticated_service(self):

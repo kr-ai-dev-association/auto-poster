@@ -37,7 +37,7 @@
 │   ├── auth_helper.py            # LinkedIn OAuth
 │   ├── linkedin_poster.py        # LinkedIn API
 │   └── summarizer.py             # Gemini AI
-├── 3_youtube_poster/             # YouTube 편집/업로드
+├── youtube_poster/               # YouTube 편집/업로드
 │   ├── youtube_poster.py         # 메인 스크립트
 │   ├── video_editor.py           # 비디오 편집 (로고, 자막)
 │   └── v_source/                 # 영상 리소스
@@ -277,16 +277,16 @@ echo "ENVIRONMENT=production" >> .env
   - Gemini AI를 사용하여 영상 내용을 분석하고 LinkedIn용 요약문 생성.
   - 영상 썸네일을 자동으로 다운로드하여 LinkedIn 포스트에 첨부.
 
-### 3. 유투브 동영상 자동 포스팅기 (`3_youtube_poster`)
+### 3. 유투브 동영상 자동 포스팅기 (`youtube_poster`)
 유투브 영상 분석, 로고 및 자막 합성, 마케팅 최적화 설명 생성 및 자동 업로드를 수행합니다.
 
 - **사전 준비**:
   1. Google Cloud Console에서 **YouTube Data API v3** 활성화 및 OAuth 클라이언트 ID(JSON) 다운로드.
-  2. `3_youtube_poster/client_secrets.json`으로 저장.
+  2. `secrets/client_secrets.json`으로 저장.
   3. `v_source/` 폴더 내 카테고리별(`tech`, `entertainment`)로 MP4, PDF, 로고 이미지, 다국어 고정 설명(`desc_ko.md`, `desc_en.md`) 준비.
 - **실행 방법**:
   ```bash
-  python 3_youtube_poster/youtube_poster.py
+  python youtube_poster/youtube_poster.py
   ```
 - **주요 기능**:
   - **카테고리 선택**: 실행 시 `tech` 또는 `entertainment`를 선택하여 해당 경로의 리소스를 사용.
@@ -298,20 +298,10 @@ echo "ENVIRONMENT=production" >> .env
   - **마케팅 메타데이터**: 다국어 템플릿(`desc_ko.md`, `desc_en.md`) 기반 스토리텔링 설명, SEO 해시태그, 클릭 가능 링크 생성.
   - **자동 정리**: 업로드 완료 후 임시 파일(SRT, 중간 영상 등) 자동 삭제.
 
-### 4. 유튜브 재업로드 전용기 (`3_youtube_poster/upload_only.py`)
+### 4. 유튜브 재업로드 전용기 (레거시)
 업로드 중 한도 초과나 오류로 실패했을 때, 이미 가공된 영상과 메타데이터를 사용하여 업로드만 다시 수행합니다.
 
-- **사용 시점**:
-  - `youtube_poster.py` 실행 중 업로드 단계에서 에러가 발생했을 때.
-  - `v_source/`에 `final_youtube_post_*.mp4`와 `metadata_*.json` 파일이 남아있을 때.
-- **실행 방법**:
-  ```bash
-  python 3_youtube_poster/upload_only.py
-  ```
-- **주요 기능**:
-  - 이미 가공된 영상 목록 중 선택하여 즉시 업로드 세션 시작.
-  - 별도의 AI 분석이나 영상 편집 과정(ffmpeg) 없이 매우 빠르게 진행.
-  - 업로드 성공 후 선택적인 파일 정리 기능 제공.
+> ⚠️ **참고**: 이 기능은 `legacy/youtube_poster/upload_only.py`로 이동되었습니다. 웹 UI를 통한 업로드를 권장합니다.
 
 ---
 

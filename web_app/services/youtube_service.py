@@ -12,7 +12,7 @@ sys.path.append(project_root)
 
 # 숫자로 시작하는 디렉토리는 직접 import가 불가능하므로 importlib 사용
 def load_youtube_poster():
-    module_path = os.path.join(project_root, '3_youtube_poster', 'youtube_poster.py')
+    module_path = os.path.join(project_root, 'youtube_poster', 'youtube_poster.py')
     spec = importlib.util.spec_from_file_location("youtube_poster", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -23,7 +23,7 @@ YouTubeAutoPoster = load_youtube_poster()
 class YouTubeService:
     def __init__(self):
         self.poster = YouTubeAutoPoster()
-        self.base_v_dir = os.path.join(project_root, '3_youtube_poster', 'v_source')
+        self.base_v_dir = os.path.join(project_root, 'youtube_poster', 'v_source')
 
     def get_logo_path(self, category):
         v_dir = os.path.join(self.base_v_dir, category)

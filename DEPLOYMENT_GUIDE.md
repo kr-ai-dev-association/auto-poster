@@ -146,8 +146,8 @@ chmod 600 .env
 
 ```bash
 # 1. 디렉토리 생성
-mkdir -p 1_md_converter
-mkdir -p 3_youtube_poster
+mkdir -p secrets
+mkdir -p youtube_poster
 
 # 2. Firebase 서비스 계정 키 배치
 # Google Cloud Console에서 다운로드한 JSON 파일을:
@@ -155,11 +155,12 @@ cp /path/to/your/serviceAccountKey.json 1_md_converter/
 
 # 3. YouTube OAuth 클라이언트 시크릿 배치
 # Google Cloud Console에서 다운로드한 JSON 파일을:
-cp /path/to/your/client_secrets.json 3_youtube_poster/
+cp /path/to/your/serviceAccountKey.json secrets/
+cp /path/to/your/client_secrets.json secrets/
 
 # 4. 파일 권한 설정
-chmod 600 1_md_converter/serviceAccountKey.json
-chmod 600 3_youtube_poster/client_secrets.json
+chmod 600 secrets/serviceAccountKey.json
+chmod 600 secrets/client_secrets.json
 ```
 
 ### 7. 데이터베이스 초기화
@@ -316,8 +317,8 @@ cd /home/autoposter/auto-poster/web_app
 pkill -f uvicorn
 
 # 5. 로컬 보안 파일 제거 (선택사항)
-rm -f 1_md_converter/serviceAccountKey.json
-rm -f 3_youtube_poster/client_secrets.json
+rm -f secrets/serviceAccountKey.json
+rm -f secrets/client_secrets.json
 ```
 
 ### 6. Supervisor 설정 (프로세스 관리)
