@@ -30,6 +30,42 @@ class YouTubeAutoPoster:
         self.youtube = self._get_authenticated_service()
         self.summarizer = GeminiSummarizer()
 
+    def _get_client_secrets_path(self):
+        """
+        DB에서 암호화된 client_secrets.json 가져오기 또는 로컬 파일 사용
+        """
+        environment = os.getenv("ENVIRONMENT", "development").lower()
+        
+        try:
+            # 1. DB에서 복호화 시도
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'web_app'))
+            from services.crypto_service import CryptoService
+            
+            secrets_content = CryptoService.get_decrypted_file_from_db('client_secrets.json')
+            
+            # 임시 파일로 저장 (OAuth flow가 파일 경로를 요구함)
+            temp_secrets_path = os.path.join(tempfile.gettempdir(), 'client_secrets.json')
+            with open(temp_secrets_path, 'wb') as f:
+                f.write(secrets_content)
+            
+            print(f"✅ [{environment.upper()}] YouTube client_secrets loaded from encrypted DB")
+            return temp_secrets_path
+            
+        except (FileNotFoundError, ImportError) as e:
+            # 2. 로컬 파일 폴백 (개발 환경만)
+            if environment == "production":
+                print(f"❌ [PRODUCTION] {str(e) if isinstance(e, FileNotFoundError) else 'client_secrets.json not in DB'}")
+                print("💡 프로덕션에서는 /admin/secure-files에서 반드시 업로드해야 합니다.")
+                sys.exit(1)
+            
+            if os.path.exists(self.client_secrets_file):
+                print(f"⚠️ [{environment.upper()}] No encrypted YouTube secrets in DB, using local file...")
+                return self.client_secrets_file
+            else:
+                print(f"❌ Error: client_secrets.json not found in DB or locally")
+                print("💡 Tip: Upload via /admin/secure-files or place file in 3_youtube_poster/")
+                sys.exit(1)
+
     def _get_authenticated_service(self):
         creds = None
         if os.path.exists(self.token_file):
@@ -40,10 +76,8 @@ class YouTubeAutoPoster:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                if not os.path.exists(self.client_secrets_file):
-                    print(f"Error: {self.client_secrets_file} not found.")
-                    sys.exit(1)
-                flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, self.scopes)
+                secrets_path = self._get_client_secrets_path()
+                flow = InstalledAppFlow.from_client_secrets_file(secrets_path, self.scopes)
                 creds = flow.run_local_server(port=0)
             
             with open(self.token_file, 'wb') as token:

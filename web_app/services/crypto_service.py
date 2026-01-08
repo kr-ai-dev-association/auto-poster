@@ -75,13 +75,14 @@ class CryptoService:
         return f"{admin_id}:{admin_pw}"
     
     @staticmethod
-    def get_decrypted_file_from_db(file_name: str, db_session=None) -> bytes:
+    def get_decrypted_file_from_db(file_name: str, db_session=None, allow_fallback: bool = None) -> bytes:
         """
         DB에서 암호화된 파일을 읽어 복호화하여 반환
         
         Args:
             file_name: 파일명 (예: 'serviceAccountKey.json')
             db_session: SQLAlchemy 세션 (없으면 새로 생성)
+            allow_fallback: 로컬 파일 폴백 허용 여부 (None이면 ENVIRONMENT 환경 변수 확인)
         
         Returns:
             복호화된 파일의 바이트 데이터
@@ -91,6 +92,11 @@ class CryptoService:
             Exception: 복호화 실패 시
         """
         from core import database, models
+        
+        # 환경 확인 (프로덕션에서는 폴백 금지)
+        if allow_fallback is None:
+            environment = os.getenv("ENVIRONMENT", "development").lower()
+            allow_fallback = (environment == "development")
         
         # 세션이 없으면 새로 생성
         if db_session is None:
@@ -106,7 +112,10 @@ class CryptoService:
             ).first()
             
             if not secure_file:
-                raise FileNotFoundError(f"DB에 '{file_name}' 파일이 없습니다. 보안 파일 관리 페이지에서 업로드해주세요.")
+                error_msg = f"DB에 '{file_name}' 파일이 없습니다."
+                if not allow_fallback:
+                    error_msg += " [PRODUCTION] 보안 파일 관리 페이지에서 반드시 업로드해야 합니다."
+                raise FileNotFoundError(error_msg)
             
             # 마스터 키 프레이즈로 복호화
             key_phrase = CryptoService.get_master_key_phrase()
@@ -141,4 +150,49 @@ class CryptoService:
             f.write(decrypted_content)
         
         return temp_path
+    
+    @staticmethod
+    def load_env_from_db():
+        """
+        DB에서 암호화된 .env 파일을 복호화하여 환경 변수로 로드
+        로컬 .env 파일이 있으면 폴백 (개발 환경만)
+        
+        Returns:
+            bool: 성공 여부
+        """
+        # 먼저 로컬 .env를 임시로 로드하여 ENVIRONMENT 확인
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        environment = os.getenv("ENVIRONMENT", "development").lower()
+        
+        try:
+            # 1. DB에서 .env 복호화 시도
+            env_content = CryptoService.get_decrypted_file_from_db('.env', allow_fallback=True)
+            
+            # 환경 변수로 파싱 및 로드
+            for line in env_content.decode('utf-8').splitlines():
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+            
+            print(f"✅ [{environment.upper()}] Environment variables loaded from encrypted DB")
+            return True
+            
+        except FileNotFoundError:
+            # 2. 로컬 .env 파일 폴백 (개발 환경만)
+            if environment == "production":
+                print("❌ [PRODUCTION] .env 파일이 DB에 없습니다. /admin/secure-files에서 업로드해야 합니다.")
+                return False
+            
+            if load_dotenv():
+                print(f"⚠️ [{environment.upper()}] No encrypted .env in DB, using local file...")
+                return True
+            else:
+                print("❌ No .env file found in DB or locally")
+                return False
+        except Exception as e:
+            print(f"❌ Error loading .env: {e}")
+            return False
 

@@ -47,6 +47,10 @@ class Token(BaseModel):
 # 의존성: DB 세션 및 수퍼 관리자 초기화
 @app.on_event("startup")
 async def startup_event():
+    # 1. 환경 변수 로드 (DB 우선, 로컬 폴백)
+    CryptoService.load_env_from_db()
+    
+    # 2. 수퍼 관리자 초기화
     db = database.SessionLocal()
     try:
         auth_service.init_super_admin(db)

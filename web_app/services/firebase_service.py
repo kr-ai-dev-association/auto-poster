@@ -32,6 +32,8 @@ class FirebaseService:
 
     def _initialize_clients(self):
         """Firestore 및 Storage 클라이언트를 초기화합니다."""
+        environment = os.getenv("ENVIRONMENT", "development").lower()
+        
         try:
             # 1. DB에서 서비스 계정 키 복호화 시도
             try:
@@ -39,10 +41,15 @@ class FirebaseService:
                 service_account_content = CryptoService.get_decrypted_file_from_db('serviceAccountKey.json')
                 service_account_info = json.loads(service_account_content.decode('utf-8'))
                 credentials = service_account.Credentials.from_service_account_info(service_account_info)
-                print("✅ Firebase credentials loaded from encrypted DB")
-            except FileNotFoundError:
-                # 2. DB에 없으면 로컬 파일 폴백
-                print("⚠️ No encrypted credentials in DB, falling back to local file...")
+                print(f"✅ [{environment.upper()}] Firebase credentials loaded from encrypted DB")
+            except FileNotFoundError as e:
+                # 2. DB에 없으면 로컬 파일 폴백 (개발 환경만)
+                if environment == "production":
+                    print(f"❌ [PRODUCTION] {str(e)}")
+                    print("💡 프로덕션에서는 /admin/secure-files에서 반드시 업로드해야 합니다.")
+                    return
+                
+                print(f"⚠️ [{environment.upper()}] No encrypted credentials in DB, falling back to local file...")
                 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 service_account_path = os.path.join(base_dir, '1_md_converter', 'serviceAccountKey.json')
                 
@@ -52,7 +59,7 @@ class FirebaseService:
                     return
                 
                 credentials = service_account.Credentials.from_service_account_file(service_account_path)
-                print("✅ Firebase credentials loaded from local file")
+                print(f"✅ [{environment.upper()}] Firebase credentials loaded from local file")
             
             # Firestore (기본 프로젝트 사용)
             self.db = firestore.Client(credentials=credentials)
