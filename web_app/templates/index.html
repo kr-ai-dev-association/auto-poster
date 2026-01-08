@@ -186,6 +186,26 @@
                                                     
                                                     <!-- LinkedIn 공유 섹션 -->
                                                     <div class="mt-6 pt-6 border-t border-green-200">
+                                                        <h4 class="text-lg font-bold text-green-900 mb-4">👁️ 미리보기</h4>
+                                                        <div class="flex flex-wrap gap-4 mb-6">
+                                                            <button 
+                                                                @click="previewHtml('ko')"
+                                                                class="flex items-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 transition shadow-md"
+                                                            >
+                                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                                한국어 미리보기
+                                                            </button>
+                                                            <button 
+                                                                @click="previewHtml('en')"
+                                                                class="flex items-center px-6 py-3 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 transition shadow-md"
+                                                            >
+                                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                                English Preview
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mt-6 pt-6 border-t border-green-200">
                                                         <h4 class="text-lg font-bold text-green-900 mb-4">📢 LinkedIn에 홍보하기</h4>
                                                         <div class="flex flex-wrap gap-4">
                                                             <button 
@@ -682,6 +702,18 @@
                     } finally {
                         this.loading = false;
                     }
+                },
+
+                previewHtml(lang) {
+                    if (!this.result || !this.result.preview_html_ko) {
+                        alert('변환된 HTML이 없습니다.');
+                        return;
+                    }
+                    
+                    const htmlContent = lang === 'ko' ? this.result.preview_html_ko : this.result.preview_html_en;
+                    const previewWindow = window.open('', '_blank', 'width=1200,height=800');
+                    previewWindow.document.write(htmlContent);
+                    previewWindow.document.close();
                 },
 
                 async shareToLinkedin(lang) {

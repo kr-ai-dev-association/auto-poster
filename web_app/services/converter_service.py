@@ -125,7 +125,9 @@ class ConverterService:
             return {
                 "status": "success", 
                 "wiki_id": wiki_id, 
-                "link": f"https://tony.banya.ai/report/{wiki_id}"
+                "link": f"https://tony.banya.ai/report/{wiki_id}",
+                "preview_html_ko": html_ko,
+                "preview_html_en": html_en
             }
         else:
             return {"status": "error", "message": "Firestore save failed"}
