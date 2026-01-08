@@ -12,15 +12,48 @@ Auto Poster의 보안 파일 관리 시스템은 민감한 설정 파일(서비�
   - 예: `admin@banya.ai:Admin1234!@#`
 
 ### 2. 지원 파일 타입
-- **Firebase** (`serviceAccountKey.json`): Firebase/GCS 서비스 계정 키
-- **YouTube** (`client_secrets.json`): YouTube Data API OAuth 클라이언트 시크릿
-- **Environment** (`.env`): 환경 변수 설정 파일
+- **Firebase** (`serviceAccountKey.json`): Firebase/GCS 서비스 계정 키 ✅ **DB 암호화 완전 지원**
+- **YouTube** (`client_secrets.json`): YouTube Data API OAuth 클라이언트 시크릿 ✅ **DB 암호화 완전 지원**
+- **Environment** (`.env`): 환경 변수 설정 파일 ✅ **DB 암호화 완전 지원**
 
 ### 3. 보안 수준
 - ✅ 파일은 AES-128 암호화되어 DB에 저장
 - ✅ 키 프레이즈 없이는 복호화 불가능
 - ✅ 슈퍼 관리자만 접근 가능
 - ✅ 로컬 파일 폴백 지원 (개발 환경)
+- ✅ **환경별 보안 정책**: 프로덕션에서는 DB 강제, 개발에서는 폴백 허용
+
+## 환경 설정
+
+### ENVIRONMENT 환경 변수
+`.env` 파일에 다음 변수를 추가하여 환경을 명시적으로 구분할 수 있습니다:
+
+```bash
+# .env 파일
+ENVIRONMENT=development  # 또는 production
+```
+
+| 환경 | 동작 방식 |
+|------|----------|
+| **development** (기본값) | DB 우선, 로컬 파일 폴백 허용 |
+| **production** | DB에서만 로드, 로컬 파일 금지 (보안 강화) |
+
+#### 개발 환경 (Development)
+```bash
+ENVIRONMENT=development
+```
+- ✅ DB에 보안 파일이 있으면 사용
+- ✅ DB에 없으면 로컬 파일 폴백
+- ⚠️ 로그: `[DEVELOPMENT] Using local file...`
+
+#### 프로덕션 환경 (Production)
+```bash
+ENVIRONMENT=production
+```
+- ✅ DB에서만 보안 파일 로드
+- ❌ 로컬 파일 폴백 금지
+- ❌ DB에 파일이 없으면 서버 시작 실패
+- 🔒 로그: `[PRODUCTION] 반드시 DB에 업로드해야 합니다.`
 
 ## 사용 방법
 
@@ -34,6 +67,8 @@ Auto Poster의 보안 파일 관리 시스템은 민감한 설정 파일(서비�
 5. "🔐 암호화하여 업로드" 버튼 클릭
 
 #### 첫 업로드 예시
+
+**1. Firebase 서비스 계정 키**
 ```
 파일: serviceAccountKey.json
 타입: firebase
@@ -41,19 +76,54 @@ Auto Poster의 보안 파일 관리 시스템은 민감한 설정 파일(서비�
 키 프레이즈: admin@banya.ai:Admin1234!@#
 ```
 
+**2. YouTube API 클라이언트 시크릿**
+```
+파일: client_secrets.json
+타입: youtube
+설명: YouTube Data API OAuth 클라이언트 시크릿
+키 프레이즈: admin@banya.ai:Admin1234!@#
+```
+
+**3. 환경 변수 파일 (선택사항)**
+```
+파일: .env
+타입: env
+설명: 프로덕션 환경 변수
+키 프레이즈: admin@banya.ai:Admin1234!@#
+```
+
 ### 2. 자동 로드 확인
 
 업로드 후 애플리케이션을 재시작하면:
 
+**개발 환경에서 DB 로드 성공:**
 ```bash
-✅ Firebase credentials loaded from encrypted DB
+✅ [DEVELOPMENT] Environment variables loaded from encrypted DB
+✅ [DEVELOPMENT] Firebase credentials loaded from encrypted DB
+✅ [DEVELOPMENT] YouTube client_secrets loaded from encrypted DB
 ✅ Firebase/GCS Clients Initialized
 ```
 
-DB에 파일이 없으면 로컬 파일로 폴백:
+**개발 환경에서 로컬 파일 폴백:**
 ```bash
-⚠️ No encrypted credentials in DB, falling back to local file...
-✅ Firebase credentials loaded from local file
+⚠️ [DEVELOPMENT] No encrypted .env in DB, using local file...
+⚠️ [DEVELOPMENT] No encrypted credentials in DB, falling back to local file...
+✅ [DEVELOPMENT] Firebase credentials loaded from local file
+```
+
+**프로덕션 환경에서 DB 로드 성공:**
+```bash
+✅ [PRODUCTION] Environment variables loaded from encrypted DB
+✅ [PRODUCTION] Firebase credentials loaded from encrypted DB
+✅ [PRODUCTION] YouTube client_secrets loaded from encrypted DB
+✅ Firebase/GCS Clients Initialized
+```
+
+**프로덕션 환경에서 파일 없음 (서버 시작 실패):**
+```bash
+❌ [PRODUCTION] DB에 'serviceAccountKey.json' 파일이 없습니다. 
+💡 프로덕션에서는 /admin/secure-files에서 반드시 업로드해야 합니다.
+ERROR: Application startup failed. Exiting.
 ```
 
 ### 3. 파일 관리
@@ -289,7 +359,9 @@ rm 3_youtube_poster/client_secrets.json
 - [ ] 키 로테이션 기능 추가
 - [ ] 접근 로그 및 감사 추적
 - [ ] 다중 키 프레이즈 지원 (팀원별)
-- [ ] YouTube `client_secrets.json` 자동 로드 구현
+- [x] ~~YouTube `client_secrets.json` 자동 로드 구현~~ ✅ 완료
+- [x] ~~`.env` 파일 DB 암호화 지원~~ ✅ 완료
+- [x] ~~환경별 보안 정책 구분~~ ✅ 완료
 - [ ] 자동 백업 및 복구 기능
 
 ## 기술 스택
