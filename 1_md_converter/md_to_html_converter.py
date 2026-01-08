@@ -4,11 +4,25 @@ import re
 import base64
 import io
 import shutil
+import datetime
 from tqdm import tqdm
 from PIL import Image
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+
+# Import upload_wiki module
+try:
+    import upload_wiki
+except ImportError:
+    # Try relative import if running as a package or direct script
+    try:
+        from . import upload_wiki
+    except ImportError:
+        # Fallback for when running from project root
+        import sys
+        sys.path.append(os.path.join(os.path.dirname(__file__)))
+        import upload_wiki
 
 # Load environment variables
 load_dotenv()
@@ -189,16 +203,62 @@ class MDToHTMLConverter:
         for d in [ko_dir, en_dir, images_dir]:
             os.makedirs(d, exist_ok=True)
 
-        # 1. Determine English filename first (to use for the shared image name)
-        tqdm.write(f"  - Translating filename for English version...")
-        en_base_name = f"{base_name}_en"
+        # 0. Initialize Firestore to check/get stable ID
+        tqdm.write("  - Initializing Firestore to check ID map...")
         try:
-            name_prompt = f"Translate this title into a concise, professional English filename (no extension, lowercase, use hyphens for spaces): {base_name}"
-            name_response = self.client.models.generate_content(model=self.model_id, contents=name_prompt)
-            translated_base = name_response.text.strip().lower().replace(" ", "-")
-            en_base_name = re.sub(r'[^\w\-_\.]', '', translated_base)
+            db, _, _ = upload_wiki.initialize_firebase()
+            id_map = upload_wiki.get_id_map(db)
         except Exception as e:
-            tqdm.write(f"    - Filename translation failed, using default: {e}")
+            tqdm.write(f"    ⚠️ Failed to initialize Firestore or get ID map: {e}")
+            id_map = {}
+            db = None
+
+        # 1. Determine English filename (Wiki ID)
+        # Check if we already have an ID for this base_name
+        if base_name in id_map:
+            en_base_name = id_map[base_name]
+            tqdm.write(f"  - ✅ Found existing ID in map: {en_base_name}")
+            is_new_id = False
+        else:
+            tqdm.write(f"  - Generating NEW English ID (filename)...")
+            try:
+                name_prompt = f"Translate this title into a concise, professional English filename (no extension, lowercase, use hyphens for spaces): {base_name}"
+                name_response = self.client.models.generate_content(model=self.model_id, contents=name_prompt)
+                translated_base = name_response.text.strip().lower().replace(" ", "-")
+                en_base_name = re.sub(r'[^\w\-_\.]', '', translated_base)
+            except Exception as e:
+                tqdm.write(f"    - Filename translation failed, using default: {e}")
+                en_base_name = f"wiki-{datetime.date.today().isoformat()}"
+            
+            is_new_id = True
+            tqdm.write(f"    -> Generated ID: {en_base_name}")
+
+        # 1-1. Generate proper English Title for Metadata
+        tqdm.write(f"  - Generating English Title for Metadata...")
+        en_title = en_base_name.replace("-", " ").title() # Default fallback
+        try:
+            title_prompt = (
+                f"Translate the following Korean title into a natural, professional English title. "
+                f"STRICT OUTPUT REQUIREMENT: Return ONLY the English title string. "
+                f"Do not include any explanations, options, 'Here is the translation', or quotation marks.\n\n"
+                f"Korean Title: {base_name}"
+            )
+            title_response = self.client.models.generate_content(model=self.model_id, contents=title_prompt)
+            # Clean up the response
+            en_title = title_response.text.strip().strip('"').strip("'")
+            # If multiple lines are returned (Gemini ignoring instructions), take the first non-empty line
+            if '\n' in en_title:
+                lines = [line.strip() for line in en_title.split('\n') if line.strip()]
+                # If it looks like a list (Option 1: ...), try to clean it, otherwise just take the first line
+                for line in lines:
+                    if not line.lower().startswith(('option', 'here', 'translated')):
+                        en_title = line
+                        break
+                else:
+                    en_title = lines[0] # Fallback to first line if everything looks like garbage
+            
+        except Exception as e:
+            tqdm.write(f"    - Title translation failed, using fallback: {e}")
 
         # 2. Generate a single summary image (shared by both versions)
         # Images are stored in html/images/, so the relative path for HTML in html/ko/ or html/en/ 
@@ -360,6 +420,35 @@ Convert the following Markdown content into a clean, professional, and responsiv
             except Exception as e:
                 tqdm.write(f"    - Error during Gemini API call for {lang}: {e}")
 
+        # 4. Auto-Upload to Firebase
+        tqdm.write(f"  - 🚀 Starting Auto-Upload to Firebase for {en_base_name}...")
+        try:
+            ko_path = os.path.join(ko_dir, f"{en_base_name}_ko.html")
+            en_path = os.path.join(en_dir, f"{en_base_name}_en.html")
+            current_date = datetime.date.today().isoformat()
+            
+            # Use base_name as Korean title
+            title_ko = base_name 
+            
+            upload_wiki.upload_wiki_entry(
+                wiki_id=en_base_name,
+                title_ko=title_ko,
+                title_en=en_title,
+                last_updated=current_date,
+                html_ko_path=ko_path,
+                html_en_path=en_path,
+                image_dir=images_dir
+            )
+            
+            # If upload was successful and it was a new ID, save to map
+            if is_new_id and db:
+                tqdm.write("  - Saving new ID mapping to Firestore...")
+                id_map[base_name] = en_base_name
+                upload_wiki.save_id_map(db, id_map)
+                
+        except Exception as e:
+            tqdm.write(f"    - ❌ Auto-Upload failed: {e}")
+
 def main():
     # Set source directory relative to the script location
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -385,27 +474,13 @@ def main():
     for md_file in tqdm(md_files, desc="Converting MD to HTML", unit="file"):
         converter.convert_file(md_file, output_dir=output_dir)
 
-    # Copy files to destination after all conversions are done
-    print(f"\n📂 Copying generated files to {dest_dir}...")
+    # Clean up: Delete local html/ directory after successful upload
+    print(f"🧹 Cleaning up local '{output_dir}' directory...")
     try:
-        if os.path.exists(output_dir):
-            if os.path.exists(dest_dir):
-                # Using copytree with dirs_exist_ok=True (Python 3.8+)
-                shutil.copytree(output_dir, dest_dir, dirs_exist_ok=True)
-            else:
-                shutil.copytree(output_dir, dest_dir)
-            
-            print(f"✅ Successfully copied all files to {dest_dir}")
-            
-            # Clean up: Delete local html/ directory after successful deployment
-            print(f"🧹 Cleaning up local {output_dir} directory...")
-            shutil.rmtree(output_dir)
-            print(f"✅ Cleanup complete.")
-        else:
-            print(f"⚠️ No files were generated in {output_dir} to copy.")
-        
+        shutil.rmtree(output_dir)
+        print(f"✅ Cleanup complete.")
     except Exception as e:
-        print(f"❌ Error during file copy or cleanup: {e}")
+        print(f"⚠️  Warning: Failed to delete local directory: {e}")
 
     print("\n✨ All tasks completed!")
 
