@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>보안 파일 관리 - Auto Poster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div x-data="secureFilesApp()" x-init="loadFiles()" class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">🔒 보안 파일 관리</h1>
+                <p class="text-gray-500 mt-1">암호화된 서비스 키 및 설정 파일 관리</p>
+            </div>
+            <a href="/" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                ← 메인으로
+            </a>
+        </div>
+
+        <!-- 파일 업로드 섹션 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">📤 보안 파일 업로드</h2>
+            
+            <form @submit.prevent="uploadFile" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">파일 선택</label>
+                        <input type="file" @change="selectedFile = $event.target.files[0]" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">파일 타입</label>
+                        <select x-model="fileType" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="">선택하세요</option>
+                            <option value="firebase">Firebase (serviceAccountKey.json)</option>
+                            <option value="youtube">YouTube (client_secrets.json)</option>
+                            <option value="env">Environment (.env)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">설명 (선택사항)</label>
+                    <input type="text" x-model="description" placeholder="예: Firebase 프로덕션 서비스 계정 키" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">암호화 키 프레이즈 (슈퍼 관리자 비밀번호)</label>
+                    <input type="password" x-model="keyPhrase" required placeholder="슈퍼 관리자 ID:비밀번호" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <p class="text-xs text-gray-500 mt-1">💡 형식: SUPER_ADMIN_ID:SUPER_ADMIN_PW (예: admin@banya.ai:Admin1234!@#)</p>
+                </div>
+
+                <button type="submit" :disabled="uploading" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 flex justify-center items-center">
+                    <span x-show="!uploading">🔐 암호화하여 업로드</span>
+                    <svg x-show="uploading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                </button>
+
+                <div x-show="uploadMessage" class="p-3 rounded-lg text-sm font-medium" :class="uploadStatus === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" x-text="uploadMessage" x-cloak></div>
+            </form>
+        </div>
+
+        <!-- 파일 목록 -->
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">📁 저장된 보안 파일</h2>
+            
+            <div x-show="loading" class="text-center py-8">
+                <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <p class="text-gray-500 mt-2">로딩 중...</p>
+            </div>
+
+            <div x-show="!loading && files.length === 0" class="text-center py-8 text-gray-500" x-cloak>
+                📭 저장된 보안 파일이 없습니다.
+            </div>
+
+            <div x-show="!loading && files.length > 0" class="overflow-x-auto" x-cloak>
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">파일명</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">타입</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">설명</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">업데이트 일시</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">작업</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        <template x-for="file in files" :key="file.id">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm font-medium text-gray-900" x-text="file.file_name"></td>
+                                <td class="px-4 py-3 text-sm">
+                                    <span class="px-2 py-1 text-xs font-bold rounded-full" 
+                                          :class="{
+                                              'bg-blue-100 text-blue-800': file.file_type === 'firebase',
+                                              'bg-red-100 text-red-800': file.file_type === 'youtube',
+                                              'bg-green-100 text-green-800': file.file_type === 'env'
+                                          }"
+                                          x-text="file.file_type.toUpperCase()"></span>
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-600" x-text="file.description || '-'"></td>
+                                <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDate(file.updated_at)"></td>
+                                <td class="px-4 py-3 text-center">
+                                    <button @click="deleteFile(file.id, file.file_name)" class="text-red-600 hover:text-red-800 font-bold text-sm">
+                                        🗑️ 삭제
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 사용 안내 -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mt-6">
+            <h3 class="text-lg font-bold text-yellow-900 mb-2">⚠️ 중요 안내</h3>
+            <ul class="text-sm text-yellow-800 space-y-1 list-disc list-inside">
+                <li>모든 파일은 슈퍼 관리자의 키 프레이즈로 암호화되어 저장됩니다.</li>
+                <li>키 프레이즈는 <strong>SUPER_ADMIN_ID:SUPER_ADMIN_PW</strong> 형식입니다.</li>
+                <li>키 프레이즈를 분실하면 파일을 복구할 수 없으므로 반드시 안전하게 보관하세요.</li>
+                <li>프로덕션 환경에서는 .env 파일 대신 이 시스템을 사용하여 보안 키를 관리하세요.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function secureFilesApp() {
+            return {
+                files: [],
+                loading: false,
+                uploading: false,
+                selectedFile: null,
+                fileType: '',
+                description: '',
+                keyPhrase: '',
+                uploadStatus: '',
+                uploadMessage: '',
+
+                async loadFiles() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/api/admin/secure-files', {
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                        });
+                        this.files = await response.json();
+                    } catch (error) {
+                        alert('파일 목록을 불러오는데 실패했습니다: ' + error.message);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async uploadFile() {
+                    if (!this.selectedFile || !this.fileType || !this.keyPhrase) {
+                        alert('모든 필수 항목을 입력해주세요.');
+                        return;
+                    }
+
+                    this.uploading = true;
+                    this.uploadStatus = '';
+                    this.uploadMessage = '';
+
+                    const formData = new FormData();
+                    formData.append('file', this.selectedFile);
+                    formData.append('file_type', this.fileType);
+                    formData.append('description', this.description);
+                    formData.append('key_phrase', this.keyPhrase);
+
+                    try {
+                        const response = await fetch('/api/admin/secure-files', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.uploadStatus = 'success';
+                            this.uploadMessage = data.message;
+                            this.selectedFile = null;
+                            this.fileType = '';
+                            this.description = '';
+                            this.keyPhrase = '';
+                            await this.loadFiles();
+                        } else {
+                            this.uploadStatus = 'error';
+                            this.uploadMessage = data.message;
+                        }
+                    } catch (error) {
+                        this.uploadStatus = 'error';
+                        this.uploadMessage = '업로드 실패: ' + error.message;
+                    } finally {
+                        this.uploading = false;
+                    }
+                },
+
+                async deleteFile(fileId, fileName) {
+                    if (!confirm(`"${fileName}" 파일을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`/api/admin/secure-files/${fileId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                        });
+
+                        const data = await response.json();
+                        alert(data.message);
+                        await this.loadFiles();
+                    } catch (error) {
+                        alert('삭제 실패: ' + error.message);
+                    }
+                },
+
+                formatDate(dateStr) {
+                    if (!dateStr) return '-';
+                    const date = new Date(dateStr);
+                    return date.toLocaleString('ko-KR');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+

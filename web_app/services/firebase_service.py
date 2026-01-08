@@ -1,5 +1,7 @@
 import os
 import glob
+import json
+import tempfile
 import mimetypes
 from bs4 import BeautifulSoup
 from google.cloud import storage, firestore
@@ -18,10 +20,6 @@ class FirebaseService:
         if self._initialized:
             return
             
-        # 서비스 계정 키 경로 (절대 경로로 계산하여 실행 위치 관계없이 작동)
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        self.service_account_path = os.path.join(base_dir, '1_md_converter', 'serviceAccountKey.json')
-        
         # 설정값
         self.image_bucket_name = 'banya_public2'
         self.image_project_id = 'banya2025'
@@ -34,12 +32,27 @@ class FirebaseService:
 
     def _initialize_clients(self):
         """Firestore 및 Storage 클라이언트를 초기화합니다."""
-        if not os.path.exists(self.service_account_path):
-            print(f"❌ Error: Service account key not found at {self.service_account_path}")
-            return
-
         try:
-            credentials = service_account.Credentials.from_service_account_file(self.service_account_path)
+            # 1. DB에서 서비스 계정 키 복호화 시도
+            try:
+                from .crypto_service import CryptoService
+                service_account_content = CryptoService.get_decrypted_file_from_db('serviceAccountKey.json')
+                service_account_info = json.loads(service_account_content.decode('utf-8'))
+                credentials = service_account.Credentials.from_service_account_info(service_account_info)
+                print("✅ Firebase credentials loaded from encrypted DB")
+            except FileNotFoundError:
+                # 2. DB에 없으면 로컬 파일 폴백
+                print("⚠️ No encrypted credentials in DB, falling back to local file...")
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                service_account_path = os.path.join(base_dir, '1_md_converter', 'serviceAccountKey.json')
+                
+                if not os.path.exists(service_account_path):
+                    print(f"❌ Error: Service account key not found at {service_account_path}")
+                    print("💡 Tip: Upload the key through /admin/secure-files")
+                    return
+                
+                credentials = service_account.Credentials.from_service_account_file(service_account_path)
+                print("✅ Firebase credentials loaded from local file")
             
             # Firestore (기본 프로젝트 사용)
             self.db = firestore.Client(credentials=credentials)

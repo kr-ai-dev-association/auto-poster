@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from services.converter_service import ConverterService
 from services.linkedin_service import LinkedinService
 from services.youtube_service import YouTubeService
+from services.crypto_service import CryptoService
 from services import auth_service
 from core import database, models
 
@@ -96,6 +97,10 @@ async def signup_page(request: Request):
 async def admin_users_page(request: Request):
     return templates.TemplateResponse("admin_users.html", {"request": request})
 
+@app.get("/admin/secure-files", response_class=HTMLResponse)
+async def admin_secure_files_page(request: Request):
+    return templates.TemplateResponse("admin_secure_files.html", {"request": request})
+
 # --- 인증 API ---
 
 @app.post("/api/auth/signup")
@@ -159,6 +164,107 @@ async def delete_user(user_id: int, db: Session = Depends(database.get_db), admi
     db.delete(user)
     db.commit()
     return {"message": "User deleted"}
+
+# --- 보안 파일 관리 API (슈퍼 관리자 전용) ---
+
+@app.get("/api/admin/secure-files")
+async def list_secure_files(db: Session = Depends(database.get_db), admin: models.User = Depends(get_super_admin)):
+    """암호화된 보안 파일 목록 조회"""
+    files = db.query(models.SecureFile).all()
+    return [{
+        "id": f.id,
+        "file_name": f.file_name,
+        "file_type": f.file_type,
+        "description": f.description,
+        "updated_at": f.updated_at.isoformat() if f.updated_at else None
+    } for f in files]
+
+@app.post("/api/admin/secure-files")
+async def upload_secure_file(
+    file: UploadFile = File(...),
+    file_type: str = Form(...),
+    description: str = Form(""),
+    key_phrase: str = Form(...),
+    db: Session = Depends(database.get_db),
+    admin: models.User = Depends(get_super_admin)
+):
+    """
+    보안 파일 업로드 및 암호화 저장
+    file_type: 'firebase', 'youtube', 'env'
+    """
+    try:
+        # 파일 읽기
+        file_content = await file.read()
+        
+        # 암호화
+        encrypted_content = CryptoService.encrypt_file(file_content, key_phrase)
+        
+        # DB에 저장 (기존 파일이 있으면 업데이트)
+        existing = db.query(models.SecureFile).filter(
+            models.SecureFile.file_name == file.filename
+        ).first()
+        
+        if existing:
+            existing.encrypted_content = encrypted_content
+            existing.file_type = file_type
+            existing.description = description
+            existing.uploaded_by = admin.id
+            db.commit()
+            return {"status": "success", "message": f"{file.filename} 파일이 업데이트되었습니다."}
+        else:
+            new_file = models.SecureFile(
+                file_name=file.filename,
+                file_type=file_type,
+                encrypted_content=encrypted_content,
+                description=description,
+                uploaded_by=admin.id
+            )
+            db.add(new_file)
+            db.commit()
+            return {"status": "success", "message": f"{file.filename} 파일이 저장되었습니다."}
+    
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+@app.get("/api/admin/secure-files/{file_id}/decrypt")
+async def decrypt_secure_file(
+    file_id: int,
+    key_phrase: str,
+    db: Session = Depends(database.get_db),
+    admin: models.User = Depends(get_super_admin)
+):
+    """
+    보안 파일 복호화 및 다운로드 (테스트용)
+    """
+    secure_file = db.query(models.SecureFile).filter(models.SecureFile.id == file_id).first()
+    if not secure_file:
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    
+    try:
+        decrypted_content = CryptoService.decrypt_file(secure_file.encrypted_content, key_phrase)
+        return FileResponse(
+            path=None,
+            content=decrypted_content,
+            media_type="application/octet-stream",
+            filename=secure_file.file_name
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"복호화 실패: 잘못된 키 프레이즈이거나 파일이 손상되었습니다. ({str(e)})")
+
+@app.delete("/api/admin/secure-files/{file_id}")
+async def delete_secure_file(
+    file_id: int,
+    db: Session = Depends(database.get_db),
+    admin: models.User = Depends(get_super_admin)
+):
+    """보안 파일 삭제"""
+    secure_file = db.query(models.SecureFile).filter(models.SecureFile.id == file_id).first()
+    if not secure_file:
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    
+    db.delete(secure_file)
+    db.commit()
+    return {"message": f"{secure_file.file_name} 파일이 삭제되었습니다."}
 
 # --- 기존 API (보안 적용) ---
 
