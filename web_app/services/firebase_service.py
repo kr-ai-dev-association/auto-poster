@@ -51,7 +51,7 @@ class FirebaseService:
                 
                 print(f"⚠️ [{environment.upper()}] No encrypted credentials in DB, falling back to local file...")
                 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                service_account_path = os.path.join(base_dir, '1_md_converter', 'serviceAccountKey.json')
+                service_account_path = os.path.join(base_dir, 'secrets', 'serviceAccountKey.json')
                 
                 if not os.path.exists(service_account_path):
                     print(f"❌ Error: Service account key not found at {service_account_path}")

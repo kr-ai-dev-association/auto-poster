@@ -24,7 +24,12 @@ load_dotenv()
 
 class YouTubeAutoPoster:
     def __init__(self, client_secrets_file='client_secrets.json'):
-        self.client_secrets_file = os.path.join(os.path.dirname(__file__), client_secrets_file)
+        # 먼저 secrets/ 디렉토리 확인, 없으면 현재 디렉토리
+        secrets_path = os.path.join(os.path.dirname(__file__), '..', 'secrets', client_secrets_file)
+        if os.path.exists(secrets_path):
+            self.client_secrets_file = secrets_path
+        else:
+            self.client_secrets_file = os.path.join(os.path.dirname(__file__), client_secrets_file)
         self.token_file = os.path.join(os.path.dirname(__file__), 'token.pickle')
         self.scopes = ['https://www.googleapis.com/auth/youtube.upload']
         self.youtube = self._get_authenticated_service()

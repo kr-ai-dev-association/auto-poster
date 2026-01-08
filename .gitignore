@@ -1,17 +1,64 @@
-.env
-venv/
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 *.pyc
-.DS_Store
-clear_license.js
 
+# Virtual Environment
+venv/
+ENV/
+env/
 
+# 환경 변수 및 보안 파일
+.env
+secrets/
+!secrets/.gitkeep
 
-3_youtube_poster/client_secrets.json
-3_youtube_poster/token.pickle
-exchange_auth.py
-test_pdf.py
-*.mp4
-*.pickle
-1_md_converter/serviceAccountKey.json
+# 데이터베이스
 *.db
+*.sqlite3
+web_app/autoposter.db
+
+# Google OAuth & API
+token.pickle
+*.pickle
+client_secrets.json
+serviceAccountKey.json
+
+# 미디어 파일
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# 시스템 파일
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# 임시 파일
+temp/
+tmp/
+*.tmp
+*.log
+
+# Legacy (백업용, 추적하지 않음)
+legacy/
+!legacy/.gitkeep
+
+# 출력 디렉토리
+html/
+output/
+
+# 테스트 파일
+test_*.py
+*_test.py
