@@ -24,6 +24,11 @@
                 <input type="password" x-model="password" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••">
             </div>
 
+            <div class="flex items-center">
+                <input type="checkbox" x-model="saveEmail" id="saveEmail" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                <label for="saveEmail" class="ml-2 text-sm text-gray-700 cursor-pointer">ID 저장</label>
+            </div>
+
             <div x-show="errorMessage" x-text="errorMessage" class="text-red-500 text-sm font-medium text-center" x-cloak></div>
 
             <button type="submit" :disabled="loading" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-lg flex justify-center items-center">
@@ -42,8 +47,17 @@
             return {
                 email: '',
                 password: '',
+                saveEmail: false,
                 loading: false,
                 errorMessage: '',
+                init() {
+                    // 저장된 ID가 있으면 불러오기
+                    const savedEmail = localStorage.getItem('saved_email');
+                    if (savedEmail) {
+                        this.email = savedEmail;
+                        this.saveEmail = true;
+                    }
+                },
                 async submitLogin() {
                     this.loading = true;
                     this.errorMessage = '';
@@ -61,6 +75,13 @@
                         
                         const data = await response.json();
                         if (response.ok) {
+                            // ID 저장 옵션 처리
+                            if (this.saveEmail) {
+                                localStorage.setItem('saved_email', this.email);
+                            } else {
+                                localStorage.removeItem('saved_email');
+                            }
+                            
                             localStorage.setItem('access_token', data.access_token);
                             window.location.href = '/';
                         } else {
