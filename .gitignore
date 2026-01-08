@@ -13,3 +13,5 @@ exchange_auth.py
 test_pdf.py
 *.mp4
 *.pickle
+1_md_converter/serviceAccountKey.json
+*.db

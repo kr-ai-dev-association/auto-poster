@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Poster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .sidebar-item-active { @apply bg-gray-800 text-white; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-0 m-0">
+
+    <div x-data="app()" class="min-h-screen flex bg-white">
+        
+        <!-- Left Sidebar -->
+        <div class="w-64 bg-gray-900 text-white flex flex-col shadow-xl">
+            <div class="p-6">
+                <h1 class="text-2xl font-bold tracking-tight">🚀 Auto Poster</h1>
+                <p class="text-gray-400 text-xs mt-1">Multi-Platform Auto Posting</p>
+            </div>
+            
+            <nav class="flex-grow mt-6 px-4 space-y-2">
+                <button 
+                    @click="mainTab = 'wiki'" 
+                    :class="mainTab === 'wiki' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
+                    class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group"
+                >
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2zM12 14v4M12 14a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                    Wiki Auto Poster
+                </button>
+                <button 
+                    @click="mainTab = 'youtube'" 
+                    :class="mainTab === 'youtube' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
+                    class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group"
+                >
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    Youtube Poster
+                </button>
+                
+                <!-- Admin Menu (Conditional) -->
+                <template x-if="user?.is_super_admin">
+                    <a 
+                        href="/admin/users"
+                        class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group text-indigo-300 hover:bg-indigo-900 hover:text-white mt-4 border border-indigo-900"
+                    >
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                        회원 관리 (Admin)
+                    </a>
+                </template>
+            </nav>
+
+            <!-- User Info & Logout -->
+            <div class="p-4 border-t border-gray-800 bg-gray-950">
+                <div class="flex items-center mb-3">
+                    <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white mr-3" x-text="user?.name?.charAt(0)"></div>
+                    <div class="flex-grow min-w-0">
+                        <p class="text-xs font-bold text-white truncate" x-text="user?.name"></p>
+                        <p class="text-[10px] text-gray-500 truncate" x-text="user?.email"></p>
+                    </div>
+                </div>
+                <button @click="logout()" class="w-full py-2 text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 rounded transition flex items-center justify-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    로그아웃
+                </button>
+            </div>
+
+            <div class="p-4 border-t border-gray-800 text-xs text-gray-400 text-center">
+                &copy; 2026 Banya AI
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-grow flex flex-col min-h-0 overflow-hidden">
+            
+            <!-- Wiki Auto Poster Section -->
+            <div x-show="mainTab === 'wiki'" class="flex flex-col h-full">
+                <!-- Header -->
+                <div class="bg-indigo-600 p-6 text-white shadow-md">
+                    <div class="container mx-auto">
+                        <h2 class="text-2xl font-bold">📄 Wiki Auto Poster</h2>
+                        <p class="text-indigo-100 text-sm mt-1">AI 기반 마크다운 변환 및 자동 배포 시스템</p>
+                    </div>
+                </div>
+
+                <!-- Main Content (Full Width) -->
+                <div class="flex-grow flex flex-col min-h-0 overflow-y-auto">
+                    <!-- Tabs -->
+                    <div class="bg-white border-b sticky top-0 z-10">
+                        <div class="container mx-auto flex">
+                            <button @click="tab = 'file'" :class="{'border-indigo-600 text-indigo-600': tab === 'file', 'border-transparent text-gray-500 hover:text-gray-700': tab !== 'file'}" class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm focus:outline-none transition-colors">
+                                📂 파일 업로드
+                            </button>
+                            <button @click="tab = 'text'" :class="{'border-indigo-600 text-indigo-600': tab === 'text', 'border-transparent text-gray-500 hover:text-gray-700': tab !== 'text'}" class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm focus:outline-none transition-colors">
+                                ✍️ 직접 작성
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="container mx-auto p-6 flex-grow flex flex-col min-h-0">
+                        <!-- File Upload Tab -->
+                        <div x-show="tab === 'file'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="flex-grow flex flex-col min-h-0">
+                            <div 
+                                @dragover.prevent="dragOver = true"
+                                @dragleave.prevent="dragOver = false"
+                                @drop.prevent="handleDrop($event)"
+                                :class="{'border-indigo-500 bg-indigo-50': dragOver, 'border-gray-300 bg-gray-50': !dragOver}"
+                                class="border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors flex-grow flex flex-col justify-center items-center min-h-[400px]"
+                                @click="$refs.fileInput.click()"
+                            >
+                                <input type="file" x-ref="fileInput" class="hidden" @change="handleFile($event)" accept=".md">
+                                
+                                <template x-if="!file">
+                                    <div class="space-y-4">
+                                        <svg class="mx-auto h-20 w-20 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                        <div class="text-xl text-gray-600">
+                                            <span class="font-medium text-indigo-600 hover:text-indigo-500">파일 선택</span>
+                                            또는 여기에 드래그하세요
+                                        </div>
+                                        <p class="text-sm text-gray-500">MD 파일만 지원됩니다</p>
+                                    </div>
+                                </template>
+
+                                <template x-if="file">
+                                    <div class="space-y-4">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-20 w-20 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        <p class="text-lg font-medium text-gray-900" x-text="file.name"></p>
+                                        <p class="text-sm text-gray-500" x-text="formatBytes(file.size)"></p>
+                                        <button @click.stop="file = null" class="text-sm text-red-500 hover:text-red-700 underline">제거</button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Text Input Tab -->
+                        <div x-show="tab === 'text'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="flex-grow flex flex-col min-h-0">
+                            <div class="space-y-4 flex-grow flex flex-col min-h-0">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">제목</label>
+                                    <input type="text" x-model="title" class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg" placeholder="예: 2025 AI 트렌드 전망">
+                                </div>
+                                <div class="flex-grow flex flex-col min-h-0">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">내용 (Markdown)</label>
+                                    <textarea x-model="content" class="w-full flex-grow px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-base resize-none min-h-[500px]" placeholder="# 내용을 입력하세요..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Button & Result Area -->
+                        <div class="mt-6 space-y-6 pb-10">
+                            <button 
+                                @click="upload()" 
+                                :disabled="loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))"
+                                :class="{'opacity-50 cursor-not-allowed': loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))}"
+                                class="w-full flex justify-center py-4 px-6 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                            >
+                                <span x-show="!loading">🚀 변환 및 배포 시작</span>
+                                <span x-show="loading" class="flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    처리 중... (약 1-2분 소요)
+                                </span>
+                            </button>
+
+                            <!-- Result Area -->
+                            <div x-show="result" x-cloak class="p-6 rounded-lg shadow-sm border" :class="result?.status === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <template x-if="result?.status === 'success'">
+                                            <svg class="h-8 w-8 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                        </template>
+                                        <template x-if="result?.status !== 'success'">
+                                            <svg class="h-8 w-8 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                                        </template>
+                                    </div>
+                                    <div class="ml-4 flex-grow">
+                                        <h3 class="text-xl font-bold" :class="result?.status === 'success' ? 'text-green-800' : 'text-red-800'" x-text="result?.status === 'success' ? '배포 완료!' : '오류 발생'"></h3>
+                                        <div class="mt-3 text-lg" :class="result?.status === 'success' ? 'text-green-700' : 'text-red-700'">
+                                            <template x-if="result?.status === 'success'">
+                                                <div class="space-y-4">
+                                                    <p>성공적으로 변환 및 배포되었습니다.</p>
+                                                    <div class="flex items-center gap-4">
+                                                        <a :href="result.link" target="_blank" class="px-6 py-2 bg-green-600 text-white rounded-md font-bold hover:bg-green-700 transition shadow-md">👉 리포트 보러가기</a>
+                                                    </div>
+                                                    
+                                                    <!-- LinkedIn 공유 섹션 -->
+                                                    <div class="mt-6 pt-6 border-t border-green-200">
+                                                        <h4 class="text-lg font-bold text-green-900 mb-4">📢 LinkedIn에 홍보하기</h4>
+                                                        <div class="flex flex-wrap gap-4">
+                                                            <button 
+                                                                @click="shareToLinkedin('ko')"
+                                                                :disabled="sharing"
+                                                                class="flex items-center px-6 py-3 bg-[#0077b5] text-white font-bold rounded-md hover:bg-[#005885] transition shadow-md disabled:opacity-50"
+                                                            >
+                                                                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                                                <span x-text="sharing === 'ko' ? '게시 중...' : '한국어로 포스팅'"></span>
+                                                            </button>
+                                                            <button 
+                                                                @click="shareToLinkedin('en')"
+                                                                :disabled="sharing"
+                                                                class="flex items-center px-6 py-3 bg-[#0077b5] text-white font-bold rounded-md hover:bg-[#005885] transition shadow-md disabled:opacity-50"
+                                                            >
+                                                                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                                                <span x-text="sharing === 'en' ? 'Posting...' : 'Post in English'"></span>
+                                                            </button>
+                                                        </div>
+                                                        <p x-show="shareMessage" class="mt-4 text-base font-bold" :class="shareStatus === 'success' ? 'text-blue-600' : 'text-red-600'" x-text="shareMessage"></p>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <template x-if="result?.status !== 'success'">
+                                                <p x-text="result?.message || '알 수 없는 오류가 발생했습니다.'"></p>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Youtube Poster Section (Placeholder) -->
+            <div x-show="mainTab === 'youtube'" class="flex flex-col h-full" x-cloak>
+                <!-- Header -->
+                <div class="bg-red-600 p-6 text-white shadow-md">
+                    <div class="container mx-auto">
+                        <h2 class="text-2xl font-bold">🎬 Youtube Poster</h2>
+                        <p class="text-red-100 text-sm mt-1">AI 기반 영상 편집 및 유튜브 업로드 자동화</p>
+                    </div>
+                </div>
+                
+                <div class="container mx-auto p-10 flex-grow overflow-y-auto">
+                    <div class="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+                        <h3 class="text-xl font-bold text-gray-800 mb-6">📹 새로운 영상 업로드</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">카테고리 선택</label>
+                                    <select x-model="ytCategory" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+                                        <option value="tech">Tech (기술)</option>
+                                        <option value="entertainment">Entertainment (엔터테인먼트)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">영상 파일 (Source Video)</label>
+                                    <div 
+                                        @dragover.prevent="ytDragOver = true"
+                                        @dragleave.prevent="ytDragOver = false"
+                                        @drop.prevent="handleYtDrop($event)"
+                                        @click="$refs.ytFileInput.click()"
+                                        :class="{'border-red-500 bg-red-50': ytDragOver, 'border-gray-300 bg-white': !ytDragOver}"
+                                        class="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-50 transition-colors cursor-pointer min-h-[150px] flex flex-col justify-center items-center"
+                                    >
+                                        <input type="file" x-ref="ytFileInput" class="hidden" @change="handleYtFile($event)" accept="video/*">
+                                        
+                                        <template x-if="!ytFile">
+                                            <div class="space-y-2">
+                                                <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                                <p class="text-sm text-gray-500 font-medium">클릭하거나 영상을 드래그하세요</p>
+                                                <p class="text-xs text-gray-400">MP4, MOV, AVI 등 영상 파일</p>
+                                            </div>
+                                        </template>
+
+                                        <template x-if="ytFile">
+                                            <div class="space-y-2">
+                                                <svg class="mx-auto h-10 w-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                <p class="text-sm font-bold text-gray-900" x-text="ytFile.name"></p>
+                                                <p class="text-xs text-gray-500" x-text="formatBytes(ytFile.size)"></p>
+                                                <button @click.stop="ytFile = null" class="text-xs text-red-600 hover:text-red-800 underline font-medium">제거</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">참조 PDF 파일 (Metadata Source)</label>
+                                    <div 
+                                        @dragover.prevent="pdfDragOver = true"
+                                        @dragleave.prevent="pdfDragOver = false"
+                                        @drop.prevent="handlePdfDrop($event)"
+                                        @click="$refs.pdfFileInput.click()"
+                                        :class="{'border-blue-500 bg-blue-50': pdfDragOver, 'border-gray-300 bg-white': !pdfDragOver}"
+                                        class="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] flex flex-col justify-center items-center"
+                                    >
+                                        <input type="file" x-ref="pdfFileInput" class="hidden" @change="handlePdfFile($event)" accept=".pdf">
+                                        
+                                        <template x-if="!pdfFile">
+                                            <div class="space-y-1">
+                                                <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                                <p class="text-xs text-gray-500 font-medium">참조할 PDF 파일을 드래그하거나 클릭하세요</p>
+                                            </div>
+                                        </template>
+
+                                        <template x-if="pdfFile">
+                                            <div class="space-y-1">
+                                                <svg class="mx-auto h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                <p class="text-xs font-bold text-gray-900" x-text="pdfFile.name"></p>
+                                                <button @click.stop="pdfFile = null" class="text-xs text-red-600 hover:text-red-800 underline">제거</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="gen_sub" x-model="genSubtitles" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                                    <label for="gen_sub" class="ml-2 block text-sm text-gray-900">AI 자막 자동 생성</label>
+                                </div>
+
+                                <!-- Logo Management Area -->
+                                <div class="pt-6 border-t border-gray-200">
+                                    <label class="block text-sm font-bold text-gray-700 mb-4">채널 로고 관리 (Overlay Logo)</label>
+                                    <div class="flex flex-col md:flex-row gap-6 items-start">
+                                        <!-- Current Logo Preview -->
+                                        <div class="w-full md:w-1/2">
+                                            <p class="text-xs font-bold text-gray-500 mb-2 uppercase">현재 적용된 로고</p>
+                                            <div class="bg-gray-100 rounded-lg p-4 border border-gray-200 flex justify-center items-center min-h-[100px]">
+                                                <img :src="'/api/youtube/logo/' + ytCategory + '?token=' + localStorage.getItem('access_token') + '&t=' + logoTimestamp" class="max-h-20 object-contain shadow-sm" alt="Current Logo">
+                                            </div>
+                                            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                                                <p>💡 **권장 사양:** 가로형 로고 (배경 투명 PNG 권장)</p>
+                                                <p>현재 로고 기준: <span class="font-bold">1000x250 (4:1 비율)</span></p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Logo Upload -->
+                                        <div class="w-full md:w-1/2">
+                                            <p class="text-xs font-bold text-gray-500 mb-2 uppercase">로고 교체</p>
+                                            <div 
+                                                @click="$refs.logoInput.click()"
+                                                class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center items-center min-h-[100px]"
+                                            >
+                                                <input type="file" x-ref="logoInput" class="hidden" @change="validateAndUploadLogo($event)" accept="image/png">
+                                                <svg class="h-6 w-6 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                <p class="text-xs text-gray-500">새 로고 업로드 (PNG)</p>
+                                            </div>
+                                            <p x-show="logoError" x-text="logoError" class="mt-2 text-[10px] text-red-500 font-bold"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
+                                <h4 class="font-bold text-gray-700">📜 통합 가이드</h4>
+                                <ul class="text-sm text-gray-600 space-y-3 list-disc ml-4">
+                                    <li><strong>콘텐츠 분석:</strong> 업로드된 PDF 자료를 Gemini AI가 분석하여 최적의 메타데이터를 추출합니다.</li>
+                                    <li><strong>프리뷰 확인:</strong> 배포 전 AI가 생성한 제목, 상세 설명, 태그를 미리 확인하고 수정할 수 있습니다.</li>
+                                    <li><strong>자동 편집:</strong> 영상에 로고, 아웃트로를 합성하고 선택 시 자막을 생성합니다.</li>
+                                    <li><strong>원클릭 업로드:</strong> 모든 준비가 완료되면 YouTube API를 통해 채널에 즉시 게시됩니다.</li>
+                                    <li><strong>소셜 홍보:</strong> 업로드 완료 후, AI 요약 기술을 활용해 LinkedIn에 즉시 홍보 게시물을 작성할 수 있습니다.</li>
+                                </ul>
+                                <div class="pt-4 space-y-3">
+                                    <button 
+                                        @click="generateYoutubeMetadata()"
+                                        :disabled="!pdfFile || ytLoading"
+                                        :class="!pdfFile || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
+                                        class="w-full py-3 text-white font-bold rounded-lg transition shadow-md flex justify-center items-center"
+                                    >
+                                        <span x-show="!ytLoading">🔍 메타데이터 미리보기 생성</span>
+                                        <svg x-show="ytLoading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    </button>
+                                    <button 
+                                        @click="uploadYoutube()"
+                                        :disabled="!ytFile || !ytMetadata || ytLoading"
+                                        :class="!ytFile || !ytMetadata || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'"
+                                        class="w-full py-4 text-white font-bold rounded-lg transition shadow-lg flex justify-center items-center"
+                                    >
+                                        <span x-show="!ytLoading">🎬 최종 편집 및 업로드 시작</span>
+                                        <svg x-show="ytLoading" class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Youtube Result Area -->
+                        <div x-show="ytResult" x-cloak class="mt-8 p-6 rounded-xl shadow-sm border" :class="ytResult?.status === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <template x-if="ytResult?.status === 'success'">
+                                        <svg class="h-8 w-8 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                    </template>
+                                    <template x-if="ytResult?.status !== 'success'">
+                                        <svg class="h-8 w-8 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                                    </template>
+                                </div>
+                                <div class="ml-4 flex-grow">
+                                    <h3 class="text-xl font-bold" :class="ytResult?.status === 'success' ? 'text-green-800' : 'text-red-800'" x-text="ytResult?.status === 'success' ? '유튜브 업로드 완료!' : '오류 발생'"></h3>
+                                    <div class="mt-3 text-lg" :class="ytResult?.status === 'success' ? 'text-green-700' : 'text-red-700'">
+                                        <template x-if="ytResult?.status === 'success'">
+                                            <div class="space-y-4">
+                                                <p>영상이 성공적으로 처리되고 유튜브에 게시되었습니다.</p>
+                                                <div class="flex items-center gap-4">
+                                                    <a :href="ytResult.link" target="_blank" class="px-6 py-2 bg-red-600 text-white rounded-md font-bold hover:bg-red-700 transition shadow-md">🎬 영상 확인하기</a>
+                                                </div>
+                                                
+                                                <!-- LinkedIn 공유 섹션 -->
+                                                <div class="mt-6 pt-6 border-t border-green-200">
+                                                    <h4 class="text-lg font-bold text-green-900 mb-4">📢 LinkedIn에 홍보하기</h4>
+                                                    <div class="flex flex-wrap gap-4">
+                                                        <button 
+                                                            @click="shareYoutubeToLinkedin('ko')"
+                                                            :disabled="sharing"
+                                                            class="flex items-center px-6 py-3 bg-[#0077b5] text-white font-bold rounded-md hover:bg-[#005885] transition shadow-md disabled:opacity-50"
+                                                        >
+                                                            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                                            <span x-text="sharing === 'ko' ? '게시 중...' : '한국어로 포스팅'"></span>
+                                                        </button>
+                                                        <button 
+                                                            @click="shareYoutubeToLinkedin('en')"
+                                                            :disabled="sharing"
+                                                            class="flex items-center px-6 py-3 bg-[#0077b5] text-white font-bold rounded-md hover:bg-[#005885] transition shadow-md disabled:opacity-50"
+                                                        >
+                                                            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                                                            <span x-text="sharing === 'en' ? 'Posting...' : 'Post in English'"></span>
+                                                        </button>
+                                                    </div>
+                                                    <p x-show="shareMessage" class="mt-4 text-base font-bold" :class="shareStatus === 'success' ? 'text-blue-600' : 'text-red-600'" x-text="shareMessage"></p>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="ytResult?.status !== 'success'">
+                                            <p x-text="ytResult?.message || '알 수 없는 오류가 발생했습니다.'"></p>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Metadata Preview Area -->
+                        <div x-show="ytMetadata" x-transition x-cloak class="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6 shadow-sm">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-lg font-bold text-blue-900 flex items-center">
+                                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                                    메타데이터 미리보기 (AI Generated)
+                                </h4>
+                                <button @click="ytMetadata = null" class="text-blue-500 hover:text-blue-700 text-sm font-medium">닫기</button>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">영상 제목</label>
+                                    <div class="bg-white border border-blue-200 rounded p-3 text-sm font-bold" x-text="ytMetadata?.title"></div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">상세 설명</label>
+                                    <div class="bg-white border border-blue-200 rounded p-3 text-sm whitespace-pre-wrap leading-relaxed h-48 overflow-y-auto" x-text="ytMetadata?.description"></div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">태그</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="tag in ytMetadata?.tags" :key="tag">
+                                            <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium" x-text="'#' + tag"></span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                mainTab: 'wiki', // 'wiki' or 'youtube'
+                tab: 'file',
+                dragOver: false,
+                file: null,
+                title: '',
+                content: '',
+                loading: false,
+                result: null,
+                sharing: null,
+                shareStatus: null,
+                shareMessage: '',
+
+                // User State
+                user: null,
+
+                // Youtube Poster State
+                ytFile: null,
+                ytDragOver: false,
+                pdfFile: null,
+                pdfDragOver: false,
+                ytCategory: 'tech',
+                genSubtitles: false,
+                ytLoading: false,
+                ytMetadata: null,
+                ytResult: null,
+                logoTimestamp: Date.now(),
+                logoError: '',
+
+                async init() {
+                    const token = localStorage.getItem('access_token');
+                    if (!token) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch('/api/auth/me', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (response.ok) {
+                            this.user = await response.json();
+                        } else {
+                            localStorage.removeItem('access_token');
+                            window.location.href = '/login';
+                        }
+                    } catch (error) {
+                        console.error('Failed to fetch user:', error);
+                    }
+                },
+
+                logout() {
+                    localStorage.removeItem('access_token');
+                    window.location.href = '/login';
+                },
+
+                handleDrop(e) {
+                    this.dragOver = false;
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].name.endsWith('.md')) {
+                        this.file = files[0];
+                    } else {
+                        alert('MD 파일만 업로드 가능합니다.');
+                    }
+                },
+
+                handleFile(e) {
+                    const files = e.target.files;
+                    if (files.length > 0) {
+                        this.file = files[0];
+                    }
+                },
+
+                handleYtDrop(e) {
+                    this.ytDragOver = false;
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].type.startsWith('video/')) {
+                        this.ytFile = files[0];
+                    } else {
+                        alert('영상 파일만 업로드 가능합니다.');
+                    }
+                },
+
+                handleYtFile(e) {
+                    const files = e.target.files;
+                    if (files.length > 0) {
+                        this.ytFile = files[0];
+                    }
+                },
+
+                handlePdfDrop(e) {
+                    this.pdfDragOver = false;
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].name.endsWith('.pdf')) {
+                        this.pdfFile = files[0];
+                    } else {
+                        alert('PDF 파일만 업로드 가능합니다.');
+                    }
+                },
+
+                handlePdfFile(e) {
+                    const files = e.target.files;
+                    if (files.length > 0) {
+                        this.pdfFile = files[0];
+                    }
+                },
+
+                async generateYoutubeMetadata() {
+                    if (!this.pdfFile) return;
+                    
+                    this.ytLoading = true;
+                    const formData = new FormData();
+                    formData.append('pdf', this.pdfFile);
+                    formData.append('category', this.ytCategory);
+
+                    try {
+                        const response = await fetch('/api/youtube/metadata', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.ytMetadata = data.metadata;
+                        } else {
+                            alert('메타데이터 생성 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('오류 발생: ' + error.message);
+                    } finally {
+                        this.ytLoading = false;
+                    }
+                },
+
+                validateAndUploadLogo(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    this.logoError = '';
+                    
+                    // 1. 파일 형식 검증
+                    if (file.type !== 'image/png') {
+                        this.logoError = '❌ 로고는 배경이 투명한 PNG 파일만 가능합니다.';
+                        return;
+                    }
+
+                    const img = new Image();
+                    img.onload = async () => {
+                        const ratio = img.width / img.height;
+                        
+                        // 2. 사이즈 및 비율 검증 (가이드 기준: 1000x250, 4:1)
+                        // 대략적인 비율 허용 오차 10%
+                        if (ratio < 2.5 || ratio > 5.5) {
+                            this.logoError = `⚠️ 비율이 적절하지 않습니다 (현재 ${ratio.toFixed(1)}:1). 4:1에 가까운 가로형 로고를 권장합니다.`;
+                            // 경고만 하고 진행할 수 있게 하거나, 아예 막으려면 여기서 return
+                        }
+
+                        if (img.width < 400) {
+                            this.logoError = '❌ 로고 가로 해상도가 너무 낮습니다. (최소 400px 이상 권장)';
+                            return;
+                        }
+
+                        // 3. 업로드 진행
+                        const formData = new FormData();
+                        formData.append('logo', file);
+                        formData.append('category', this.ytCategory);
+
+                        try {
+                        const response = await fetch('/api/youtube/logo/upload', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
+                            const data = await response.json();
+                            if (data.status === 'success') {
+                                this.logoTimestamp = Date.now();
+                                alert('✅ 로고가 성공적으로 교체되었습니다.');
+                            } else {
+                                this.logoError = '❌ 업로드 실패: ' + data.message;
+                            }
+                        } catch (err) {
+                            this.logoError = '❌ 서버 오류 발생';
+                        }
+                    };
+                    img.src = URL.createObjectURL(file);
+                },
+
+                formatBytes(bytes, decimals = 2) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const dm = decimals < 0 ? 0 : decimals;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+                },
+
+                async upload() {
+                    this.loading = true;
+                    this.result = null;
+                    const formData = new FormData();
+
+                    if (this.tab === 'file') {
+                        formData.append('file', this.file);
+                    } else {
+                        formData.append('title', this.title);
+                        formData.append('content', this.content);
+                    }
+
+                    try {
+                        const response = await fetch('/api/upload', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
+                        this.result = await response.json();
+                    } catch (error) {
+                        this.result = { status: 'error', message: error.message };
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async shareToLinkedin(lang) {
+                    this.sharing = lang;
+                    this.shareStatus = null;
+                    this.shareMessage = '';
+
+                    const formData = new FormData();
+                    formData.append('wiki_id', this.result.wiki_id);
+                    formData.append('wiki_url', this.result.link);
+                    formData.append('lang', lang);
+
+                    try {
+                        const response = await fetch('/api/share/linkedin', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
+                        const data = await response.json();
+                        this.shareStatus = data.status;
+                        this.shareMessage = data.message;
+                    } catch (error) {
+                        this.shareStatus = 'error';
+                        this.shareMessage = '공유 중 오류가 발생했습니다: ' + error.message;
+                    } finally {
+                        this.sharing = null;
+                    }
+                },
+
+                async uploadYoutube() {
+                    if (!this.ytFile || !this.pdfFile) {
+                        alert('영상과 PDF 파일을 모두 업로드해주세요.');
+                        return;
+                    }
+
+                    this.ytLoading = true;
+                    this.ytResult = null;
+                    const formData = new FormData();
+                    formData.append('video', this.ytFile);
+                    formData.append('pdf', this.pdfFile);
+                    formData.append('category', this.ytCategory);
+                    formData.append('gen_sub', this.genSubtitles);
+
+                    try {
+                        const response = await fetch('/api/youtube/upload', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
+                        this.ytResult = await response.json();
+                    } catch (error) {
+                        this.ytResult = { status: 'error', message: error.message };
+                    } finally {
+                        this.ytLoading = false;
+                    }
+                },
+
+                async shareYoutubeToLinkedin(lang) {
+                    this.sharing = lang;
+                    this.shareStatus = null;
+                    this.shareMessage = '';
+
+                    const formData = new FormData();
+                    formData.append('video_id', this.ytResult.video_id);
+                    formData.append('video_url', this.ytResult.link);
+                    formData.append('lang', lang);
+
+                    try {
+                        const response = await fetch('/api/youtube/share/linkedin', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
+                        const data = await response.json();
+                        this.shareStatus = data.status;
+                        this.shareMessage = data.message;
+                    } catch (error) {
+                        this.shareStatus = 'error';
+                        this.shareMessage = '공유 중 오류가 발생했습니다: ' + error.message;
+                    } finally {
+                        this.sharing = null;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+

@@ -296,12 +296,18 @@ You are an expert web developer, technical writer, and translator.
 
 Convert the following Markdown content into a clean, professional, and responsive HTML document in {lang_label}.
 
+[CRITICAL: MOBILE OPTIMIZATION]
+1. **Viewport**: You MUST include <meta name="viewport" content="width=device-width, initial-scale=1.0"> in the <head>.
+2. **Container**: Wrap the article in a responsive container using Tailwind: `max-w-4xl mx-auto px-4 sm:px-6 lg:px-8`.
+3. **Typography**: Ensure font sizes adjust appropriately for small screens (e.g., use `text-2xl sm:text-3xl` for titles).
+4. **Tables & Images**: Ensure they don't break the layout. Use `overflow-x-auto` for tables if necessary.
+
 [CRITICAL REQUIREMENTS]
 1. **Structure**: Use the exact HTML structure provided below for the <body>. 
    - **DO NOT CHANGE** the <img> tag's `src` attribute. Use the provided {image_html} as-is.
-   <article class="wiki-content">
-     <div class="flex justify-between items-start border-b border-[#a2a9b1] pb-2 mb-6">
-       <h1 class="text-3xl font-sans font-bold text-[#000] leading-tight">{{{{TITLE_IN_{lang.upper()}}}}}</h1>
+   <article class="wiki-content max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+     <div class="flex flex-col sm:flex-row justify-between items-start border-b border-[#a2a9b1] pb-2 mb-6">
+       <h1 class="text-2xl sm:text-3xl font-sans font-bold text-[#000] leading-tight">{{{{TITLE_IN_{lang.upper()}}}}}</h1>
        <div class="flex items-center gap-2 mt-2 ml-4 shrink-0">
          <button class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-all" title="Copy Link">
            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
@@ -390,8 +396,16 @@ Convert the following Markdown content into a clean, professional, and responsiv
 
 4. **Output**: 
    - Return a COMPLETE, valid HTML5 document starting with <!DOCTYPE html>.
-   - The <head> should include appropriate meta tags, title, Tailwind scripts, and MathJax setup.
-   - The <body> should contain the <article> structure described above.
+   - The <head> MUST include:
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <title>{{{{TITLE_IN_{lang.upper()}}}}}</title>
+     <script src="https://cdn.tailwindcss.com"></script>
+     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+     <style>
+       /* Ensure long words break on mobile */
+       body { word-break: break-word; overflow-wrap: break-word; }
+       .wiki-html-content { width: 100%; max-width: 100vw; overflow-x: hidden; }
    - DO NOT include markdown code fences (like ```html) or any extra text.
 
 [MARKDOWN CONTENT TO CONVERT]
