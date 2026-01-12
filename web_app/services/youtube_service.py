@@ -22,8 +22,15 @@ YouTubeAutoPoster = load_youtube_poster()
 
 class YouTubeService:
     def __init__(self):
-        self.poster = YouTubeAutoPoster()
+        self._poster = None  # 지연 초기화
         self.base_v_dir = os.path.join(project_root, 'youtube_poster', 'v_source')
+    
+    @property
+    def poster(self):
+        """필요할 때만 YouTubeAutoPoster 인스턴스 생성"""
+        if self._poster is None:
+            self._poster = YouTubeAutoPoster()
+        return self._poster
 
     def get_logo_path(self, category):
         v_dir = os.path.join(self.base_v_dir, category)
