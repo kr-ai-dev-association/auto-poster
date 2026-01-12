@@ -127,15 +127,48 @@ class YouTubeService:
             )
             print(f"✅ Gemini API 응답 수신")
             
+            # 원본 응답 로깅 (디버깅용)
+            raw_text = response.text.strip()
+            print(f"📝 원본 응답 (처음 500자): {raw_text[:500]}")
+            
             # Remove any markdown code block wrappers if present
-            clean_text = re.sub(r'```json\s*|\s*```', '', response.text.strip())
+            clean_text = re.sub(r'```json\s*|\s*```', '', raw_text)
+            clean_text = clean_text.strip()
+            
+            # JSON 객체만 추출 (중괄호로 시작하고 끝나는 부분)
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+            if json_match:
+                clean_text = json_match.group(0)
+                print(f"📝 JSON 추출 완료 (길이: {len(clean_text)})")
+            else:
+                print(f"⚠️ JSON 객체를 찾을 수 없습니다. 원본 텍스트 사용")
             
             # Remove potential control characters that break json.loads
+            # 먼저 일반적인 JSON 파싱 시도
             try:
                 metadata = json.loads(clean_text)
-            except json.JSONDecodeError:
-                # Fallback: strict=False allows some control characters
-                metadata = json.loads(clean_text, strict=False)
+                print(f"✅ JSON 파싱 성공")
+            except json.JSONDecodeError as e:
+                print(f"⚠️ JSON 파싱 실패 (첫 번째 시도): {e}")
+                print(f"📝 파싱 시도한 텍스트 (처음 1000자): {clean_text[:1000]}")
+                
+                # 더 강력한 정리: 제어 문자 제거
+                import string
+                printable = set(string.printable)
+                clean_text = ''.join(filter(lambda x: x in printable, clean_text))
+                
+                # 다시 JSON 추출 시도
+                json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+                if json_match:
+                    clean_text = json_match.group(0)
+                
+                try:
+                    metadata = json.loads(clean_text, strict=False)
+                    print(f"✅ JSON 파싱 성공 (두 번째 시도)")
+                except json.JSONDecodeError as e2:
+                    print(f"❌ JSON 파싱 완전 실패: {e2}")
+                    print(f"📝 최종 시도 텍스트 (처음 2000자): {clean_text[:2000]}")
+                    raise Exception(f"JSON 파싱 실패: {str(e2)}. 응답 텍스트를 확인하세요.")
             
             return metadata
         except Exception as e:
@@ -197,19 +230,23 @@ class YouTubeService:
             if not logo_path:
                 raise Exception("Logo not found for category " + category)
             print(f"   로고 경로: {logo_path}")
+            print(f"   비디오 경로: {video_path}")
+            print(f"   최종 비디오 경로: {os.path.join(v_dir, f'final_{filename}')}")
+            print(f"   자막 경로: {srt_path if srt_path else '없음'}")
 
             final_video_path = os.path.join(v_dir, f"final_{filename}")
             try:
                 success = self.poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, final_video_path)
                 print(f"✅ 비디오 편집 완료: {success}")
+                if not success:
+                    error_msg = "비디오 편집이 실패했습니다. FFmpeg 에러 로그를 확인하세요."
+                    print(f"❌ {error_msg}")
+                    raise Exception(error_msg)
             except Exception as e:
                 print(f"❌ 비디오 편집 실패: {e}")
                 import traceback
                 traceback.print_exc()
                 raise
-            
-            if not success:
-                raise Exception("Video processing failed")
 
             # 5. 유튜브 업로드
             print(f"📤 YouTube 업로드 시작...")

@@ -182,12 +182,24 @@ class YouTubeAutoPoster:
             return None
 
     def get_video_info(self, video_path):
+        print(f"📹 비디오 정보 조회 시작: {video_path}")
+        print(f"   파일 존재 여부: {os.path.exists(video_path)}")
         cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'format=duration:stream=width,height', '-of', 'json', video_path]
         try:
+            print(f"   FFprobe 명령어: {' '.join(cmd)}")
             output = subprocess.check_output(cmd, text=True).strip()
             data = json.loads(output)
-            return float(data['format']['duration']), int(data['streams'][0]['width']), int(data['streams'][0]['height'])
-        except Exception:
+            duration = float(data['format']['duration'])
+            width = int(data['streams'][0]['width'])
+            height = int(data['streams'][0]['height'])
+            print(f"✅ 비디오 정보: duration={duration}s, width={width}, height={height}")
+            return duration, width, height
+        except Exception as e:
+            print(f"❌ 비디오 정보 조회 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            import sys
+            sys.stdout.flush()
             return 0, 1280, 720
 
     def generate_subtitles(self, video_path, lang='ko'):
@@ -304,8 +316,19 @@ class YouTubeAutoPoster:
         return path.replace('\\', '\\\\').replace(':', '\\\\:').replace("'", "'\\\\''")
 
     def add_logo_and_subs_to_video(self, video_input, logo_input, srt_input, video_output, margin=30, logo_width=180):
+        print(f"🎬 add_logo_and_subs_to_video 시작")
+        print(f"   video_input: {video_input}")
+        print(f"   logo_input: {logo_input}")
+        print(f"   srt_input: {srt_input}")
+        print(f"   video_output: {video_output}")
+        import sys
+        sys.stdout.flush()
+        
         duration, width, height = self.get_video_info(video_input)
         if duration == 0:
+            print(f"❌ 비디오 duration이 0입니다. 비디오 정보 조회 실패.")
+            import sys
+            sys.stdout.flush()
             return False
         
         outro_start = max(0, duration - 3)
@@ -379,20 +402,31 @@ class YouTubeAutoPoster:
         ]
         
         print(f"🎬 Processing video...")
+        print(f"   FFmpeg 명령어: {' '.join(cmd)}")
         original_cwd = os.getcwd()
         try:
             os.chdir(video_dir) # Change CWD to video directory
             print(f"   Working directory: {os.getcwd()}")
+            print(f"   입력 비디오 파일 존재 여부: {os.path.exists(os.path.basename(video_input))}")
+            print(f"   로고 파일 존재 여부: {os.path.exists(os.path.abspath(logo_input))}")
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
                 print("✅ Done!")
+                print(f"   출력 파일 생성 여부: {os.path.exists(os.path.abspath(video_output))}")
                 return True
             else:
                 print(f"❌ FFmpeg Error (code {result.returncode}):")
-                print(result.stderr)
+                print(f"   stdout: {result.stdout}")
+                print(f"   stderr: {result.stderr}")
+                import sys
+                sys.stdout.flush()
                 return False
         except Exception as e:
             print(f"❌ Exception: {e}")
+            import traceback
+            traceback.print_exc()
+            import sys
+            sys.stdout.flush()
             return False
         finally:
             os.chdir(original_cwd) # Restore CWD
