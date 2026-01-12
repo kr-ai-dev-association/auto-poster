@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>보안 파일 관리 - Auto Poster</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
@@ -14,9 +15,12 @@
     <div x-data="secureFilesApp()" x-init="loadFiles()" class="container mx-auto px-4 py-8">
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900">🔒 보안 파일 관리</h1>
-                <p class="text-gray-500 mt-1">암호화된 서비스 키 및 설정 파일 관리</p>
+            <div class="flex items-center">
+                <img src="/static/imgs/ai_profile.jpeg" alt="Logo" class="w-12 h-12 rounded-full object-cover mr-4 border-2 border-gray-300 shadow-md">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">🔒 보안 파일 관리</h1>
+                    <p class="text-gray-500 mt-1">암호화된 서비스 키 및 설정 파일 관리</p>
+                </div>
             </div>
             <a href="/" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
                 ← 메인으로

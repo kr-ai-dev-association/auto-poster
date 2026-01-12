@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>회원 관리 - Auto Poster</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
@@ -13,9 +14,12 @@
 <body class="bg-gray-50 min-h-screen">
     <div x-data="adminApp()" class="container mx-auto p-8">
         <div class="flex justify-between items-center mb-8">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900">👥 회원 관리</h1>
-                <p class="text-gray-500">사용 승인 및 권한 관리</p>
+            <div class="flex items-center">
+                <img src="/static/imgs/ai_profile.jpeg" alt="Logo" class="w-12 h-12 rounded-full object-cover mr-4 border-2 border-gray-300 shadow-md">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">👥 회원 관리</h1>
+                    <p class="text-gray-500">사용 승인 및 권한 관리</p>
+                </div>
             </div>
             <a href="/" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition">홈으로 돌아가기</a>
         </div>

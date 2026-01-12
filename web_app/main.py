@@ -85,6 +85,14 @@ def get_super_admin(user: models.User = Depends(get_current_user)):
 
 # --- 페이지 라우트 ---
 
+@app.get("/favicon.ico")
+async def favicon():
+    """Favicon 반환"""
+    favicon_path = os.path.join("static", "imgs", "ai_profile.ico")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path, media_type="image/x-icon")
+    raise HTTPException(status_code=404, detail="Favicon not found")
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})

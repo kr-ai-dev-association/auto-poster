@@ -1,20 +1,17 @@
 import os
 import sys
-import glob
 import logging
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
-# core 및 2_blog_poster 모듈 import를 위한 경로 설정
+# core 모듈 import를 위한 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir)) # 루트
 sys.path.append(project_root)
-sys.path.append(os.path.join(project_root, '2_blog_poster'))
 
 # 기존 core 모듈 재사용
 from core.linkedin_poster import LinkedInPoster
 from core.summarizer import GeminiSummarizer
-from scraper import parse_content
 
 load_dotenv()
 logger = logging.getLogger(__name__)
