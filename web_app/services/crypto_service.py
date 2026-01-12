@@ -175,7 +175,12 @@ class CryptoService:
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
+                    value = value.strip()
+                    # 따옴표 제거 (양쪽 따옴표가 모두 있으면 제거)
+                    if len(value) >= 2:
+                        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                            value = value[1:-1]
+                    os.environ[key.strip()] = value
             
             print(f"✅ [{environment.upper()}] Environment variables loaded from encrypted DB")
             return True

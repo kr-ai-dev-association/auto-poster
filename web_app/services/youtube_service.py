@@ -2,8 +2,10 @@ import os
 import sys
 import json
 import shutil
+import re
 import importlib.util
 from fastapi.responses import FileResponse
+from google.genai import types
 
 # 루트 경로 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -64,11 +66,15 @@ class YouTubeService:
         return save_path
 
     async def generate_metadata(self, pdf_content, category, lang='ko'):
-        # 임시 파일로 PDF 저장
-        temp_pdf = os.path.join(self.base_v_dir, category, "temp_metadata_source.pdf")
-        with open(temp_pdf, "wb") as f:
-            f.write(pdf_content)
-
+        """PDF 분석을 통해 유튜브 메타데이터를 생성합니다. YouTube API 인증 없이 Gemini만 사용."""
+        from core.summarizer import GeminiSummarizer
+        
+        # PDF 내용 확인
+        if not pdf_content or len(pdf_content) == 0:
+            raise Exception("PDF 파일이 비어있거나 전달되지 않았습니다.")
+        
+        print(f"📄 PDF 파일 수신: {len(pdf_content)} bytes")
+        
         # 템플릿 읽기
         desc_path = os.path.join(self.base_v_dir, category, f'desc_{lang}.md')
         if not os.path.exists(desc_path):
@@ -79,13 +85,65 @@ class YouTubeService:
             with open(desc_path, 'r', encoding='utf-8') as f:
                 desc_template = f.read()
 
-        metadata = self.poster.generate_youtube_metadata(temp_pdf, lang=lang, desc_template=desc_template)
+        # GeminiSummarizer 사용 (YouTube API 인증 불필요)
+        summarizer = GeminiSummarizer()
+        if not summarizer.client:
+            raise Exception("GEMINI_API_KEY가 설정되지 않았습니다.")
         
-        # 임시 파일 삭제
-        if os.path.exists(temp_pdf):
-            os.remove(temp_pdf)
+        lang_str = "Korean" if lang == 'ko' else "English"
+        
+        # YouTube 메타데이터 생성 프롬프트
+        prompt = f"""
+        Analyze the attached PDF and generate YouTube-optimized metadata in {lang_str}.
+        
+        [CRITICAL INSTRUCTIONS]
+        1. Title: Create a click-worthy, dramatic title based on the PDF content.
+        2. Description: Use the provided [TEMPLATE] below as a reference for style, tone, and structure.
+           - Keep the dramatic storytelling opening.
+           - Integrate the CORE findings and value propositions from the PDF into the middle section.
+           - Keep the 'Service & Contact' information at the bottom exactly as in the template.
+           - Use Emojis and Unicode bold characters for emphasis (YouTube doesn't support markdown bold).
+           - Ensure URLs are plain text so they become clickable on YouTube.
+        3. Tags: Generate 20+ highly relevant hashtags and keywords in {lang_str} based on the PDF content.
+        
+        [TEMPLATE]
+        {desc_template}
+        
+        IMPORTANT: You MUST analyze the PDF content thoroughly and extract key information from it. Do not use generic content.
+        
+        Return ONLY a valid JSON object:
+        {{
+          "title": "...",
+          "description": "...",
+          "tags": ["tag1", "tag2", ...]
+        }}
+        """
+        
+        try:
+            print(f"🤖 Gemini API 호출 중... (PDF 크기: {len(pdf_content)} bytes)")
+            response = summarizer.client.models.generate_content(
+                model=summarizer.model_id,
+                contents=[prompt, types.Part.from_bytes(data=pdf_content, mime_type='application/pdf')]
+            )
+            print(f"✅ Gemini API 응답 수신")
             
-        return metadata
+            # Remove any markdown code block wrappers if present
+            clean_text = re.sub(r'```json\s*|\s*```', '', response.text.strip())
+            
+            # Remove potential control characters that break json.loads
+            try:
+                metadata = json.loads(clean_text)
+            except json.JSONDecodeError:
+                # Fallback: strict=False allows some control characters
+                metadata = json.loads(clean_text, strict=False)
+            
+            return metadata
+        except Exception as e:
+            print(f"❌ Error generating metadata: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback metadata는 사용하지 않고 에러를 전파
+            raise Exception(f"메타데이터 생성 실패: {str(e)}")
 
     async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', gen_sub=False):
         """영상을 처리하고 유튜브에 업로드합니다."""
@@ -113,26 +171,56 @@ class YouTubeService:
                 with open(desc_path, 'r', encoding='utf-8') as f:
                     desc_template = f.read()
 
-            metadata = self.poster.generate_youtube_metadata(pdf_path, lang=lang, desc_template=desc_template)
+            print(f"📝 메타데이터 생성 시작 (PDF: {pdf_path})")
+            # YouTube API 인증 없이 메타데이터 생성 (generate_metadata 메서드 사용)
+            with open(pdf_path, 'rb') as f:
+                pdf_content = f.read()
+            metadata = await self.generate_metadata(pdf_content, category, lang)
+            print(f"✅ 메타데이터 생성 완료: {metadata.get('title', 'N/A')[:50]}...")
 
             # 3. 자막 생성 (옵션)
             srt_path = None
             if gen_sub:
-                srt_path = self.poster.generate_subtitles(video_path, lang=lang)
+                print(f"📝 자막 생성 시작...")
+                try:
+                    srt_path = self.poster.generate_subtitles(video_path, lang=lang)
+                    print(f"✅ 자막 생성 완료: {srt_path}")
+                except Exception as e:
+                    print(f"❌ 자막 생성 실패: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    raise
 
             # 4. 로고 및 자막 합성
+            print(f"🎨 로고 및 자막 합성 시작...")
             logo_path = self.get_logo_path(category)
             if not logo_path:
                 raise Exception("Logo not found for category " + category)
+            print(f"   로고 경로: {logo_path}")
 
             final_video_path = os.path.join(v_dir, f"final_{filename}")
-            success = self.poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, final_video_path)
+            try:
+                success = self.poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, final_video_path)
+                print(f"✅ 비디오 편집 완료: {success}")
+            except Exception as e:
+                print(f"❌ 비디오 편집 실패: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
             
             if not success:
                 raise Exception("Video processing failed")
 
             # 5. 유튜브 업로드
-            video_id = self.poster.upload_video(final_video_path, metadata)
+            print(f"📤 YouTube 업로드 시작...")
+            try:
+                video_id = self.poster.upload_video(final_video_path, metadata)
+                print(f"✅ YouTube 업로드 완료: {video_id}")
+            except Exception as e:
+                print(f"❌ YouTube 업로드 실패: {e}")
+                import traceback
+                traceback.print_exc()
+                raise
             
             if not video_id:
                 raise Exception("YouTube upload failed")

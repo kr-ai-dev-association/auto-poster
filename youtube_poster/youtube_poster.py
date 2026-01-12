@@ -79,14 +79,20 @@ class YouTubeAutoPoster:
         
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                try:
+                    creds.refresh(Request())
+                    # 갱신된 토큰 저장
+                    with open(self.token_file, 'wb') as token:
+                        pickle.dump(creds, token)
+                except Exception as e:
+                    raise Exception(f"YouTube OAuth 토큰 갱신 실패: {str(e)}. 새로운 인증이 필요합니다.")
             else:
-                secrets_path = self._get_client_secrets_path()
-                flow = InstalledAppFlow.from_client_secrets_file(secrets_path, self.scopes)
-                creds = flow.run_local_server(port=0)
-            
-            with open(self.token_file, 'wb') as token:
-                pickle.dump(creds, token)
+                # 서버 환경에서는 대화형 OAuth 플로우를 사용할 수 없음
+                raise Exception(
+                    "YouTube OAuth 인증이 필요합니다. "
+                    "로컬 환경에서 먼저 인증을 완료하고 token.pickle 파일을 서버에 업로드하세요. "
+                    "또는 refresh_token이 있는 유효한 토큰이 필요합니다."
+                )
         
         return build('youtube', 'v3', credentials=creds)
 
