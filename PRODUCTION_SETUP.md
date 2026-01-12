@@ -1,5 +1,22 @@
 # 프로덕션 모드 설정 가이드
 
+## 시스템 요구사항
+
+### 필수 패키지 설치
+
+YouTube 비디오 업로드 기능을 사용하려면 FFmpeg가 필요합니다:
+
+```bash
+sudo apt update
+sudo apt install -y ffmpeg
+```
+
+설치 확인:
+```bash
+which ffmpeg ffprobe
+ffmpeg -version
+```
+
 ## 현재 상태
 - ✅ `ENVIRONMENT=production`으로 설정 완료
 - ⚠️ DB에 업로드된 보안 파일들이 복호화되지 않음
