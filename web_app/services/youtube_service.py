@@ -22,6 +22,127 @@ def load_youtube_poster():
 
 YouTubeAutoPoster = load_youtube_poster()
 
+class YouTubeMetadataValidator:
+    """YouTube 메타데이터 검증기"""
+    
+    # YouTube API 제약사항
+    MAX_TITLE_LENGTH = 100
+    MAX_DESCRIPTION_LENGTH = 5000
+    MAX_TAGS_COUNT = 500
+    MAX_TAG_LENGTH = 30
+    
+    @staticmethod
+    def validate(metadata):
+        """
+        YouTube 메타데이터를 검증합니다.
+        
+        Returns:
+            tuple: (is_valid: bool, errors: list, warnings: list)
+        """
+        errors = []
+        warnings = []
+        
+        if not isinstance(metadata, dict):
+            errors.append("메타데이터는 딕셔너리 형식이어야 합니다.")
+            return False, errors, warnings
+        
+        # 필수 필드 검증
+        required_fields = ['title', 'description', 'tags']
+        for field in required_fields:
+            if field not in metadata:
+                errors.append(f"필수 필드 '{field}'가 없습니다.")
+        
+        if errors:
+            return False, errors, warnings
+        
+        # 제목 검증
+        title = str(metadata['title']).strip()
+        if not title:
+            errors.append("제목이 비어있습니다.")
+        elif len(title) > YouTubeMetadataValidator.MAX_TITLE_LENGTH:
+            errors.append(f"제목이 너무 깁니다. (최대 {YouTubeMetadataValidator.MAX_TITLE_LENGTH}자, 현재 {len(title)}자)")
+            # 자동 자르기 제안
+            warnings.append(f"제목을 {YouTubeMetadataValidator.MAX_TITLE_LENGTH}자로 자르는 것을 권장합니다.")
+        
+        # 설명 검증
+        description = str(metadata['description']).strip()
+        if not description:
+            errors.append("설명이 비어있습니다.")
+        elif len(description) > YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH:
+            errors.append(f"설명이 너무 깁니다. (최대 {YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH}자, 현재 {len(description)}자)")
+            warnings.append(f"설명을 {YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH}자로 자르는 것을 권장합니다.")
+        
+        # 태그 검증
+        tags = metadata['tags']
+        if not isinstance(tags, list):
+            errors.append("태그는 배열 형식이어야 합니다.")
+        elif len(tags) == 0:
+            warnings.append("태그가 없습니다. 검색 최적화를 위해 태그를 추가하는 것을 권장합니다.")
+        else:
+            if len(tags) > YouTubeMetadataValidator.MAX_TAGS_COUNT:
+                errors.append(f"태그가 너무 많습니다. (최대 {YouTubeMetadataValidator.MAX_TAGS_COUNT}개, 현재 {len(tags)}개)")
+                warnings.append(f"태그를 {YouTubeMetadataValidator.MAX_TAGS_COUNT}개로 줄이는 것을 권장합니다.")
+            
+            # 각 태그 검증
+            invalid_tags = []
+            for i, tag in enumerate(tags):
+                tag_str = str(tag).strip()
+                if not tag_str:
+                    invalid_tags.append(f"태그 #{i+1}: 빈 태그")
+                elif len(tag_str) > YouTubeMetadataValidator.MAX_TAG_LENGTH:
+                    invalid_tags.append(f"태그 #{i+1} ('{tag_str[:20]}...'): {len(tag_str)}자 (최대 {YouTubeMetadataValidator.MAX_TAG_LENGTH}자)")
+            
+            if invalid_tags:
+                errors.extend(invalid_tags)
+        
+        is_valid = len(errors) == 0
+        return is_valid, errors, warnings
+    
+    @staticmethod
+    def fix(metadata):
+        """
+        메타데이터를 자동으로 수정합니다 (제한 초과 시 자르기).
+        
+        Returns:
+            dict: 수정된 메타데이터
+        """
+        fixed = metadata.copy()
+        
+        # 제목 자르기
+        if 'title' in fixed:
+            title = str(fixed['title']).strip()
+            if len(title) > YouTubeMetadataValidator.MAX_TITLE_LENGTH:
+                fixed['title'] = title[:YouTubeMetadataValidator.MAX_TITLE_LENGTH].strip()
+                print(f"⚠️ 제목이 {len(title)}자에서 {len(fixed['title'])}자로 자동 자름")
+        
+        # 설명 자르기
+        if 'description' in fixed:
+            description = str(fixed['description']).strip()
+            if len(description) > YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH:
+                fixed['description'] = description[:YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH].strip()
+                print(f"⚠️ 설명이 {len(description)}자에서 {len(fixed['description'])}자로 자동 자름")
+        
+        # 태그 정리
+        if 'tags' in fixed and isinstance(fixed['tags'], list):
+            fixed_tags = []
+            for tag in fixed['tags']:
+                tag_str = str(tag).strip()
+                if tag_str:
+                    # 태그 길이 제한
+                    if len(tag_str) > YouTubeMetadataValidator.MAX_TAG_LENGTH:
+                        tag_str = tag_str[:YouTubeMetadataValidator.MAX_TAG_LENGTH].strip()
+                        print(f"⚠️ 태그 '{tag_str}'가 자동으로 자름")
+                    fixed_tags.append(tag_str)
+            
+            # 태그 개수 제한
+            if len(fixed_tags) > YouTubeMetadataValidator.MAX_TAGS_COUNT:
+                fixed_tags = fixed_tags[:YouTubeMetadataValidator.MAX_TAGS_COUNT]
+                print(f"⚠️ 태그가 {len(fixed_tags)}개로 자동 제한")
+            
+            fixed['tags'] = fixed_tags
+        
+        return fixed
+
 class YouTubeService:
     def __init__(self):
         self._poster = None  # 지연 초기화
@@ -346,6 +467,33 @@ class YouTubeService:
                                     print(f"📝 에러 위치 표시: {error_line[:e2.colno-1]}>>>{error_line[e2.colno-1:min(e2.colno+20, len(error_line))]}")
                         raise Exception(f"JSON 파싱 실패: {str(e2)}. 응답 텍스트를 확인하세요.")
             
+            # 메타데이터 검증
+            print(f"🔍 메타데이터 검증 중...")
+            is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
+            
+            if warnings:
+                for warning in warnings:
+                    print(f"⚠️ 경고: {warning}")
+            
+            if not is_valid:
+                print(f"❌ 메타데이터 검증 실패:")
+                for error in errors:
+                    print(f"   - {error}")
+                
+                # 자동 수정 시도
+                print(f"🔧 메타데이터 자동 수정 시도 중...")
+                metadata = YouTubeMetadataValidator.fix(metadata)
+                
+                # 재검증
+                is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
+                if not is_valid:
+                    error_msg = "메타데이터 검증 실패:\n" + "\n".join(f"  - {e}" for e in errors)
+                    raise Exception(error_msg)
+                else:
+                    print(f"✅ 메타데이터 자동 수정 완료")
+            else:
+                print(f"✅ 메타데이터 검증 통과")
+            
             return metadata
         except Exception as e:
             print(f"❌ Error generating metadata: {e}")
@@ -386,6 +534,33 @@ class YouTubeService:
                 pdf_content = f.read()
             metadata = await self.generate_metadata(pdf_content, category, lang)
             print(f"✅ 메타데이터 생성 완료: {metadata.get('title', 'N/A')[:50]}...")
+            
+            # 업로드 전 최종 검증
+            print(f"🔍 업로드 전 메타데이터 최종 검증 중...")
+            is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
+            
+            if warnings:
+                for warning in warnings:
+                    print(f"⚠️ 경고: {warning}")
+            
+            if not is_valid:
+                print(f"❌ 메타데이터 검증 실패:")
+                for error in errors:
+                    print(f"   - {error}")
+                
+                # 자동 수정 시도
+                print(f"🔧 메타데이터 자동 수정 시도 중...")
+                metadata = YouTubeMetadataValidator.fix(metadata)
+                
+                # 재검증
+                is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
+                if not is_valid:
+                    error_msg = "업로드 전 메타데이터 검증 실패:\n" + "\n".join(f"  - {e}" for e in errors)
+                    raise Exception(error_msg)
+                else:
+                    print(f"✅ 메타데이터 자동 수정 완료")
+            else:
+                print(f"✅ 메타데이터 최종 검증 통과")
 
             # 3. 자막 생성 (옵션)
             srt_path = None

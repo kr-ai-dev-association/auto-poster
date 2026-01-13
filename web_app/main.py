@@ -370,9 +370,23 @@ async def generate_youtube_metadata(
 ):
     """PDF 분석을 통해 유튜브 메타데이터를 생성합니다."""
     try:
+        from web_app.services.youtube_service import YouTubeMetadataValidator
+        
         content = await pdf.read()
         metadata = await youtube.generate_metadata(content, category, lang)
-        return JSONResponse(content={"status": "success", "metadata": metadata})
+        
+        # 검증 결과 포함
+        is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "metadata": metadata,
+            "validation": {
+                "is_valid": is_valid,
+                "errors": errors,
+                "warnings": warnings
+            }
+        })
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
