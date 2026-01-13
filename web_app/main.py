@@ -390,6 +390,28 @@ async def generate_youtube_metadata(
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@app.post("/api/youtube/metadata/validate")
+async def validate_youtube_metadata(
+    metadata: dict,
+    user: models.User = Depends(get_current_user)
+):
+    """YouTube 메타데이터를 검증합니다."""
+    try:
+        from web_app.services.youtube_service import YouTubeMetadataValidator
+        
+        is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "validation": {
+                "is_valid": is_valid,
+                "errors": errors,
+                "warnings": warnings
+            }
+        })
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
 @app.post("/api/youtube/upload")
 async def youtube_upload(
     video: UploadFile = File(...),

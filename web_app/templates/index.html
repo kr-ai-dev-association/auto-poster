@@ -473,7 +473,38 @@
                                     <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
                                     메타데이터 미리보기 (AI Generated)
                                 </h4>
-                                <button @click="ytMetadata = null; ytValidation = null;" class="text-blue-500 hover:text-blue-700 text-sm font-medium">닫기</button>
+                                <div class="flex gap-2">
+                                    <template x-if="!ytMetadataEditing">
+                                        <button @click="startEditingMetadata()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                            편집
+                                        </button>
+                                    </template>
+                                    <template x-if="ytMetadataEditing">
+                                        <button @click="validateMetadata()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            검증
+                                        </button>
+                                    </template>
+                                    <template x-if="ytMetadataEditing">
+                                        <button @click="saveMetadata()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            저장
+                                        </button>
+                                    </template>
+                                    <template x-if="ytMetadataEditing">
+                                        <button @click="cancelEditingMetadata()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm font-medium">
+                                            취소
+                                        </button>
+                                    </template>
+                                    <button @click="ytMetadata = null; ytValidation = null; ytMetadataEditing = false; ytMetadataEdited = null;" class="text-blue-500 hover:text-blue-700 text-sm font-medium">닫기</button>
+                                </div>
                             </div>
                             
                             <!-- 검증 결과 표시 -->
@@ -505,22 +536,78 @@
                             </div>
                             
                             <div class="space-y-4">
-                                <div>
-                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">영상 제목</label>
-                                    <div class="bg-white border border-blue-200 rounded p-3 text-sm font-bold" x-text="ytMetadata?.title"></div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">상세 설명</label>
-                                    <div class="bg-white border border-blue-200 rounded p-3 text-sm whitespace-pre-wrap leading-relaxed h-48 overflow-y-auto" x-text="ytMetadata?.description"></div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">태그</label>
-                                    <div class="flex flex-wrap gap-2">
-                                        <template x-for="(tag, index) in (ytMetadata?.tags || [])" :key="`tag-${index}-${tag}`">
-                                            <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium" x-text="'#' + tag"></span>
-                                        </template>
+                                <!-- 편집 모드가 아닐 때 -->
+                                <template x-if="!ytMetadataEditing">
+                                    <div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">영상 제목</label>
+                                            <div class="bg-white border border-blue-200 rounded p-3 text-sm font-bold" x-text="ytMetadata?.title"></div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">상세 설명</label>
+                                            <div class="bg-white border border-blue-200 rounded p-3 text-sm whitespace-pre-wrap leading-relaxed h-48 overflow-y-auto" x-text="ytMetadata?.description"></div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">태그</label>
+                                            <div class="flex flex-wrap gap-2">
+                                                <template x-for="(tag, index) in (ytMetadata?.tags || [])" :key="`tag-${index}-${tag}`">
+                                                    <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium" x-text="'#' + tag"></span>
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
+                                </template>
+                                
+                                <!-- 편집 모드일 때 -->
+                                <template x-if="ytMetadataEditing">
+                                    <div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">
+                                                영상 제목 <span class="text-gray-500">(최대 100자)</span>
+                                            </label>
+                                            <input 
+                                                type="text" 
+                                                x-model="ytMetadataEdited.title"
+                                                class="w-full bg-white border border-blue-200 rounded p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                :maxlength="100"
+                                            />
+                                            <div class="text-xs text-gray-500 mt-1" x-text="`${(ytMetadataEdited?.title || '').length} / 100자`"></div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">
+                                                상세 설명 <span class="text-gray-500">(최대 5000자)</span>
+                                            </label>
+                                            <textarea 
+                                                x-model="ytMetadataEdited.description"
+                                                class="w-full bg-white border border-blue-200 rounded p-3 text-sm leading-relaxed h-48 resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                :maxlength="5000"
+                                            ></textarea>
+                                            <div class="text-xs text-gray-500 mt-1" x-text="`${(ytMetadataEdited?.description || '').length} / 5000자`"></div>
+                                        </div>
+                                        <div class="mt-4">
+                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">
+                                                태그 <span class="text-gray-500">(쉼표로 구분, 최대 500개, 각 태그 최대 30자)</span>
+                                            </label>
+                                            <textarea 
+                                                x-model="ytMetadataEdited.tagsString"
+                                                @input="updateTagsFromString()"
+                                                class="w-full bg-white border border-blue-200 rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                placeholder="태그1, 태그2, 태그3..."
+                                                rows="3"
+                                            ></textarea>
+                                            <div class="text-xs text-gray-500 mt-1">
+                                                <span x-text="`${getTagsArray().length}개 태그`"></span>
+                                                <span class="ml-2" x-show="getTagsArray().length > 0">
+                                                    미리보기: 
+                                                    <template x-for="(tag, index) in getTagsArray().slice(0, 10)" :key="`preview-${index}-${tag}`">
+                                                        <span class="bg-blue-100 text-blue-700 px-1 py-0.5 rounded text-xs mr-1" x-text="'#' + tag"></span>
+                                                    </template>
+                                                    <span x-show="getTagsArray().length > 10" x-text="` 외 ${getTagsArray().length - 10}개`"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -557,6 +644,8 @@
                 genSubtitles: false,
                 ytLoading: false,
                 ytMetadata: null,
+                ytMetadataEditing: false,
+                ytMetadataEdited: null,
                 ytValidation: null,
                 ytResult: null,
                 logoTimestamp: Date.now(),
@@ -659,6 +748,8 @@
                         if (data.status === 'success') {
                             this.ytMetadata = data.metadata;
                             this.ytValidation = data.validation || null;
+                            this.ytMetadataEditing = false;
+                            this.ytMetadataEdited = null;
                         } else {
                             alert('메타데이터 생성 실패: ' + data.message);
                         }
@@ -667,6 +758,99 @@
                     } finally {
                         this.ytLoading = false;
                     }
+                },
+                
+                startEditingMetadata() {
+                    if (!this.ytMetadata) return;
+                    
+                    // 편집용 복사본 생성
+                    this.ytMetadataEdited = {
+                        title: this.ytMetadata.title || '',
+                        description: this.ytMetadata.description || '',
+                        tagsString: (this.ytMetadata.tags || []).join(', ')
+                    };
+                    
+                    this.ytMetadataEditing = true;
+                },
+                
+                getTagsArray() {
+                    if (!this.ytMetadataEdited || !this.ytMetadataEdited.tagsString) return [];
+                    return this.ytMetadataEdited.tagsString
+                        .split(',')
+                        .map(t => t.trim())
+                        .filter(t => t.length > 0);
+                },
+                
+                updateTagsFromString() {
+                    // 태그 배열 업데이트 (실시간 미리보기용)
+                    // 실제로는 getTagsArray()를 사용하므로 별도 업데이트 불필요
+                },
+                
+                cancelEditingMetadata() {
+                    this.ytMetadataEditing = false;
+                    this.ytMetadataEdited = null;
+                },
+                
+                async validateMetadata() {
+                    if (!this.ytMetadataEdited) return;
+                    
+                    // 태그 문자열을 배열로 변환
+                    const tags = this.getTagsArray();
+                    
+                    const metadataToValidate = {
+                        title: this.ytMetadataEdited.title || '',
+                        description: this.ytMetadataEdited.description || '',
+                        tags: tags
+                    };
+                    
+                    try {
+                        const response = await fetch('/api/youtube/metadata/validate', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(metadataToValidate)
+                        });
+                        
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.ytValidation = data.validation;
+                            
+                            if (data.validation.is_valid) {
+                                alert('✅ 메타데이터 검증 통과!');
+                            } else {
+                                alert('❌ 메타데이터 검증 실패:\n' + data.validation.errors.join('\n'));
+                            }
+                        } else {
+                            alert('검증 중 오류 발생: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('검증 중 오류 발생: ' + error.message);
+                    }
+                },
+                
+                saveMetadata() {
+                    if (!this.ytMetadataEdited) return;
+                    
+                    // 태그 문자열을 배열로 변환
+                    const tags = this.getTagsArray();
+                    
+                    // 메타데이터 업데이트
+                    this.ytMetadata = {
+                        title: this.ytMetadataEdited.title || '',
+                        description: this.ytMetadataEdited.description || '',
+                        tags: tags
+                    };
+                    
+                    // 검증 초기화 (새로 검증 필요)
+                    this.ytValidation = null;
+                    
+                    // 편집 모드 종료
+                    this.ytMetadataEditing = false;
+                    this.ytMetadataEdited = null;
+                    
+                    alert('✅ 메타데이터가 저장되었습니다.');
                 },
 
                 validateAndUploadLogo(e) {
