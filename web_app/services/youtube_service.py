@@ -135,39 +135,157 @@ class YouTubeService:
             clean_text = re.sub(r'```json\s*|\s*```', '', raw_text)
             clean_text = clean_text.strip()
             
-            # JSON 객체만 추출 (중괄호로 시작하고 끝나는 부분)
-            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
-            if json_match:
-                clean_text = json_match.group(0)
+            # JSON 객체 추출 함수 (중괄호 매칭)
+            def extract_json_object(text):
+                """중괄호를 정확히 매칭하여 JSON 객체 추출"""
+                start_idx = text.find('{')
+                if start_idx == -1:
+                    return None
+                
+                depth = 0
+                in_string = False
+                escape_next = False
+                
+                for i in range(start_idx, len(text)):
+                    char = text[i]
+                    
+                    if escape_next:
+                        escape_next = False
+                        continue
+                    
+                    if char == '\\':
+                        escape_next = True
+                        continue
+                    
+                    if char == '"' and not escape_next:
+                        in_string = not in_string
+                        continue
+                    
+                    if not in_string:
+                        if char == '{':
+                            depth += 1
+                        elif char == '}':
+                            depth -= 1
+                            if depth == 0:
+                                return text[start_idx:i+1]
+                
+                return None
+            
+            # JSON 객체 추출
+            json_text = extract_json_object(clean_text)
+            if json_text:
+                clean_text = json_text
                 print(f"📝 JSON 추출 완료 (길이: {len(clean_text)})")
             else:
-                print(f"⚠️ JSON 객체를 찾을 수 없습니다. 원본 텍스트 사용")
-            
-            # Remove potential control characters that break json.loads
-            # 먼저 일반적인 JSON 파싱 시도
-            try:
-                metadata = json.loads(clean_text)
-                print(f"✅ JSON 파싱 성공")
-            except json.JSONDecodeError as e:
-                print(f"⚠️ JSON 파싱 실패 (첫 번째 시도): {e}")
-                print(f"📝 파싱 시도한 텍스트 (처음 1000자): {clean_text[:1000]}")
-                
-                # 더 강력한 정리: 제어 문자 제거
-                import string
-                printable = set(string.printable)
-                clean_text = ''.join(filter(lambda x: x in printable, clean_text))
-                
-                # 다시 JSON 추출 시도
+                # 대체 방법: 정규식으로 추출
                 json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
                 if json_match:
                     clean_text = json_match.group(0)
-                
+                    print(f"📝 JSON 추출 완료 (정규식, 길이: {len(clean_text)})")
+                else:
+                    print(f"⚠️ JSON 객체를 찾을 수 없습니다. 원본 텍스트 사용")
+            
+            # JSON 파싱 시도 (여러 단계)
+            metadata = None
+            parse_attempts = [
+                ("기본 파싱", lambda t: json.loads(t)),
+                ("strict=False", lambda t: json.loads(t, strict=False)),
+            ]
+            
+            for attempt_name, parse_func in parse_attempts:
                 try:
-                    metadata = json.loads(clean_text, strict=False)
-                    print(f"✅ JSON 파싱 성공 (두 번째 시도)")
+                    metadata = parse_func(clean_text)
+                    print(f"✅ JSON 파싱 성공 ({attempt_name})")
+                    break
+                except json.JSONDecodeError as e:
+                    print(f"⚠️ JSON 파싱 실패 ({attempt_name}): {e}")
+                    if attempt_name == "기본 파싱":
+                        print(f"📝 파싱 시도한 텍스트 (처음 1000자): {clean_text[:1000]}")
+            
+            # 파싱 실패 시 추가 정리 시도
+            if metadata is None:
+                print(f"🔧 추가 정리 시도 중...")
+                
+                # 제어 문자 제거
+                import string
+                printable = set(string.printable)
+                cleaned = ''.join(filter(lambda x: x in printable, clean_text))
+                
+                # 다시 JSON 추출
+                json_text = extract_json_object(cleaned)
+                if json_text:
+                    cleaned = json_text
+                else:
+                    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+                    if json_match:
+                        cleaned = json_match.group(0)
+                
+                # 일반적인 JSON 오류 수정 시도
+                # 1. 문자열 내부의 줄바꿈을 이스케이프
+                def fix_json_strings(text):
+                    """문자열 내부의 줄바꿈과 특수 문자를 이스케이프"""
+                    result = []
+                    in_string = False
+                    escape_next = False
+                    i = 0
+                    
+                    while i < len(text):
+                        char = text[i]
+                        
+                        if escape_next:
+                            result.append(char)
+                            escape_next = False
+                            i += 1
+                            continue
+                        
+                        if char == '\\':
+                            result.append(char)
+                            escape_next = True
+                            i += 1
+                            continue
+                        
+                        if char == '"':
+                            in_string = not in_string
+                            result.append(char)
+                            i += 1
+                            continue
+                        
+                        if in_string:
+                            # 문자열 내부: 줄바꿈과 탭을 이스케이프
+                            if char == '\n':
+                                result.append('\\n')
+                            elif char == '\r':
+                                result.append('\\r')
+                            elif char == '\t':
+                                result.append('\\t')
+                            elif ord(char) < 32:  # 제어 문자
+                                result.append(f'\\u{ord(char):04x}')
+                            else:
+                                result.append(char)
+                        else:
+                            result.append(char)
+                        
+                        i += 1
+                    
+                    return ''.join(result)
+                
+                cleaned = fix_json_strings(cleaned)
+                
+                # 마지막 파싱 시도
+                try:
+                    metadata = json.loads(cleaned, strict=False)
+                    print(f"✅ JSON 파싱 성공 (추가 정리 후)")
                 except json.JSONDecodeError as e2:
                     print(f"❌ JSON 파싱 완전 실패: {e2}")
-                    print(f"📝 최종 시도 텍스트 (처음 2000자): {clean_text[:2000]}")
+                    print(f"📝 최종 시도 텍스트 (처음 2000자): {cleaned[:2000]}")
+                    print(f"📝 에러 위치: line {e2.lineno}, column {e2.colno}")
+                    if e2.lineno and e2.colno:
+                        lines = cleaned.split('\n')
+                        if e2.lineno <= len(lines):
+                            error_line = lines[e2.lineno - 1]
+                            print(f"📝 에러 라인: {error_line}")
+                            if e2.colno <= len(error_line):
+                                print(f"📝 에러 위치 표시: {error_line[:e2.colno-1]}>>>{error_line[e2.colno-1:min(e2.colno+20, len(error_line))]}")
                     raise Exception(f"JSON 파싱 실패: {str(e2)}. 응답 텍스트를 확인하세요.")
             
             return metadata
