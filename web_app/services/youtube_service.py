@@ -221,7 +221,6 @@ class YouTubeService:
                         cleaned = json_match.group(0)
                 
                 # 일반적인 JSON 오류 수정 시도
-                # 1. 문자열 내부의 줄바꿈을 이스케이프
                 def fix_json_strings(text):
                     """문자열 내부의 줄바꿈과 특수 문자를 이스케이프"""
                     result = []
@@ -258,6 +257,8 @@ class YouTubeService:
                                 result.append('\\r')
                             elif char == '\t':
                                 result.append('\\t')
+                            elif char == '"':  # 문자열 내부의 따옴표는 이스케이프
+                                result.append('\\"')
                             elif ord(char) < 32:  # 제어 문자
                                 result.append(f'\\u{ord(char):04x}')
                             else:
@@ -269,24 +270,72 @@ class YouTubeService:
                     
                     return ''.join(result)
                 
+                def fix_json_common_errors(text, error_line, error_col):
+                    """에러 위치를 기반으로 일반적인 JSON 오류 수정"""
+                    lines = text.split('\n')
+                    if error_line > len(lines):
+                        return text
+                    
+                    error_text = lines[error_line - 1]
+                    
+                    # 에러 위치 주변 텍스트 확인
+                    start = max(0, error_col - 50)
+                    end = min(len(error_text), error_col + 50)
+                    context = error_text[start:end]
+                    
+                    print(f"🔧 에러 컨텍스트: {context}")
+                    
+                    # 일반적인 패턴 수정
+                    fixed_text = text
+                    
+                    # 패턴 1: "value" "key" -> "value", "key"
+                    fixed_text = re.sub(r'"\s+"([^"]+)"\s*:', r'", "\1":', fixed_text)
+                    
+                    # 패턴 2: } "key" -> }, "key"
+                    fixed_text = re.sub(r'}\s+"([^"]+)"\s*:', r'}, "\1":', fixed_text)
+                    
+                    # 패턴 3: ] "key" -> ], "key"
+                    fixed_text = re.sub(r']\s+"([^"]+)"\s*:', r'], "\1":', fixed_text)
+                    
+                    # 패턴 4: "value" 다음에 쉼표 없이 "key"가 오는 경우
+                    fixed_text = re.sub(r'"\s*\n\s*"([^"]+)"\s*:', r'",\n    "\1":', fixed_text)
+                    
+                    # 패턴 5: 배열에서 ] 다음에 쉼표 없이 값이 오는 경우
+                    fixed_text = re.sub(r']\s+(["\[])', r'], \1', fixed_text)
+                    
+                    return fixed_text
+                
+                # 1단계: 문자열 내부 특수 문자 이스케이프
                 cleaned = fix_json_strings(cleaned)
                 
-                # 마지막 파싱 시도
+                # 2단계: 구조 수정 없이 먼저 파싱 시도
                 try:
-                    metadata = json.loads(cleaned, strict=False)
-                    print(f"✅ JSON 파싱 성공 (추가 정리 후)")
-                except json.JSONDecodeError as e2:
-                    print(f"❌ JSON 파싱 완전 실패: {e2}")
-                    print(f"📝 최종 시도 텍스트 (처음 2000자): {cleaned[:2000]}")
-                    print(f"📝 에러 위치: line {e2.lineno}, column {e2.colno}")
-                    if e2.lineno and e2.colno:
-                        lines = cleaned.split('\n')
-                        if e2.lineno <= len(lines):
-                            error_line = lines[e2.lineno - 1]
-                            print(f"📝 에러 라인: {error_line}")
-                            if e2.colno <= len(error_line):
-                                print(f"📝 에러 위치 표시: {error_line[:e2.colno-1]}>>>{error_line[e2.colno-1:min(e2.colno+20, len(error_line))]}")
-                    raise Exception(f"JSON 파싱 실패: {str(e2)}. 응답 텍스트를 확인하세요.")
+                    test_parse = json.loads(cleaned, strict=False)
+                    print(f"✅ JSON 파싱 성공 (문자열 수정 후)")
+                    metadata = test_parse
+                except json.JSONDecodeError as test_e:
+                    # 구조 수정 시도
+                    print(f"🔧 JSON 구조 수정 시도 중...")
+                    if test_e.lineno and test_e.colno:
+                        cleaned = fix_json_common_errors(cleaned, test_e.lineno, test_e.colno)
+                
+                # 마지막 파싱 시도
+                if metadata is None:
+                    try:
+                        metadata = json.loads(cleaned, strict=False)
+                        print(f"✅ JSON 파싱 성공 (추가 정리 후)")
+                    except json.JSONDecodeError as e2:
+                        print(f"❌ JSON 파싱 완전 실패: {e2}")
+                        print(f"📝 최종 시도 텍스트 (처음 2000자): {cleaned[:2000]}")
+                        print(f"📝 에러 위치: line {e2.lineno}, column {e2.colno}")
+                        if e2.lineno and e2.colno:
+                            lines = cleaned.split('\n')
+                            if e2.lineno <= len(lines):
+                                error_line = lines[e2.lineno - 1]
+                                print(f"📝 에러 라인: {error_line}")
+                                if e2.colno <= len(error_line):
+                                    print(f"📝 에러 위치 표시: {error_line[:e2.colno-1]}>>>{error_line[e2.colno-1:min(e2.colno+20, len(error_line))]}")
+                        raise Exception(f"JSON 파싱 실패: {str(e2)}. 응답 텍스트를 확인하세요.")
             
             return metadata
         except Exception as e:
