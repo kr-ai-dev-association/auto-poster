@@ -278,6 +278,13 @@
                                     </select>
                                 </div>
                                 <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">메타데이터 언어 선택</label>
+                                    <select x-model="ytLang" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+                                        <option value="ko">한국어 (Korean)</option>
+                                        <option value="en">영어 (English)</option>
+                                    </select>
+                                </div>
+                                <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">영상 파일 (Source Video)</label>
                                     <div 
                                         @dragover.prevent="ytDragOver = true"
@@ -517,6 +524,7 @@
                 pdfFile: null,
                 pdfDragOver: false,
                 ytCategory: 'tech',
+                ytLang: 'ko',
                 genSubtitles: false,
                 ytLoading: false,
                 ytMetadata: null,
@@ -609,6 +617,7 @@
                     const formData = new FormData();
                     formData.append('pdf', this.pdfFile);
                     formData.append('category', this.ytCategory);
+                    formData.append('lang', this.ytLang);
 
                     try {
                         const response = await fetch('/api/youtube/metadata', {
@@ -768,6 +777,7 @@
                     formData.append('video', this.ytFile);
                     formData.append('pdf', this.pdfFile);
                     formData.append('category', this.ytCategory);
+                    formData.append('lang', this.ytLang);
                     formData.append('gen_sub', this.genSubtitles);
 
                     try {
