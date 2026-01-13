@@ -111,13 +111,22 @@ class YouTubeService:
         
         IMPORTANT: You MUST analyze the PDF content thoroughly and extract key information from it. Do not use generic content.
         
-        Return ONLY a valid JSON object:
-        {{
-          "title": "...",
-          "description": "...",
-          "tags": ["tag1", "tag2", ...]
-        }}
-        """
+             Return ONLY a valid JSON object with NO markdown code blocks, NO explanations, NO extra text.
+             The JSON must be valid and parseable. Follow these strict rules:
+             1. All strings must be properly escaped (use \\n for newlines, \\" for quotes)
+             2. All array items and object properties must be separated by commas
+             3. No trailing commas
+             4. All special characters in strings must be escaped
+             
+             Example format:
+             {{
+               "title": "Your title here",
+               "description": "Your description here with \\n for line breaks",
+               "tags": ["tag1", "tag2", "tag3"]
+             }}
+             
+             Return ONLY the JSON object, nothing else.
+             """
         
         try:
             print(f"🤖 Gemini API 호출 중... (PDF 크기: {len(pdf_content)} bytes)")
