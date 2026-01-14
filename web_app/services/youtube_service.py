@@ -195,7 +195,7 @@ class YouTubeService:
             raise Exception("PDF 파일이 비어있거나 전달되지 않았습니다.")
         
         print(f"📄 PDF 파일 수신: {len(pdf_content)} bytes")
-        
+
         # 템플릿 읽기
         desc_path = os.path.join(self.base_v_dir, category, f'desc_{lang}.md')
         if not os.path.exists(desc_path):
@@ -314,7 +314,7 @@ class YouTubeService:
                     print(f"📝 JSON 추출 완료 (정규식, 길이: {len(clean_text)})")
                 else:
                     print(f"⚠️ JSON 객체를 찾을 수 없습니다. 원본 텍스트 사용")
-            
+        
             # JSON 파싱 시도 (여러 단계)
             metadata = None
             parse_attempts = [
