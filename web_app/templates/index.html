@@ -17,6 +17,11 @@
             min-height: 500px;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
             font-size: 14px;
+            height: auto !important;
+        }
+        .EasyMDEContainer .CodeMirror-scroll {
+            overflow-y: auto !important;
+            overflow-x: auto !important;
         }
         .EasyMDEContainer .editor-toolbar {
             border-top: 1px solid #4b5563;
@@ -39,11 +44,118 @@
             background-color: #1f2937;
             color: #f3f4f6;
         }
+        .EasyMDEContainer .CodeMirror-scroll {
+            overflow-y: auto !important;
+            overflow-x: auto !important;
+            max-height: 70vh;
+        }
+        .EasyMDEContainer .CodeMirror-scrollbar {
+            width: 10px;
+        }
+        .EasyMDEContainer .CodeMirror-cursor {
+            border-left-color: #ffffff !important;
+        }
         .EasyMDEContainer .CodeMirror:focus-within {
             border-color: #6366f1;
             outline: 2px solid transparent;
             outline-offset: 2px;
             box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+        /* 미리보기 다크 테마 */
+        .EasyMDEContainer .editor-preview {
+            background-color: #1f2937 !important;
+            color: #f3f4f6 !important;
+        }
+        .EasyMDEContainer .editor-preview h1,
+        .EasyMDEContainer .editor-preview h2,
+        .EasyMDEContainer .editor-preview h3,
+        .EasyMDEContainer .editor-preview h4,
+        .EasyMDEContainer .editor-preview h5,
+        .EasyMDEContainer .editor-preview h6 {
+            color: #f3f4f6 !important;
+        }
+        .EasyMDEContainer .editor-preview p,
+        .EasyMDEContainer .editor-preview li,
+        .EasyMDEContainer .editor-preview code {
+            color: #d1d5db !important;
+        }
+        .EasyMDEContainer .editor-preview pre {
+            background-color: #111827 !important;
+            color: #f3f4f6 !important;
+        }
+        .EasyMDEContainer .editor-preview blockquote {
+            border-left-color: #6366f1 !important;
+            color: #d1d5db !important;
+        }
+        .EasyMDEContainer .editor-preview a {
+            color: #818cf8 !important;
+        }
+        .EasyMDEContainer .editor-preview table {
+            color: #d1d5db !important;
+        }
+        .EasyMDEContainer .editor-preview table th,
+        .EasyMDEContainer .editor-preview table td {
+            border-color: #4b5563 !important;
+        }
+        /* 전체 화면 모드 z-index 조정 */
+        .EasyMDEContainer .CodeMirror-fullscreen {
+            z-index: 5 !important;
+        }
+        .EasyMDEContainer.editor-preview-active-side {
+            z-index: 5 !important;
+        }
+        /* side-by-side 모드가 전체 화면으로 전환되지 않도록 */
+        .EasyMDEContainer.editor-preview-active-side {
+            position: relative !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: stretch !important;
+        }
+        .EasyMDEContainer.editor-preview-active-side .CodeMirror {
+            position: relative !important;
+            flex: 1 1 50% !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-self: stretch !important;
+        }
+        .EasyMDEContainer.editor-preview-active-side .CodeMirror-scroll {
+            flex: 1 1 auto !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overflow-x: auto !important;
+            position: relative !important;
+        }
+        .EasyMDEContainer.editor-preview-active-side .CodeMirror-sizer {
+            min-height: 100% !important;
+        }
+        .EasyMDEContainer.editor-preview-active-side .editor-preview-side {
+            position: relative !important;
+            flex: 1 1 50% !important;
+            height: 100% !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-self: stretch !important;
+        }
+        /* side-by-side 모드에서 에디터와 미리보기 높이 동일하게 */
+        .EasyMDEContainer.editor-preview-active-side .CodeMirror,
+        .EasyMDEContainer.editor-preview-active-side .editor-preview-side {
+            align-self: stretch !important;
+        }
+        /* 전체 화면 모드일 때 탭 메뉴를 최상단 헤더로 고정 (JavaScript로 동적 적용) */
+        .wiki-tabs-container.fixed-header {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 1000 !important;
+            width: 100% !important;
+        }
+        .wiki-content-container.with-header-padding {
+            padding-top: 60px !important;
         }
     </style>
 </head>
@@ -129,17 +241,31 @@
             <div x-show="mainTab === 'wiki'" class="flex flex-col h-full">
                 <!-- Header -->
                 <div class="bg-indigo-600 p-6 text-white shadow-md">
-                    <div class="container mx-auto">
-                        <h2 class="text-2xl font-bold">📄 Wiki Auto Poster</h2>
-                        <p class="text-indigo-100 text-sm mt-1">AI 기반 마크다운 변환 및 자동 배포 시스템</p>
+                    <div class="container mx-auto flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold">📄 Wiki Auto Poster</h2>
+                            <p class="text-indigo-100 text-sm mt-1">AI 기반 마크다운 변환 및 자동 배포 시스템</p>
+                        </div>
+                        <button 
+                            @click="upload()" 
+                            :disabled="loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))"
+                            :class="{'opacity-50 cursor-not-allowed': loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))}"
+                            class="px-6 py-3 border border-gray-300 rounded-lg shadow-lg text-base font-bold text-gray-800 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-all whitespace-nowrap"
+                        >
+                            <span x-show="!loading">🚀 변환 및 배포 시작</span>
+                            <span x-show="loading" class="flex items-center">
+                                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-gray-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                처리 중...
+                            </span>
+                        </button>
                     </div>
                 </div>
 
                 <!-- Main Content (Full Width) -->
                 <div class="flex-grow flex flex-col min-h-0 overflow-y-auto">
                     <!-- Tabs -->
-                    <div class="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
-                        <div class="container mx-auto flex">
+                    <div class="wiki-tabs-container bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
+                        <div class="container mx-auto flex items-center">
                             <button @click="tab = 'file'" :class="{'border-indigo-500 text-indigo-400': tab === 'file', 'border-transparent text-gray-400 hover:text-gray-300': tab !== 'file'}" class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm focus:outline-none transition-colors">
                                 📂 파일 업로드
                             </button>
@@ -149,7 +275,7 @@
                         </div>
                     </div>
 
-                    <div class="container mx-auto p-6 flex-grow flex flex-col min-h-0">
+                    <div class="wiki-content-container container mx-auto p-6 flex-grow flex flex-col min-h-0">
                         <!-- File Upload Tab -->
                         <div x-show="tab === 'file'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="flex-grow flex flex-col min-h-0">
                             <div 
@@ -185,35 +311,23 @@
                         </div>
 
                         <!-- Text Input Tab -->
-                        <div x-show="tab === 'text'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="flex-grow flex flex-col min-h-0">
+                        <div x-show="tab === 'text'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="flex-grow flex flex-col min-h-0 overflow-y-auto">
                             <div class="space-y-4 flex-grow flex flex-col min-h-0">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-300 mb-1">제목</label>
                                     <input type="text" x-model="title" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg placeholder-gray-500" placeholder="예: 2025 AI 트렌드 전망">
                                 </div>
-                                <div class="flex-grow flex flex-col min-h-0">
+                                <div class="flex-grow flex flex-col min-h-0 overflow-visible">
                                     <label class="block text-sm font-medium text-gray-300 mb-1">내용 (Markdown)</label>
-                                    <textarea x-ref="markdownEditor" x-model="content" class="w-full flex-grow" placeholder="# 내용을 입력하세요..."></textarea>
+                                    <div class="flex-grow flex flex-col min-h-0">
+                                        <textarea x-ref="markdownEditor" x-model="content" class="w-full flex-grow" placeholder="# 내용을 입력하세요..."></textarea>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Action Button & Result Area -->
+                        <!-- Result Area -->
                         <div class="mt-6 space-y-6 pb-10">
-                            <button 
-                                @click="upload()" 
-                                :disabled="loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))"
-                                :class="{'opacity-50 cursor-not-allowed': loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))}"
-                                class="w-full flex justify-center py-4 px-6 border border-transparent rounded-lg shadow-lg text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
-                            >
-                                <span x-show="!loading">🚀 변환 및 배포 시작</span>
-                                <span x-show="loading" class="flex items-center">
-                                    <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    처리 중... (약 1-2분 소요)
-                                </span>
-                            </button>
-
-                            <!-- Result Area -->
                             <div x-show="result" x-cloak class="p-6 rounded-lg shadow-sm border" :class="result?.status === 'success' ? 'bg-green-900 border-green-700' : 'bg-red-900 border-red-700'">
                                 <div class="flex">
                                     <div class="flex-shrink-0">
@@ -661,7 +775,7 @@
         function app() {
             return {
                 mainTab: 'wiki', // 'wiki' or 'youtube'
-                tab: 'file',
+                tab: 'text',
                 dragOver: false,
                 file: null,
                 title: '',
@@ -677,6 +791,7 @@
 
                 // Markdown Editor
                 markdownEditor: null,
+                isEditorFullscreen: false,
 
                 // Youtube Poster State
                 ytFile: null,
@@ -762,9 +877,10 @@
                             'heading-1', 'heading-2', 'heading-3', '|',
                             'code', 'quote', 'unordered-list', 'ordered-list', '|',
                             'link', 'image', 'table', '|',
-                            'preview', 'side-by-side', 'fullscreen', '|',
+                            'preview', 'side-by-side', '|',
                             'guide'
                         ],
+                        sideBySideFullscreen: false,
                         initialValue: this.content || '',
                         minHeight: '500px',
                         forceSync: true
@@ -774,6 +890,288 @@
                     this.markdownEditor.codemirror.on('change', () => {
                         this.content = this.markdownEditor.value();
                     });
+                    
+                    // side-by-side 모드 클릭 시 전체 화면으로 전환되지 않도록 방지
+                    const sideBySideButton = this.markdownEditor.toolbarElements?.sideBySide;
+                    if (sideBySideButton) {
+                        const originalClick = sideBySideButton.onclick;
+                        sideBySideButton.addEventListener('click', (e) => {
+                            // side-by-side 모드가 활성화될 때 전체 화면 모드가 켜지지 않도록
+                            setTimeout(() => {
+                                const codeMirror = this.markdownEditor.codemirror;
+                                if (codeMirror && codeMirror.getOption('fullScreen')) {
+                                    codeMirror.setOption('fullScreen', false);
+                                }
+                                // 높이 동기화
+                                syncSideBySideHeight();
+                            }, 50);
+                        });
+                    }
+                    
+                    // side-by-side 모드에서 에디터와 미리보기 높이 동기화
+                    const syncSideBySideHeight = () => {
+                        const editorContainer = document.querySelector('.EasyMDEContainer');
+                        if (editorContainer && editorContainer.classList.contains('editor-preview-active-side')) {
+                            const previewSide = editorContainer.querySelector('.editor-preview-side');
+                            const codeMirror = editorContainer.querySelector('.CodeMirror');
+                            const codeMirrorScroll = editorContainer.querySelector('.CodeMirror-scroll');
+                            
+                            if (previewSide && codeMirror && codeMirrorScroll) {
+                                // 미리보기 영역의 실제 높이를 가져와서 에디터 높이에 적용
+                                const previewHeight = previewSide.offsetHeight;
+                                if (previewHeight > 0) {
+                                    codeMirror.style.height = previewHeight + 'px';
+                                    codeMirrorScroll.style.height = previewHeight + 'px';
+                                }
+                            }
+                        }
+                    };
+                    
+                    // side-by-side 모드 감지 및 탭 메뉴 위치 조정
+                    const checkEditorMode = () => {
+                        const editorContainer = document.querySelector('.EasyMDEContainer');
+                        const codeMirror = this.markdownEditor.codemirror;
+                        const tabsContainer = document.querySelector('.wiki-tabs-container');
+                        const contentContainer = document.querySelector('.wiki-content-container');
+                        
+                        // side-by-side 모드 확인 (전체 화면 모드는 사용하지 않음)
+                        const isSideBySide = editorContainer && editorContainer.classList.contains('editor-preview-active-side');
+                        
+                        // 전체 화면 모드가 활성화되면 강제로 비활성화
+                        if (codeMirror && codeMirror.getOption('fullScreen')) {
+                            codeMirror.setOption('fullScreen', false);
+                        }
+                        
+                        if (isSideBySide) {
+                            // 높이 동기화
+                            setTimeout(syncSideBySideHeight, 100);
+                            // 모드 활성화 - 탭 메뉴를 최상단 헤더로 고정
+                            if (tabsContainer) {
+                                tabsContainer.classList.add('fixed-header');
+                            }
+                            if (contentContainer) {
+                                contentContainer.classList.add('with-header-padding');
+                            }
+                        } else {
+                            // 모드 비활성화 - 원래 위치로 복원
+                            if (tabsContainer) {
+                                tabsContainer.classList.remove('fixed-header');
+                            }
+                            if (contentContainer) {
+                                contentContainer.classList.remove('with-header-padding');
+                            }
+                            
+                            // 에디터 컨테이너 스타일 초기화 (side-by-side 모드 종료 시)
+                            if (editorContainer) {
+                                editorContainer.style.position = '';
+                                editorContainer.style.top = '';
+                                editorContainer.style.left = '';
+                                editorContainer.style.right = '';
+                                editorContainer.style.bottom = '';
+                                editorContainer.style.zIndex = '';
+                                editorContainer.style.width = '';
+                                editorContainer.style.height = '';
+                                
+                                // CodeMirror 에디터도 원래 위치로 복원
+                                const cmEditor = editorContainer.querySelector('.CodeMirror');
+                                if (cmEditor) {
+                                    cmEditor.style.position = '';
+                                    cmEditor.style.top = '';
+                                    cmEditor.style.left = '';
+                                    cmEditor.style.right = '';
+                                    cmEditor.style.bottom = '';
+                                    cmEditor.style.zIndex = '';
+                                    cmEditor.style.width = '';
+                                    cmEditor.style.height = '';
+                                    cmEditor.style.overflow = '';
+                                }
+                                
+                                // CodeMirror 스크롤 영역도 복원
+                                const cmScroll = editorContainer.querySelector('.CodeMirror-scroll');
+                                if (cmScroll) {
+                                    cmScroll.style.overflow = '';
+                                    cmScroll.style.overflowY = '';
+                                    cmScroll.style.overflowX = '';
+                                    cmScroll.style.maxHeight = '';
+                                }
+                                
+                                // 미리보기 영역도 초기화
+                                const previewArea = editorContainer.querySelector('.editor-preview-side');
+                                if (previewArea) {
+                                    previewArea.style.position = '';
+                                    previewArea.style.top = '';
+                                    previewArea.style.left = '';
+                                    previewArea.style.right = '';
+                                    previewArea.style.bottom = '';
+                                    previewArea.style.zIndex = '';
+                                    previewArea.style.width = '';
+                                    previewArea.style.height = '';
+                                }
+                            }
+                        }
+                    };
+                    
+                    // 초기 체크
+                    setTimeout(checkEditorMode, 100);
+                    
+                    // MutationObserver로 side-by-side 모드 변경 감지
+                    const editorContainerForObserver = document.querySelector('.EasyMDEContainer');
+                    if (editorContainerForObserver) {
+                        const observer = new MutationObserver((mutations) => {
+                            checkEditorMode();
+                            
+                            // side-by-side 모드 활성화 시 높이 동기화
+                            setTimeout(() => {
+                                syncSideBySideHeight();
+                            }, 150);
+                            
+                            // side-by-side 모드 종료 시 추가 정리
+                            setTimeout(() => {
+                                const currentEditorContainer = document.querySelector('.EasyMDEContainer');
+                                const codeMirror = this.markdownEditor.codemirror;
+                                const isSideBySide = currentEditorContainer && currentEditorContainer.classList.contains('editor-preview-active-side');
+                                
+                                // 전체 화면 모드가 활성화되면 강제로 비활성화
+                                if (codeMirror && codeMirror.getOption('fullScreen')) {
+                                    codeMirror.setOption('fullScreen', false);
+                                }
+                                
+                                if (!isSideBySide && currentEditorContainer) {
+                                    // 에디터 컨테이너 스타일 초기화
+                                    currentEditorContainer.style.position = '';
+                                    currentEditorContainer.style.top = '';
+                                    currentEditorContainer.style.left = '';
+                                    currentEditorContainer.style.right = '';
+                                    currentEditorContainer.style.bottom = '';
+                                    currentEditorContainer.style.zIndex = '';
+                                    currentEditorContainer.style.width = '';
+                                    currentEditorContainer.style.height = '';
+                                    
+                                    // CodeMirror 에디터도 원래 위치로 복원
+                                    const cmEditor = currentEditorContainer.querySelector('.CodeMirror');
+                                    if (cmEditor) {
+                                        cmEditor.style.position = '';
+                                        cmEditor.style.top = '';
+                                        cmEditor.style.left = '';
+                                        cmEditor.style.right = '';
+                                        cmEditor.style.bottom = '';
+                                        cmEditor.style.zIndex = '';
+                                        cmEditor.style.width = '';
+                                        cmEditor.style.height = '';
+                                        cmEditor.style.overflow = '';
+                                    }
+                                    
+                                    // CodeMirror 스크롤 영역도 복원
+                                    const cmScroll = currentEditorContainer.querySelector('.CodeMirror-scroll');
+                                    if (cmScroll) {
+                                        cmScroll.style.overflow = '';
+                                        cmScroll.style.overflowY = '';
+                                        cmScroll.style.overflowX = '';
+                                        cmScroll.style.maxHeight = '';
+                                    }
+                                    
+                                    // 미리보기 영역도 초기화
+                                    const previewArea = currentEditorContainer.querySelector('.editor-preview-side');
+                                    if (previewArea) {
+                                        previewArea.style.position = '';
+                                        previewArea.style.top = '';
+                                        previewArea.style.left = '';
+                                        previewArea.style.right = '';
+                                        previewArea.style.bottom = '';
+                                        previewArea.style.zIndex = '';
+                                        previewArea.style.width = '';
+                                        previewArea.style.height = '';
+                                        previewArea.style.overflow = '';
+                                    }
+                                }
+                            }, 150);
+                        });
+                        observer.observe(editorContainerForObserver, {
+                            attributes: true,
+                            attributeFilter: ['class'],
+                            subtree: true
+                        });
+                    }
+                    
+                    // 전체 화면 모드 진입 시도 시 강제로 비활성화
+                    this.markdownEditor.codemirror.on('fullscreenchange', () => {
+                        const codeMirror = this.markdownEditor.codemirror;
+                        if (codeMirror && codeMirror.getOption('fullScreen')) {
+                            // 전체 화면 모드가 활성화되면 즉시 비활성화
+                            codeMirror.setOption('fullScreen', false);
+                            
+                            // 레이아웃 복원
+                            setTimeout(() => {
+                                const tabsContainer = document.querySelector('.wiki-tabs-container');
+                                const contentContainer = document.querySelector('.wiki-content-container');
+                                
+                                if (tabsContainer) {
+                                    tabsContainer.classList.remove('fixed-header');
+                                }
+                                if (contentContainer) {
+                                    contentContainer.classList.remove('with-header-padding');
+                                }
+                                
+                                checkEditorMode();
+                            }, 50);
+                        }
+                    });
+                },
+                
+                exitFullscreen() {
+                    if (this.markdownEditor && this.markdownEditor.codemirror) {
+                        const codeMirror = this.markdownEditor.codemirror;
+                        if (codeMirror.getOption('fullScreen')) {
+                            codeMirror.setOption('fullScreen', false);
+                            
+                            // 전체 화면 모드 종료 후 레이아웃 복원
+                            setTimeout(() => {
+                                const tabsContainer = document.querySelector('.wiki-tabs-container');
+                                const contentContainer = document.querySelector('.wiki-content-container');
+                                
+                                // 클래스 제거로 원래 위치로 복원
+                                if (tabsContainer) {
+                                    tabsContainer.classList.remove('fixed-header');
+                                }
+                                if (contentContainer) {
+                                    contentContainer.classList.remove('with-header-padding');
+                                }
+                                
+                                // 전체 화면 모드 상태 업데이트
+                                this.isEditorFullscreen = false;
+                                
+                                // CodeMirror가 원래 컨테이너로 돌아가도록 강제
+                                const editorContainer = document.querySelector('.EasyMDEContainer');
+                                if (editorContainer) {
+                                    // 에디터 컨테이너 스타일 초기화
+                                    editorContainer.style.position = '';
+                                    editorContainer.style.top = '';
+                                    editorContainer.style.left = '';
+                                    editorContainer.style.right = '';
+                                    editorContainer.style.bottom = '';
+                                    editorContainer.style.zIndex = '';
+                                    editorContainer.style.width = '';
+                                    editorContainer.style.height = '';
+                                    editorContainer.style.overflow = '';
+                                    
+                                    // CodeMirror 에디터도 복원
+                                    const cmEditor = editorContainer.querySelector('.CodeMirror');
+                                    if (cmEditor) {
+                                        cmEditor.style.overflow = '';
+                                    }
+                                    
+                                    // CodeMirror 스크롤 영역도 복원
+                                    const cmScroll = editorContainer.querySelector('.CodeMirror-scroll');
+                                    if (cmScroll) {
+                                        cmScroll.style.overflow = '';
+                                        cmScroll.style.overflowY = '';
+                                        cmScroll.style.overflowX = '';
+                                        cmScroll.style.maxHeight = '';
+                                    }
+                                }
+                            }, 150);
+                        }
+                    }
                 },
 
                 logout() {
