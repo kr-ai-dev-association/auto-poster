@@ -19,16 +19,25 @@
             font-size: 14px;
         }
         .EasyMDEContainer .editor-toolbar {
-            border-top: 1px solid #d1d5db;
-            border-left: 1px solid #d1d5db;
-            border-right: 1px solid #d1d5db;
+            border-top: 1px solid #4b5563;
+            border-left: 1px solid #4b5563;
+            border-right: 1px solid #4b5563;
             border-bottom: none;
             border-radius: 0.375rem 0.375rem 0 0;
+            background-color: #374151;
+        }
+        .EasyMDEContainer .editor-toolbar button {
+            color: #d1d5db;
+        }
+        .EasyMDEContainer .editor-toolbar button:hover {
+            background-color: #4b5563;
         }
         .EasyMDEContainer .CodeMirror {
-            border: 1px solid #d1d5db;
+            border: 1px solid #4b5563;
             border-top: none;
             border-radius: 0 0 0.375rem 0.375rem;
+            background-color: #1f2937;
+            color: #f3f4f6;
         }
         .EasyMDEContainer .CodeMirror:focus-within {
             border-color: #6366f1;
@@ -38,9 +47,9 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-0 m-0">
+<body class="bg-gray-900 min-h-screen p-0 m-0">
 
-    <div x-data="app()" class="min-h-screen flex bg-white">
+    <div x-data="app()" class="min-h-screen flex bg-gray-900">
         
         <!-- Left Sidebar -->
         <div class="w-64 bg-gray-900 text-white flex flex-col shadow-xl">
@@ -129,12 +138,12 @@
                 <!-- Main Content (Full Width) -->
                 <div class="flex-grow flex flex-col min-h-0 overflow-y-auto">
                     <!-- Tabs -->
-                    <div class="bg-white border-b sticky top-0 z-10">
+                    <div class="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
                         <div class="container mx-auto flex">
-                            <button @click="tab = 'file'" :class="{'border-indigo-600 text-indigo-600': tab === 'file', 'border-transparent text-gray-500 hover:text-gray-700': tab !== 'file'}" class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm focus:outline-none transition-colors">
+                            <button @click="tab = 'file'" :class="{'border-indigo-500 text-indigo-400': tab === 'file', 'border-transparent text-gray-400 hover:text-gray-300': tab !== 'file'}" class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm focus:outline-none transition-colors">
                                 📂 파일 업로드
                             </button>
-                            <button @click="tab = 'text'" :class="{'border-indigo-600 text-indigo-600': tab === 'text', 'border-transparent text-gray-500 hover:text-gray-700': tab !== 'text'}" class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm focus:outline-none transition-colors">
+                            <button @click="tab = 'text'" :class="{'border-indigo-500 text-indigo-400': tab === 'text', 'border-transparent text-gray-400 hover:text-gray-300': tab !== 'text'}" class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm focus:outline-none transition-colors">
                                 ✍️ 직접 작성
                             </button>
                         </div>
@@ -147,7 +156,7 @@
                                 @dragover.prevent="dragOver = true"
                                 @dragleave.prevent="dragOver = false"
                                 @drop.prevent="handleDrop($event)"
-                                :class="{'border-indigo-500 bg-indigo-50': dragOver, 'border-gray-300 bg-gray-50': !dragOver}"
+                                :class="{'border-indigo-500 bg-indigo-900': dragOver, 'border-gray-600 bg-gray-800': !dragOver}"
                                 class="border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors flex-grow flex flex-col justify-center items-center min-h-[400px]"
                                 @click="$refs.fileInput.click()"
                             >
@@ -156,20 +165,20 @@
                                 <template x-if="!file">
                                     <div class="space-y-4">
                                         <svg class="mx-auto h-20 w-20 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                                        <div class="text-xl text-gray-600">
-                                            <span class="font-medium text-indigo-600 hover:text-indigo-500">파일 선택</span>
+                                        <div class="text-xl text-gray-300">
+                                            <span class="font-medium text-indigo-400 hover:text-indigo-300">파일 선택</span>
                                             또는 여기에 드래그하세요
                                         </div>
-                                        <p class="text-sm text-gray-500">MD 파일만 지원됩니다</p>
+                                        <p class="text-sm text-gray-400">MD 파일만 지원됩니다</p>
                                     </div>
                                 </template>
 
                                 <template x-if="file">
                                     <div class="space-y-4">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-20 w-20 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                        <p class="text-lg font-medium text-gray-900" x-text="file.name"></p>
-                                        <p class="text-sm text-gray-500" x-text="formatBytes(file.size)"></p>
-                                        <button @click.stop="file = null" class="text-sm text-red-500 hover:text-red-700 underline">제거</button>
+                                        <p class="text-lg font-medium text-white" x-text="file.name"></p>
+                                        <p class="text-sm text-gray-400" x-text="formatBytes(file.size)"></p>
+                                        <button @click.stop="file = null" class="text-sm text-red-400 hover:text-red-300 underline">제거</button>
                                     </div>
                                 </template>
                             </div>
@@ -179,11 +188,11 @@
                         <div x-show="tab === 'text'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="flex-grow flex flex-col min-h-0">
                             <div class="space-y-4 flex-grow flex flex-col min-h-0">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">제목</label>
-                                    <input type="text" x-model="title" class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg" placeholder="예: 2025 AI 트렌드 전망">
+                                    <label class="block text-sm font-medium text-gray-300 mb-1">제목</label>
+                                    <input type="text" x-model="title" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg placeholder-gray-500" placeholder="예: 2025 AI 트렌드 전망">
                                 </div>
                                 <div class="flex-grow flex flex-col min-h-0">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">내용 (Markdown)</label>
+                                    <label class="block text-sm font-medium text-gray-300 mb-1">내용 (Markdown)</label>
                                     <textarea x-ref="markdownEditor" x-model="content" class="w-full flex-grow" placeholder="# 내용을 입력하세요..."></textarea>
                                 </div>
                             </div>
@@ -205,7 +214,7 @@
                             </button>
 
                             <!-- Result Area -->
-                            <div x-show="result" x-cloak class="p-6 rounded-lg shadow-sm border" :class="result?.status === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+                            <div x-show="result" x-cloak class="p-6 rounded-lg shadow-sm border" :class="result?.status === 'success' ? 'bg-green-900 border-green-700' : 'bg-red-900 border-red-700'">
                                 <div class="flex">
                                     <div class="flex-shrink-0">
                                         <template x-if="result?.status === 'success'">
@@ -216,8 +225,8 @@
                                         </template>
                                     </div>
                                     <div class="ml-4 flex-grow">
-                                        <h3 class="text-xl font-bold" :class="result?.status === 'success' ? 'text-green-800' : 'text-red-800'" x-text="result?.status === 'success' ? '배포 완료!' : '오류 발생'"></h3>
-                                        <div class="mt-3 text-lg" :class="result?.status === 'success' ? 'text-green-700' : 'text-red-700'">
+                                        <h3 class="text-xl font-bold" :class="result?.status === 'success' ? 'text-green-300' : 'text-red-300'" x-text="result?.status === 'success' ? '배포 완료!' : '오류 발생'"></h3>
+                                        <div class="mt-3 text-lg" :class="result?.status === 'success' ? 'text-green-200' : 'text-red-200'">
                                             <template x-if="result?.status === 'success'">
                                                 <div class="space-y-4">
                                                     <p>성공적으로 변환 및 배포되었습니다.</p>
@@ -226,8 +235,8 @@
                                                     </div>
                                                     
                                                     <!-- LinkedIn 공유 섹션 -->
-                                                    <div class="mt-6 pt-6 border-t border-green-200">
-                                                        <h4 class="text-lg font-bold text-green-900 mb-4">👁️ 미리보기</h4>
+                                                    <div class="mt-6 pt-6 border-t border-green-700">
+                                                        <h4 class="text-lg font-bold text-green-300 mb-4">👁️ 미리보기</h4>
                                                         <div class="flex flex-wrap gap-4 mb-6">
                                                             <button 
                                                                 @click="previewHtml('ko')"
@@ -246,8 +255,8 @@
                                                         </div>
                                                     </div>
 
-                                                    <div class="mt-6 pt-6 border-t border-green-200">
-                                                        <h4 class="text-lg font-bold text-green-900 mb-4">📢 LinkedIn에 홍보하기</h4>
+                                                    <div class="mt-6 pt-6 border-t border-green-700">
+                                                        <h4 class="text-lg font-bold text-green-300 mb-4">📢 LinkedIn에 홍보하기</h4>
                                                         <div class="flex flex-wrap gap-4">
                                                             <button 
                                                                 @click="shareToLinkedin('ko')"
@@ -293,41 +302,41 @@
                 </div>
                 
                 <div class="container mx-auto p-10 flex-grow overflow-y-auto">
-                    <div class="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
-                        <h3 class="text-xl font-bold text-gray-800 mb-6">📹 새로운 영상 업로드</h3>
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 p-8 shadow-sm">
+                        <h3 class="text-xl font-bold text-white mb-6">📹 새로운 영상 업로드</h3>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div class="space-y-6">
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">카테고리 선택</label>
-                                    <select x-model="ytCategory" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">카테고리 선택</label>
+                                    <select x-model="ytCategory" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
                                         <option value="tech">Tech (기술)</option>
                                         <option value="entertainment">Entertainment (엔터테인먼트)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">메타데이터 언어 선택</label>
-                                    <select x-model="ytLang" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">메타데이터 언어 선택</label>
+                                    <select x-model="ytLang" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
                                         <option value="ko">한국어 (Korean)</option>
                                         <option value="en">영어 (English)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">영상 파일 (Source Video)</label>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">영상 파일 (Source Video)</label>
                                     <div 
                                         @dragover.prevent="ytDragOver = true"
                                         @dragleave.prevent="ytDragOver = false"
                                         @drop.prevent="handleYtDrop($event)"
                                         @click="$refs.ytFileInput.click()"
-                                        :class="{'border-red-500 bg-red-50': ytDragOver, 'border-gray-300 bg-white': !ytDragOver}"
-                                        class="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-50 transition-colors cursor-pointer min-h-[150px] flex flex-col justify-center items-center"
+                                        :class="{'border-red-500 bg-red-900': ytDragOver, 'border-gray-600 bg-gray-700': !ytDragOver}"
+                                        class="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[150px] flex flex-col justify-center items-center"
                                     >
                                         <input type="file" x-ref="ytFileInput" class="hidden" @change="handleYtFile($event)" accept="video/*">
                                         
                                         <template x-if="!ytFile">
                                             <div class="space-y-2">
                                                 <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                                <p class="text-sm text-gray-500 font-medium">클릭하거나 영상을 드래그하세요</p>
+                                                <p class="text-sm text-gray-300 font-medium">클릭하거나 영상을 드래그하세요</p>
                                                 <p class="text-xs text-gray-400">MP4, MOV, AVI 등 영상 파일</p>
                                             </div>
                                         </template>
@@ -335,57 +344,57 @@
                                         <template x-if="ytFile">
                                             <div class="space-y-2">
                                                 <svg class="mx-auto h-10 w-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                <p class="text-sm font-bold text-gray-900" x-text="ytFile.name"></p>
-                                                <p class="text-xs text-gray-500" x-text="formatBytes(ytFile.size)"></p>
-                                                <button @click.stop="ytFile = null" class="text-xs text-red-600 hover:text-red-800 underline font-medium">제거</button>
+                                                <p class="text-sm font-bold text-white" x-text="ytFile.name"></p>
+                                                <p class="text-xs text-gray-400" x-text="formatBytes(ytFile.size)"></p>
+                                                <button @click.stop="ytFile = null" class="text-xs text-red-400 hover:text-red-300 underline font-medium">제거</button>
                                             </div>
                                         </template>
                                     </div>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">참조 PDF 파일 (Metadata Source)</label>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">참조 PDF 파일 (Metadata Source)</label>
                                     <div 
                                         @dragover.prevent="pdfDragOver = true"
                                         @dragleave.prevent="pdfDragOver = false"
                                         @drop.prevent="handlePdfDrop($event)"
                                         @click="$refs.pdfFileInput.click()"
-                                        :class="{'border-blue-500 bg-blue-50': pdfDragOver, 'border-gray-300 bg-white': !pdfDragOver}"
-                                        class="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] flex flex-col justify-center items-center"
+                                        :class="{'border-blue-500 bg-blue-900': pdfDragOver, 'border-gray-600 bg-gray-700': !pdfDragOver}"
+                                        class="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[120px] flex flex-col justify-center items-center"
                                     >
                                         <input type="file" x-ref="pdfFileInput" class="hidden" @change="handlePdfFile($event)" accept=".pdf">
                                         
                                         <template x-if="!pdfFile">
                                             <div class="space-y-1">
                                                 <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                                                <p class="text-xs text-gray-500 font-medium">참조할 PDF 파일을 드래그하거나 클릭하세요</p>
+                                                <p class="text-xs text-gray-300 font-medium">참조할 PDF 파일을 드래그하거나 클릭하세요</p>
                                             </div>
                                         </template>
 
                                         <template x-if="pdfFile">
                                             <div class="space-y-1">
                                                 <svg class="mx-auto h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                <p class="text-xs font-bold text-gray-900" x-text="pdfFile.name"></p>
-                                                <button @click.stop="pdfFile = null" class="text-xs text-red-600 hover:text-red-800 underline">제거</button>
+                                                <p class="text-xs font-bold text-white" x-text="pdfFile.name"></p>
+                                                <button @click.stop="pdfFile = null" class="text-xs text-red-400 hover:text-red-300 underline">제거</button>
                                             </div>
                                         </template>
                                     </div>
                                 </div>
                                 <div class="flex items-center">
-                                    <input type="checkbox" id="gen_sub" x-model="genSubtitles" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
-                                    <label for="gen_sub" class="ml-2 block text-sm text-gray-900">AI 자막 자동 생성</label>
+                                    <input type="checkbox" id="gen_sub" x-model="genSubtitles" class="h-4 w-4 text-red-600 focus:ring-red-500 bg-gray-700 border-gray-600 rounded">
+                                    <label for="gen_sub" class="ml-2 block text-sm text-gray-300">AI 자막 자동 생성</label>
                                 </div>
 
                                 <!-- Logo Management Area -->
-                                <div class="pt-6 border-t border-gray-200">
-                                    <label class="block text-sm font-bold text-gray-700 mb-4">채널 로고 관리 (Overlay Logo)</label>
+                                <div class="pt-6 border-t border-gray-700">
+                                    <label class="block text-sm font-bold text-gray-300 mb-4">채널 로고 관리 (Overlay Logo)</label>
                                     <div class="flex flex-col md:flex-row gap-6 items-start">
                                         <!-- Current Logo Preview -->
                                         <div class="w-full md:w-1/2">
-                                            <p class="text-xs font-bold text-gray-500 mb-2 uppercase">현재 적용된 로고</p>
-                                            <div class="bg-gray-100 rounded-lg p-4 border border-gray-200 flex justify-center items-center min-h-[100px]">
+                                            <p class="text-xs font-bold text-gray-400 mb-2 uppercase">현재 적용된 로고</p>
+                                            <div class="bg-gray-700 rounded-lg p-4 border border-gray-600 flex justify-center items-center min-h-[100px]">
                                                 <img :src="'/api/youtube/logo/' + ytCategory + '?token=' + localStorage.getItem('access_token') + '&t=' + logoTimestamp" class="max-h-20 object-contain shadow-sm" alt="Current Logo">
                                             </div>
-                                            <div class="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                                            <div class="mt-2 text-[10px] text-gray-400 leading-relaxed">
                                                 <p>💡 **권장 사양:** 가로형 로고 (배경 투명 PNG 권장)</p>
                                                 <p>현재 로고 기준: <span class="font-bold">1000x250 (4:1 비율)</span></p>
                                             </div>
@@ -393,24 +402,24 @@
 
                                         <!-- Logo Upload -->
                                         <div class="w-full md:w-1/2">
-                                            <p class="text-xs font-bold text-gray-500 mb-2 uppercase">로고 교체</p>
+                                            <p class="text-xs font-bold text-gray-400 mb-2 uppercase">로고 교체</p>
                                             <div 
                                                 @click="$refs.logoInput.click()"
-                                                class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer flex flex-col justify-center items-center min-h-[100px]"
+                                                class="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:bg-gray-600 transition-colors cursor-pointer flex flex-col justify-center items-center min-h-[100px]"
                                             >
                                                 <input type="file" x-ref="logoInput" class="hidden" @change="validateAndUploadLogo($event)" accept="image/png">
                                                 <svg class="h-6 w-6 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                                <p class="text-xs text-gray-500">새 로고 업로드 (PNG)</p>
+                                                <p class="text-xs text-gray-300">새 로고 업로드 (PNG)</p>
                                             </div>
-                                            <p x-show="logoError" x-text="logoError" class="mt-2 text-[10px] text-red-500 font-bold"></p>
+                                            <p x-show="logoError" x-text="logoError" class="mt-2 text-[10px] text-red-400 font-bold"></p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="space-y-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
-                                <h4 class="font-bold text-gray-700">📜 통합 가이드</h4>
-                                <ul class="text-sm text-gray-600 space-y-3 list-disc ml-4">
+                            <div class="space-y-6 bg-gray-700 p-6 rounded-lg border border-gray-600">
+                                <h4 class="font-bold text-white">📜 통합 가이드</h4>
+                                <ul class="text-sm text-gray-300 space-y-3 list-disc ml-4">
                                     <li><strong>콘텐츠 분석:</strong> 업로드된 PDF 자료를 Gemini AI가 분석하여 최적의 메타데이터를 추출합니다.</li>
                                     <li><strong>프리뷰 확인:</strong> 배포 전 AI가 생성한 제목, 상세 설명, 태그를 미리 확인하고 수정할 수 있습니다.</li>
                                     <li><strong>자동 편집:</strong> 영상에 로고, 아웃트로를 합성하고 선택 시 자막을 생성합니다.</li>
@@ -441,19 +450,19 @@
                         </div>
 
                         <!-- Youtube Result Area -->
-                        <div x-show="ytResult" x-cloak class="mt-8 p-6 rounded-xl shadow-sm border" :class="ytResult?.status === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'">
+                        <div x-show="ytResult" x-cloak class="mt-8 p-6 rounded-xl shadow-sm border" :class="ytResult?.status === 'success' ? 'bg-green-900 border-green-700' : 'bg-red-900 border-red-700'">
                             <div class="flex">
                                 <div class="flex-shrink-0">
                                     <template x-if="ytResult?.status === 'success'">
-                                        <svg class="h-8 w-8 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                        <svg class="h-8 w-8 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
                                     </template>
                                     <template x-if="ytResult?.status !== 'success'">
-                                        <svg class="h-8 w-8 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                                        <svg class="h-8 w-8 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
                                     </template>
                                 </div>
                                 <div class="ml-4 flex-grow">
-                                    <h3 class="text-xl font-bold" :class="ytResult?.status === 'success' ? 'text-green-800' : 'text-red-800'" x-text="ytResult?.status === 'success' ? '유튜브 업로드 완료!' : '오류 발생'"></h3>
-                                    <div class="mt-3 text-lg" :class="ytResult?.status === 'success' ? 'text-green-700' : 'text-red-700'">
+                                    <h3 class="text-xl font-bold" :class="ytResult?.status === 'success' ? 'text-green-300' : 'text-red-300'" x-text="ytResult?.status === 'success' ? '유튜브 업로드 완료!' : '오류 발생'"></h3>
+                                    <div class="mt-3 text-lg" :class="ytResult?.status === 'success' ? 'text-green-200' : 'text-red-200'">
                                         <template x-if="ytResult?.status === 'success'">
                                             <div class="space-y-4">
                                                 <p>영상이 성공적으로 처리되고 유튜브에 게시되었습니다.</p>
@@ -462,8 +471,8 @@
                                                 </div>
                                                 
                                                 <!-- LinkedIn 공유 섹션 -->
-                                                <div class="mt-6 pt-6 border-t border-green-200">
-                                                    <h4 class="text-lg font-bold text-green-900 mb-4">📢 LinkedIn에 홍보하기</h4>
+                                                <div class="mt-6 pt-6 border-t border-green-700">
+                                                    <h4 class="text-lg font-bold text-green-300 mb-4">📢 LinkedIn에 홍보하기</h4>
                                                     <div class="flex flex-wrap gap-4">
                                                         <button 
                                                             @click="shareYoutubeToLinkedin('ko')"
@@ -495,9 +504,9 @@
                         </div>
 
                         <!-- Metadata Preview Area -->
-                        <div x-show="ytMetadata" x-transition x-cloak class="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6 shadow-sm">
+                        <div x-show="ytMetadata" x-transition x-cloak class="mt-8 bg-blue-900 border border-blue-700 rounded-xl p-6 shadow-sm">
                             <div class="flex justify-between items-center mb-4">
-                                <h4 class="text-lg font-bold text-blue-900 flex items-center">
+                                <h4 class="text-lg font-bold text-blue-300 flex items-center">
                                     <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
                                     메타데이터 미리보기 (AI Generated)
                                 </h4>
@@ -531,14 +540,14 @@
                                             취소
                                         </button>
                                     </template>
-                                    <button @click="ytMetadata = null; ytValidation = null; ytMetadataEditing = false; ytMetadataEdited = null;" class="text-blue-500 hover:text-blue-700 text-sm font-medium">닫기</button>
+                                    <button @click="ytMetadata = null; ytValidation = null; ytMetadataEditing = false; ytMetadataEdited = null;" class="text-blue-400 hover:text-blue-300 text-sm font-medium">닫기</button>
                             </div>
                             </div>
                             
                             <!-- 검증 결과 표시 -->
                             <template x-if="ytValidation">
                                 <div x-transition class="mb-4">
-                                    <div x-show="ytValidation.is_valid" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-2">
+                                    <div x-show="ytValidation.is_valid" class="bg-green-900 border border-green-700 text-green-300 px-4 py-3 rounded mb-2">
                                         <div class="flex items-center">
                                             <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
@@ -546,7 +555,7 @@
                                             <span class="font-bold">✅ 메타데이터 검증 통과</span>
                                         </div>
                                     </div>
-                                    <div x-show="!ytValidation.is_valid" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-2">
+                                    <div x-show="!ytValidation.is_valid" class="bg-red-900 border border-red-700 text-red-300 px-4 py-3 rounded mb-2">
                                         <div class="font-bold mb-2">❌ 메타데이터 검증 실패</div>
                                         <ul class="list-disc list-inside text-sm space-y-1">
                                             <template x-for="error in (ytValidation.errors || [])" :key="error">
@@ -555,7 +564,7 @@
                                         </ul>
                                     </div>
                                     <template x-if="ytValidation.warnings && ytValidation.warnings.length > 0">
-                                        <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mt-2">
+                                        <div class="bg-yellow-900 border border-yellow-700 text-yellow-300 px-4 py-3 rounded mt-2">
                                             <div class="font-bold mb-2">⚠️ 경고</div>
                                             <ul class="list-disc list-inside text-sm space-y-1">
                                                 <template x-for="warning in ytValidation.warnings" :key="warning">
@@ -572,18 +581,18 @@
                                 <template x-if="!ytMetadataEditing">
                                     <div>
                                 <div>
-                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">영상 제목</label>
-                                    <div class="bg-white border border-blue-200 rounded p-3 text-sm font-bold" x-text="ytMetadata?.title"></div>
+                                    <label class="block text-xs font-bold text-blue-300 uppercase mb-1">영상 제목</label>
+                                    <div class="bg-gray-800 border border-blue-700 rounded p-3 text-sm font-bold text-white" x-text="ytMetadata?.title"></div>
                                 </div>
                                         <div class="mt-4">
-                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">상세 설명</label>
-                                    <div class="bg-white border border-blue-200 rounded p-3 text-sm whitespace-pre-wrap leading-relaxed h-48 overflow-y-auto" x-text="ytMetadata?.description"></div>
+                                    <label class="block text-xs font-bold text-blue-300 uppercase mb-1">상세 설명</label>
+                                    <div class="bg-gray-800 border border-blue-700 rounded p-3 text-sm whitespace-pre-wrap leading-relaxed h-48 overflow-y-auto text-gray-200" x-text="ytMetadata?.description"></div>
                                 </div>
                                         <div class="mt-4">
-                                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">태그</label>
+                                    <label class="block text-xs font-bold text-blue-300 uppercase mb-1">태그</label>
                                     <div class="flex flex-wrap gap-2">
                                                 <template x-for="(tag, index) in (ytMetadata?.tags || [])" :key="`tag-${index}-${tag}`">
-                                            <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium" x-text="'#' + tag"></span>
+                                            <span class="bg-blue-800 text-blue-300 px-2 py-1 rounded text-xs font-medium" x-text="'#' + tag"></span>
                                         </template>
                                     </div>
                                 </div>
@@ -594,45 +603,45 @@
                                 <template x-if="ytMetadataEditing">
                                     <div>
                                         <div>
-                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">
-                                                영상 제목 <span class="text-gray-500">(최대 100자)</span>
+                                            <label class="block text-xs font-bold text-blue-300 uppercase mb-1">
+                                                영상 제목 <span class="text-gray-400">(최대 100자)</span>
                                             </label>
                                             <input 
                                                 type="text" 
                                                 x-model="ytMetadataEdited.title"
-                                                class="w-full bg-white border border-blue-200 rounded p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                class="w-full bg-gray-800 border border-blue-700 text-white rounded p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none placeholder-gray-500"
                                                 :maxlength="100"
                                             />
-                                            <div class="text-xs text-gray-500 mt-1" x-text="`${(ytMetadataEdited?.title || '').length} / 100자`"></div>
+                                            <div class="text-xs text-gray-400 mt-1" x-text="`${(ytMetadataEdited?.title || '').length} / 100자`"></div>
                         </div>
                                         <div class="mt-4">
-                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">
-                                                상세 설명 <span class="text-gray-500">(최대 5000자)</span>
+                                            <label class="block text-xs font-bold text-blue-300 uppercase mb-1">
+                                                상세 설명 <span class="text-gray-400">(최대 5000자)</span>
                                             </label>
                                             <textarea 
                                                 x-model="ytMetadataEdited.description"
-                                                class="w-full bg-white border border-blue-200 rounded p-3 text-sm leading-relaxed h-48 resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                class="w-full bg-gray-800 border border-blue-700 text-white rounded p-3 text-sm leading-relaxed h-48 resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none placeholder-gray-500"
                                                 :maxlength="5000"
                                             ></textarea>
-                                            <div class="text-xs text-gray-500 mt-1" x-text="`${(ytMetadataEdited?.description || '').length} / 5000자`"></div>
+                                            <div class="text-xs text-gray-400 mt-1" x-text="`${(ytMetadataEdited?.description || '').length} / 5000자`"></div>
                     </div>
                                         <div class="mt-4">
-                                            <label class="block text-xs font-bold text-blue-700 uppercase mb-1">
-                                                태그 <span class="text-gray-500">(쉼표로 구분, 최대 500개, 각 태그 최대 30자)</span>
+                                            <label class="block text-xs font-bold text-blue-300 uppercase mb-1">
+                                                태그 <span class="text-gray-400">(쉼표로 구분, 최대 500개, 각 태그 최대 30자)</span>
                                             </label>
                                             <textarea 
                                                 x-model="ytMetadataEdited.tagsString"
                                                 @input="updateTagsFromString()"
-                                                class="w-full bg-white border border-blue-200 rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                class="w-full bg-gray-800 border border-blue-700 text-white rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none placeholder-gray-500"
                                                 placeholder="태그1, 태그2, 태그3..."
                                                 rows="3"
                                             ></textarea>
-                                            <div class="text-xs text-gray-500 mt-1">
+                                            <div class="text-xs text-gray-400 mt-1">
                                                 <span x-text="`${getTagsArray().length}개 태그`"></span>
                                                 <span class="ml-2" x-show="getTagsArray().length > 0">
                                                     미리보기: 
                                                     <template x-for="(tag, index) in getTagsArray().slice(0, 10)" :key="`preview-${index}-${tag}`">
-                                                        <span class="bg-blue-100 text-blue-700 px-1 py-0.5 rounded text-xs mr-1" x-text="'#' + tag"></span>
+                                                        <span class="bg-blue-800 text-blue-300 px-1 py-0.5 rounded text-xs mr-1" x-text="'#' + tag"></span>
                                                     </template>
                                                     <span x-show="getTagsArray().length > 10" x-text="` 외 ${getTagsArray().length - 10}개`"></span>
                                                 </span>

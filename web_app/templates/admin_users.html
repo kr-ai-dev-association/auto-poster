@@ -11,54 +11,54 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-900 min-h-screen">
     <div x-data="adminApp()" class="container mx-auto p-8">
         <div class="flex justify-between items-center mb-8">
             <div class="flex items-center">
-                <img src="/static/imgs/ai_profile.jpeg" alt="Logo" class="w-12 h-12 rounded-full object-cover mr-4 border-2 border-gray-300 shadow-md">
+                <img src="/static/imgs/ai_profile.jpeg" alt="Logo" class="w-12 h-12 rounded-full object-cover mr-4 border-2 border-gray-700 shadow-md">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">👥 회원 관리</h1>
-                    <p class="text-gray-500">사용 승인 및 권한 관리</p>
+                    <h1 class="text-3xl font-bold text-white">👥 회원 관리</h1>
+                    <p class="text-gray-400">사용 승인 및 권한 관리</p>
                 </div>
             </div>
-            <a href="/" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition">홈으로 돌아가기</a>
+            <a href="/" class="px-4 py-2 bg-gray-700 text-white rounded-lg font-bold hover:bg-gray-600 transition">홈으로 돌아가기</a>
         </div>
 
-        <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+        <div class="bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-700">
             <table class="w-full text-left border-collapse">
-                <thead class="bg-gray-50 border-b border-gray-200">
+                <thead class="bg-gray-700 border-b border-gray-600">
                     <tr>
-                        <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">이름</th>
-                        <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">이메일</th>
-                        <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">가입일</th>
-                        <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">상태</th>
-                        <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">권한</th>
-                        <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">작업</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-300 uppercase tracking-wider">이름</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-300 uppercase tracking-wider">이메일</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-300 uppercase tracking-wider">가입일</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-300 uppercase tracking-wider">상태</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-300 uppercase tracking-wider">권한</th>
+                        <th class="px-6 py-4 text-xs font-bold text-gray-300 uppercase tracking-wider text-right">작업</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody class="divide-y divide-gray-700">
                     <template x-for="user in users" :key="user.id">
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900" x-text="user.name"></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-gray-600" x-text="user.email"></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-gray-500 text-sm" x-text="formatDate(user.created_at)"></td>
+                        <tr class="hover:bg-gray-700 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap font-medium text-white" x-text="user.name"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-300" x-text="user.email"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-400 text-sm" x-text="formatDate(user.created_at)"></td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span :class="user.is_active ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'" class="px-2.5 py-0.5 rounded-full text-xs font-bold" x-text="user.is_active ? '승인됨' : '승인 대기'"></span>
+                                <span :class="user.is_active ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'" class="px-2.5 py-0.5 rounded-full text-xs font-bold" x-text="user.is_active ? '승인됨' : '승인 대기'"></span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span x-show="user.is_super_admin" class="bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full text-xs font-bold">수퍼관리자</span>
-                                <span x-show="!user.is_super_admin" class="text-gray-400 text-xs">-</span>
+                                <span x-show="user.is_super_admin" class="bg-purple-900 text-purple-300 px-2.5 py-0.5 rounded-full text-xs font-bold">수퍼관리자</span>
+                                <span x-show="!user.is_super_admin" class="text-gray-500 text-xs">-</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                <button x-show="!user.is_active" @click="approveUser(user.id)" class="text-indigo-600 font-bold hover:text-indigo-900 mr-3">승인</button>
-                                <button x-show="!user.is_super_admin" @click="deleteUser(user.id)" class="text-red-600 font-bold hover:text-red-900">삭제</button>
+                                <button x-show="!user.is_active" @click="approveUser(user.id)" class="text-indigo-400 font-bold hover:text-indigo-300 mr-3">승인</button>
+                                <button x-show="!user.is_super_admin" @click="deleteUser(user.id)" class="text-red-400 font-bold hover:text-red-300">삭제</button>
                             </td>
                         </tr>
                     </template>
                 </tbody>
             </table>
             
-            <div x-show="users.length === 0" class="p-12 text-center text-gray-500">
+            <div x-show="users.length === 0" class="p-12 text-center text-gray-400">
                 가입된 회원이 없습니다.
             </div>
         </div>
@@ -119,4 +119,3 @@
     </script>
 </body>
 </html>
-
