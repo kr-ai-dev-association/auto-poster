@@ -47,17 +47,18 @@ class ConverterService:
             logger.warning(f"Could not read template styles: {e}")
         return ""
 
-    async def process_markdown(self, file_content: str, filename: str):
+    async def process_markdown(self, file_content: str, filename: str, image_mode: str = "auto"):
         """
         마크다운 내용을 받아 변환, 이미지 생성, 업로드까지 수행하는 메인 로직
         file_content: 마크다운 텍스트
         filename: 원본 파일명 (예: '2025 전망.md')
+        image_mode: 'auto' (자동 생성) 또는 'manual' (수동 삽입)
         """
         if not self.client:
             return {"status": "error", "message": "Gemini Client not initialized"}
 
         base_name = os.path.splitext(filename)[0]
-        logger.info(f"Processing: {base_name}")
+        logger.info(f"Processing: {base_name} (image_mode: {image_mode})")
 
         # 1. ID 결정 (매핑 확인)
         id_map = self.firebase.get_id_map()
@@ -75,27 +76,35 @@ class ConverterService:
         # 2. 영문 제목 생성 (메타데이터용)
         title_en = self._generate_english_title(base_name, wiki_id)
 
-        # 3. 요약 이미지 생성
-        # 임시 작업 디렉토리 생성
-        temp_dir = f"temp_{wiki_id}"
-        os.makedirs(temp_dir, exist_ok=True)
-        images_dir = os.path.join(temp_dir, "images")
-        os.makedirs(images_dir, exist_ok=True)
-
+        # 3. 요약 이미지 처리
         image_url = None
-        try:
-            image_path = self._generate_summary_image(file_content, wiki_id, images_dir)
-            if image_path:
-                # GCS 업로드
-                dest_path = f"wiki-images/{wiki_id}/{os.path.basename(image_path)}"
-                image_url = self.firebase.upload_image(image_path, dest_path)
-        except Exception as e:
-            logger.error(f"Image generation failed: {e}")
-
-        # 이미지 HTML 태그
         image_html = ""
-        if image_url:
-            image_html = f'<div class="my-6 rounded-lg overflow-hidden border border-[#a2a9b1] shadow-sm"><img src="{image_url}" alt="Summary Image" class="w-full h-auto object-cover" style="aspect-ratio: 16/9;"></div>'
+        
+        if image_mode == "manual":
+            # 수동 삽입 모드: MD 파일에서 이미지 링크 추출
+            image_url = self._extract_image_from_markdown(file_content)
+            if image_url:
+                logger.info(f"Extracted image URL from markdown: {image_url}")
+                image_html = f'<div class="my-6 rounded-lg overflow-hidden border border-[#a2a9b1] shadow-sm"><img src="{image_url}" alt="Summary Image" class="w-full h-auto object-cover" style="aspect-ratio: 16/9;"></div>'
+            else:
+                logger.warning("No image URL found in markdown content")
+        else:
+            # 자동 생성 모드: Gemini로 이미지 생성
+            temp_dir = f"temp_{wiki_id}"
+            os.makedirs(temp_dir, exist_ok=True)
+            images_dir = os.path.join(temp_dir, "images")
+            os.makedirs(images_dir, exist_ok=True)
+
+            try:
+                image_path = self._generate_summary_image(file_content, wiki_id, images_dir)
+                if image_path:
+                    # GCS 업로드
+                    dest_path = f"wiki-images/{wiki_id}/{os.path.basename(image_path)}"
+                    image_url = self.firebase.upload_image(image_path, dest_path)
+                    if image_url:
+                        image_html = f'<div class="my-6 rounded-lg overflow-hidden border border-[#a2a9b1] shadow-sm"><img src="{image_url}" alt="Summary Image" class="w-full h-auto object-cover" style="aspect-ratio: 16/9;"></div>'
+            except Exception as e:
+                logger.error(f"Image generation failed: {e}")
 
         # 4. HTML 변환 (KO / EN)
         html_ko = self._convert_to_html(file_content, "ko", image_html, wiki_id)
@@ -118,8 +127,10 @@ class ConverterService:
             id_map[base_name] = wiki_id
             self.firebase.save_id_map(id_map)
 
-        # 7. 정리
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        # 7. 정리 (자동 생성 모드일 때만 temp_dir 정리)
+        if image_mode == "auto":
+            temp_dir = f"temp_{wiki_id}"
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
         if success:
             return {
@@ -148,6 +159,87 @@ class ConverterService:
             return response.text.strip().replace('"', '')
         except:
             return default_id.replace("-", " ").title()
+
+    def _extract_image_from_markdown(self, markdown_content: str) -> str:
+        """
+        마크다운 내용에서 첫 번째 이미지 URL을 추출합니다.
+        지원 형식:
+        - ![alt](url)
+        - <img src="url" alt="alt">
+        - <img src='url' alt='alt'>
+        구글 드라이브 공유 링크는 자동으로 직접 이미지 URL로 변환됩니다.
+        """
+        if not markdown_content:
+            return None
+        
+        url = None
+        
+        # 1. Markdown 이미지 형식: ![alt](url)
+        markdown_pattern = r'!\[.*?\]\((.*?)\)'
+        match = re.search(markdown_pattern, markdown_content)
+        if match:
+            url = match.group(1).strip()
+        
+        # 2. HTML img 태그 형식: <img src="url" ...>
+        if not url:
+            html_pattern = r'<img\s+[^>]*src=["\']([^"\']+)["\']'
+            match = re.search(html_pattern, markdown_content, re.IGNORECASE)
+            if match:
+                url = match.group(1).strip()
+        
+        if not url or not (url.startswith('http://') or url.startswith('https://')):
+            logger.warning("No valid image URL found in markdown content")
+            return None
+        
+        # 3. 구글 드라이브 링크를 직접 이미지 URL로 변환
+        url = self._convert_google_drive_link(url)
+        
+        return url
+    
+    def _convert_google_drive_link(self, url: str) -> str:
+        """
+        구글 드라이브 공유 링크를 직접 이미지 URL로 변환합니다.
+        
+        지원 형식:
+        - https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+        - https://drive.google.com/open?id=FILE_ID
+        - https://drive.google.com/uc?id=FILE_ID (이미 변환된 형식)
+        
+        변환 형식:
+        - https://drive.google.com/uc?export=view&id=FILE_ID
+        """
+        if not url or 'drive.google.com' not in url:
+            return url
+        
+        # FILE_ID 추출
+        file_id = None
+        
+        # 형식 1: /file/d/FILE_ID/
+        match = re.search(r'/file/d/([a-zA-Z0-9_-]+)', url)
+        if match:
+            file_id = match.group(1)
+        
+        # 형식 2: ?id=FILE_ID
+        if not file_id:
+            match = re.search(r'[?&]id=([a-zA-Z0-9_-]+)', url)
+            if match:
+                file_id = match.group(1)
+        
+        # 형식 3: /uc?id=FILE_ID (이미 변환된 형식)
+        if not file_id:
+            match = re.search(r'/uc\?id=([a-zA-Z0-9_-]+)', url)
+            if match:
+                file_id = match.group(1)
+        
+        if file_id:
+            # 직접 이미지 URL로 변환
+            converted_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+            logger.info(f"Converted Google Drive link to direct image URL: {converted_url}")
+            return converted_url
+        
+        # 변환 실패 시 원본 URL 반환
+        logger.warning(f"Could not extract file ID from Google Drive link: {url}")
+        return url
 
     def _generate_summary_image(self, content, base_name, output_dir):
         # (기존 md_to_html_converter의 _generate_summary_image 로직을 여기에 구현)

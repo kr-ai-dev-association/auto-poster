@@ -26,10 +26,10 @@ app = FastAPI(title="Auto Poster")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# 서비스 인스턴스
-converter = ConverterService()
-linkedin = LinkedinService()
-youtube = YouTubeService()
+# 서비스 인스턴스 (startup_event에서 재초기화됨)
+converter = None
+linkedin = None
+youtube = None
 
 # OAuth2 설정
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -47,10 +47,17 @@ class Token(BaseModel):
 # 의존성: DB 세션 및 수퍼 관리자 초기화
 @app.on_event("startup")
 async def startup_event():
+    global converter, linkedin, youtube
+    
     # 1. 환경 변수 로드 (DB 우선, 로컬 폴백)
     CryptoService.load_env_from_db()
     
-    # 2. 수퍼 관리자 초기화
+    # 2. 서비스 인스턴스 초기화 (환경 변수 로드 후)
+    converter = ConverterService()
+    linkedin = LinkedinService()
+    youtube = YouTubeService()
+    
+    # 3. 수퍼 관리자 초기화
     db = database.SessionLocal()
     try:
         auth_service.init_super_admin(db)
@@ -285,13 +292,19 @@ async def process_content(
     file: UploadFile = File(None),
     content: str = Form(None),
     title: str = Form(None),
+    image_mode: str = Form("auto"),
     user: models.User = Depends(get_current_user)
 ):
     """
     파일 업로드 또는 텍스트 직접 입력을 처리합니다.
+    image_mode: 'auto' (자동 생성) 또는 'manual' (수동 삽입)
     """
     if not file and not content:
         return JSONResponse(status_code=400, content={"message": "No file or content provided"})
+
+    # image_mode 검증
+    if image_mode not in ['auto', 'manual']:
+        image_mode = 'auto'
 
     # 1. 파일 처리
     if file:
@@ -307,8 +320,11 @@ async def process_content(
         markdown_text = content
 
     # 3. 비동기 변환 작업 시작
+    if not converter:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
+    
     try:
-        result = await converter.process_markdown(markdown_text, filename)
+        result = await converter.process_markdown(markdown_text, filename, image_mode=image_mode)
         return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -323,6 +339,9 @@ async def share_linkedin(
     """
     배포된 위키를 LinkedIn에 공유합니다.
     """
+    if not linkedin:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
+    
     try:
         result = await linkedin.share_wiki(wiki_id, wiki_url, lang)
         return JSONResponse(content=result)
@@ -342,6 +361,9 @@ async def get_youtube_logo(category: str, token: str = None, db: Session = Depen
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
+    
     logo_path = youtube.get_logo_path(category)
     if logo_path and os.path.exists(logo_path):
         return FileResponse(logo_path)
@@ -354,6 +376,9 @@ async def upload_youtube_logo(
     user: models.User = Depends(get_current_user)
 ):
     """새로운 로고 이미지를 업로드하고 교체합니다."""
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
+    
     try:
         content = await logo.read()
         youtube.save_logo(category, content, logo.filename)
@@ -369,6 +394,9 @@ async def generate_youtube_metadata(
     user: models.User = Depends(get_current_user)
 ):
     """PDF 분석을 통해 유튜브 메타데이터를 생성합니다."""
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
+    
     try:
         from web_app.services.youtube_service import YouTubeMetadataValidator
         
@@ -433,6 +461,9 @@ async def youtube_upload(
     user: models.User = Depends(get_current_user)
 ):
     """영상을 처리하고 유튜브에 업로드합니다."""
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
+    
     try:
         video_content = await video.read()
         pdf_content = await pdf.read()
@@ -451,6 +482,9 @@ async def youtube_share_linkedin(
     user: models.User = Depends(get_current_user)
 ):
     """유튜브 영상을 링크드인에 공유합니다."""
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
+    
     try:
         result = await youtube.share_to_linkedin(video_id, video_url, lang)
         return JSONResponse(content=result)

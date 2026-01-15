@@ -248,8 +248,8 @@
                         </div>
                         <button 
                             @click="upload()" 
-                            :disabled="loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))"
-                            :class="{'opacity-50 cursor-not-allowed': loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !content))}"
+                            :disabled="loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !hasContent()))"
+                            :class="{'opacity-50 cursor-not-allowed': loading || (tab === 'file' && !file) || (tab === 'text' && (!title || !hasContent()))}"
                             class="px-6 py-3 border border-gray-300 rounded-lg shadow-lg text-base font-bold text-gray-800 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-all whitespace-nowrap"
                         >
                             <span x-show="!loading">🚀 변환 및 배포 시작</span>
@@ -275,9 +275,36 @@
                         </div>
                     </div>
 
-                    <div class="wiki-content-container container mx-auto p-6 flex-grow flex flex-col min-h-0">
+                    <div class="wiki-content-container w-full px-6 py-6 flex-grow flex flex-col min-h-0">
                         <!-- File Upload Tab -->
                         <div x-show="tab === 'file'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="flex-grow flex flex-col min-h-0">
+                            <!-- 이미지 생성 방식 선택 -->
+                            <div class="mb-4 bg-gray-800 border border-gray-700 rounded-lg p-4">
+                                <label class="block text-sm font-medium text-gray-300 mb-3">타이틀 이미지 생성 방식</label>
+                                <div class="space-y-3">
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="radio" x-model="imageMode" value="auto" class="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500">
+                                        <span class="ml-3 text-sm text-gray-300">
+                                            <span class="font-medium">🤖 자동 생성</span>
+                                            <span class="text-gray-400 ml-2">(Gemini AI가 자동으로 이미지 생성)</span>
+                                        </span>
+                                    </label>
+                                    <label class="flex items-center cursor-pointer">
+                                        <input type="radio" x-model="imageMode" value="manual" class="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500">
+                                        <span class="ml-3 text-sm text-gray-300">
+                                            <span class="font-medium">✏️ 수동 삽입</span>
+                                            <span class="text-gray-400 ml-2">(MD 파일에 이미지 링크를 직접 삽입)</span>
+                                        </span>
+                                    </label>
+                                </div>
+                                <div x-show="imageMode === 'manual'" class="mt-3 p-3 bg-indigo-900/30 border border-indigo-700 rounded text-xs text-indigo-200">
+                                    <p class="font-medium mb-1">💡 사용 방법:</p>
+                                    <p class="text-indigo-300">MD 파일의 맨 위에 이미지 링크를 삽입하세요.</p>
+                                    <p class="text-indigo-300 mt-1">예: <code class="bg-gray-900 px-1 py-0.5 rounded">![이미지 설명](https://example.com/image.jpg)</code></p>
+                                    <p class="text-indigo-300 mt-1">또는: <code class="bg-gray-900 px-1 py-0.5 rounded">&lt;img src="https://example.com/image.jpg" alt="설명"&gt;</code></p>
+                                </div>
+                            </div>
+                            
                             <div 
                                 @dragover.prevent="dragOver = true"
                                 @dragleave.prevent="dragOver = false"
@@ -317,6 +344,129 @@
                                     <label class="block text-sm font-medium text-gray-300 mb-1">제목</label>
                                     <input type="text" x-model="title" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg placeholder-gray-500" placeholder="예: 2025 AI 트렌드 전망">
                                 </div>
+                                
+                                <!-- 이미지 생성 방식 선택과 가이드 패널 -->
+                                <div class="flex flex-row gap-4">
+                                    <!-- 좌측: 이미지 생성 방식 선택 (최소화) -->
+                                    <div class="flex-shrink-0 bg-gray-800 border border-gray-700 rounded-lg p-4" style="min-width: 280px; max-width: 320px;">
+                                        <label class="block text-sm font-medium text-gray-300 mb-3">타이틀 이미지 생성 방식</label>
+                                        <div class="space-y-3">
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio" x-model="imageMode" value="auto" class="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500">
+                                                <span class="ml-3 text-sm text-gray-300">
+                                                    <span class="font-medium">🤖 자동 생성</span>
+                                                    <span class="text-gray-400 ml-1 text-xs">(AI 자동 생성)</span>
+                                                </span>
+                                            </label>
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio" x-model="imageMode" value="manual" class="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-500">
+                                                <span class="ml-3 text-sm text-gray-300">
+                                                    <span class="font-medium">✏️ 수동 삽입</span>
+                                                    <span class="text-gray-400 ml-1 text-xs">(링크 직접 삽입)</span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 우측: 구글 드라이브 이미지 삽입 가이드 -->
+                                    <div class="flex-1 bg-indigo-900/30 border border-indigo-700 rounded-lg overflow-hidden">
+                                        <!-- 헤더 (클릭 가능) -->
+                                        <button 
+                                            @click="guidePanelExpanded = !guidePanelExpanded"
+                                            class="w-full flex items-center justify-between p-4 hover:bg-indigo-800/50 transition-colors cursor-pointer"
+                                        >
+                                            <div class="flex items-center gap-2">
+                                                <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                <h3 class="text-base font-bold text-indigo-300">📸 구글 드라이브 이미지 삽입 가이드</h3>
+                                            </div>
+                                            <svg 
+                                                class="w-5 h-5 text-indigo-400 transition-transform"
+                                                :class="{'rotate-180': guidePanelExpanded}"
+                                                fill="none" 
+                                                stroke="currentColor" 
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+                                        
+                                        <!-- 접힌 상태에서 보이는 요약 -->
+                                        <div x-show="!guidePanelExpanded" class="px-4 pb-4 space-y-2">
+                                            <p class="text-xs text-indigo-200/80 leading-relaxed">
+                                                이미지삽입은 <code class="bg-gray-900/50 px-1 py-0.5 rounded text-indigo-100">![설명](구글드라이브링크)</code> 형식으로 삽입하세요.
+                                            </p>
+                                            <p class="text-xs text-indigo-200/80 leading-relaxed">
+                                                Auto Poster가 구글드라이브 이미지를 사용 가능한 URL 형태로 변환합니다.
+                                            </p>
+                                        </div>
+                                        
+                                        <!-- 내용 (접기/펼치기) -->
+                                        <div 
+                                            x-show="guidePanelExpanded"
+                                            x-transition:enter="transition ease-out duration-200"
+                                            x-transition:enter-start="opacity-0 max-h-0"
+                                            x-transition:enter-end="opacity-100 max-h-[400px]"
+                                            x-transition:leave="transition ease-in duration-200"
+                                            x-transition:leave-start="opacity-100 max-h-[400px]"
+                                            x-transition:leave-end="opacity-0 max-h-0"
+                                            class="overflow-y-auto"
+                                            style="max-height: 400px;"
+                                        >
+                                            <div class="p-5 pt-0 space-y-4">
+                                                <div class="space-y-3 text-sm text-indigo-200">
+                                                <div>
+                                                    <p class="font-medium text-indigo-300 mb-2">1️⃣ 구글 드라이브에 이미지 업로드</p>
+                                                    <p class="text-indigo-200/90 leading-relaxed text-xs">구글 드라이브에 이미지를 업로드하고 공유 링크를 생성하세요.</p>
+                                                </div>
+                                                
+                                                <div>
+                                                    <p class="font-medium text-indigo-300 mb-2">2️⃣ 공유 설정</p>
+                                                    <p class="text-indigo-200/90 leading-relaxed text-xs mb-1">파일 우클릭 → "공유" → "링크가 있는 모든 사용자"로 설정</p>
+                                                    <p class="text-xs text-indigo-300/80 italic">⚠️ 공유 설정이 없으면 이미지가 표시되지 않습니다</p>
+                                                </div>
+                                                
+                                                <div>
+                                                    <p class="font-medium text-indigo-300 mb-2">3️⃣ 마크다운에 삽입</p>
+                                                    <p class="text-indigo-200/90 leading-relaxed text-xs mb-2">마크다운 내용의 <span class="font-bold text-indigo-100">맨 위</span>에 다음 형식으로 삽입:</p>
+                                                    
+                                                    <div class="bg-gray-900/50 border border-gray-700 rounded p-2">
+                                                        <code class="block text-xs text-indigo-100 bg-gray-950 px-2 py-1 rounded break-all">
+                                                            ![이미지 설명](https://drive.google.com/file/d/FILE_ID/view?usp=sharing)
+                                                        </code>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div>
+                                                    <p class="font-medium text-indigo-300 mb-2">✨ 자동 변환</p>
+                                                    <p class="text-indigo-200/90 leading-relaxed text-xs">구글 드라이브 공유 링크는 자동으로 직접 이미지 URL로 변환됩니다.</p>
+                                                    <p class="text-xs text-indigo-300/80 mt-1 italic">예: drive.google.com/file/d/... → drive.google.com/uc?export=view&id=...</p>
+                                                </div>
+                                                
+                                                <div class="pt-2 border-t border-indigo-700/50">
+                                                    <p class="font-medium text-indigo-300 mb-2">💡 다른 이미지 호스팅</p>
+                                                    <p class="text-indigo-200/90 leading-relaxed text-xs">구글 드라이브 외에도 다음 형식의 이미지 URL을 사용할 수 있습니다:</p>
+                                                    <ul class="list-disc list-inside text-xs text-indigo-300/80 mt-1 space-y-1">
+                                                        <li>일반 이미지 URL (https://example.com/image.jpg)</li>
+                                                        <li>이미지 호스팅 서비스 (Imgur, Cloudinary 등)</li>
+                                                    </ul>
+                                                </div>
+                                                
+                                                <div class="pt-2 border-t border-indigo-700/50">
+                                                    <p class="text-xs text-yellow-300/80 font-medium">⚠️ 주의사항</p>
+                                                    <ul class="list-disc list-inside text-xs text-indigo-300/80 mt-1 space-y-1">
+                                                        <li>이미지가 삭제되거나 공유 설정이 변경되면 표시되지 않을 수 있습니다</li>
+                                                        <li>더 안정적인 방법: 이미지를 다운로드하여 직접 호스팅하는 것을 권장합니다</li>
+                                                    </ul>
+                                                </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 마크다운 에디터 (전체 너비) -->
                                 <div class="flex-grow flex flex-col min-h-0 overflow-visible">
                                     <label class="block text-sm font-medium text-gray-300 mb-1">내용 (Markdown)</label>
                                     <div class="flex-grow flex flex-col min-h-0">
@@ -780,6 +930,8 @@
                 file: null,
                 title: '',
                 content: '',
+                imageMode: 'auto', // 'auto' or 'manual'
+                guidePanelExpanded: false, // 구글 드라이브 가이드 패널 접기/펼치기 상태 (기본: 접힘)
                 loading: false,
                 result: null,
                 sharing: null,
@@ -1416,22 +1568,56 @@
                     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
                 },
 
+                hasContent() {
+                    // 마크다운 에디터가 있으면 에디터의 내용 확인
+                    if (this.markdownEditor) {
+                        const editorContent = this.markdownEditor.value();
+                        return editorContent && editorContent.trim().length > 0;
+                    }
+                    // 에디터가 없으면 content 변수 확인
+                    return this.content && this.content.trim().length > 0;
+                },
+
                 async upload() {
                     this.loading = true;
                     this.result = null;
                     const formData = new FormData();
 
                     if (this.tab === 'file') {
-                        formData.append('file', this.file);
-                    } else {
-                        // 마크다운 에디터가 있으면 에디터에서 직접 가져오기
-                        let contentToSend = this.content;
-                        if (this.markdownEditor) {
-                            contentToSend = this.markdownEditor.value();
-                            this.content = contentToSend; // 동기화
+                        if (!this.file) {
+                            alert('파일을 선택해주세요.');
+                            this.loading = false;
+                            return;
                         }
-                        formData.append('title', this.title);
+                        formData.append('file', this.file);
+                        formData.append('image_mode', this.imageMode || 'auto');
+                    } else {
+                        // 직접 작성 모드: 마크다운 에디터에서 내용 가져오기
+                        if (!this.title || !this.title.trim()) {
+                            alert('제목을 입력해주세요.');
+                            this.loading = false;
+                            return;
+                        }
+                        
+                        let contentToSend = '';
+                        if (this.markdownEditor) {
+                            // 마크다운 에디터가 있으면 에디터에서 직접 가져오기
+                            contentToSend = this.markdownEditor.value() || '';
+                            this.content = contentToSend; // 동기화
+                        } else {
+                            // 에디터가 없으면 content 변수 사용
+                            contentToSend = this.content || '';
+                        }
+                        
+                        if (!contentToSend || !contentToSend.trim()) {
+                            alert('내용을 입력해주세요.');
+                            this.loading = false;
+                            return;
+                        }
+                        
+                        formData.append('title', this.title.trim());
                         formData.append('content', contentToSend);
+                        formData.append('image_mode', this.imageMode || 'auto');
                     }
 
                     try {
