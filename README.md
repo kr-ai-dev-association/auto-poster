@@ -130,7 +130,10 @@ FastAPI 기반의 통합 웹 인터페이스로 모든 기능을 제공합니다
 
 #### 📝 Wiki Auto Poster
 - 마크다운 파일 업로드 또는 직접 작성
-- AI 기반 16:9 요약 이미지 자동 생성
+- **타이틀 이미지 생성 방식 선택**:
+  - 🤖 **자동 생성**: Gemini AI가 콘텐츠를 분석하여 16:9 요약 이미지 자동 생성
+  - ✏️ **수동 삽입**: MD 파일에 이미지 링크를 직접 삽입 (구글 드라이브 링크 자동 변환 지원)
+- 구글 드라이브 이미지 링크 자동 변환 (공유 링크 → 직접 이미지 URL)
 - 한국어/영어 동시 변환 및 배포
 - Firebase/GCS 자동 배포
 - HTML 미리보기 기능
@@ -163,9 +166,58 @@ FastAPI 기반의 통합 웹 인터페이스로 모든 기능을 제공합니다
 ### Wiki Auto Poster 사용법
 1. 로그인 후 메인 화면에서 "Wiki Auto Poster" 선택
 2. **파일 업로드** 또는 **직접 작성** 탭 선택
-3. 마크다운 파일 업로드 또는 내용 입력
-4. "변환 및 배포" 버튼 클릭
-5. 완료 후 미리보기 및 LinkedIn 홍보 가능
+3. **타이틀 이미지 생성 방식 선택**:
+   - **자동 생성**: Gemini AI가 자동으로 이미지 생성 (기본값)
+   - **수동 삽입**: MD 파일 맨 위에 `![이미지 설명](구글드라이브링크)` 형식으로 삽입
+4. 마크다운 파일 업로드 또는 내용 입력
+5. "변환 및 배포" 버튼 클릭
+6. 완료 후 미리보기 및 LinkedIn 홍보 가능
+
+#### 구글 드라이브 이미지 사용법 (수동 삽입 모드)
+1. 구글 드라이브에 이미지 업로드
+2. 파일 우클릭 → "공유" → "링크가 있는 모든 사용자"로 설정
+3. 마크다운 파일 맨 위에 다음 형식으로 삽입:
+   ```markdown
+   ![이미지 설명](https://drive.google.com/file/d/FILE_ID/view?usp=sharing)
+   ```
+4. Auto Poster가 자동으로 구글 드라이브 링크를 사용 가능한 이미지 URL로 변환
+
+#### 배포 구조 및 저장 위치
+변환된 HTML 콘텐츠는 **Google Cloud Firestore**에 저장됩니다:
+
+**Firestore 구조:**
+- **컬렉션**: `static-wiki`
+- **문서 ID**: `wiki_id` (영문 슬러그, 예: `ai-trends-2025`)
+- **문서 구조**:
+  ```json
+  {
+    "id": "ai-trends-2025",
+    "titles": {
+      "ko": "2025 AI 트렌드 전망",
+      "en": "AI Trends 2025"
+    },
+    "content": {
+      "ko": "<html>한국어 HTML 콘텐츠</html>",
+      "en": "<html>English HTML content</html>"
+    },
+    "thumbnailUrl": "https://storage.googleapis.com/.../wiki-images/.../image.png",
+    "lastUpdated": "2025-01-15",
+    "type": "firestore-content",
+    "createdAt": "2025-01-15T10:30:00Z"
+  }
+  ```
+
+**이미지 저장 위치 (Google Cloud Storage):**
+- **경로**: `wiki-images/{wiki_id}/{filename}`
+- **URL 형식**: `https://storage.googleapis.com/{bucket_name}/wiki-images/{wiki_id}/{filename}`
+- **예시**: `https://storage.googleapis.com/my-bucket/wiki-images/ai-trends-2025/summary.png`
+
+**ID 매핑 (Firestore):**
+- 원본 파일명과 `wiki_id`의 매핑 정보는 Firestore의 별도 문서에 저장됩니다.
+- 동일한 파일명으로 업로드 시 기존 `wiki_id`를 재사용합니다.
+
+**접근 URL:**
+- 배포된 콘텐츠는 `https://tony.banya.ai/report/{wiki_id}` 형식으로 접근 가능합니다.
 
 ### Youtube Poster 사용법
 1. 메인 화면에서 "Youtube Poster" 선택

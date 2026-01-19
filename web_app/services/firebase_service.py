@@ -72,26 +72,34 @@ class FirebaseService:
         except Exception as e:
             print(f"❌ Firebase Initialization Failed: {e}")
 
-    def get_id_map(self):
-        """Firestore에서 ID 매핑 정보를 가져옵니다."""
+    def get_id_map(self, category='tech'):
+        """
+        Firestore에서 ID 매핑 정보를 가져옵니다.
+        category: 'tech' 또는 'news'
+        """
         if not self.db:
             return {}
         try:
-            doc_ref = self.db.collection('system-metadata').document('wiki-id-map')
+            doc_id = f'wiki-id-map-{category}'
+            doc_ref = self.db.collection('system-metadata').document(doc_id)
             doc = doc_ref.get()
             return doc.to_dict() if doc.exists else {}
         except Exception as e:
             print(f"⚠️ Failed to fetch ID map: {e}")
             return {}
 
-    def save_id_map(self, id_map):
-        """ID 매핑 정보를 Firestore에 저장합니다."""
+    def save_id_map(self, id_map, category='tech'):
+        """
+        ID 매핑 정보를 Firestore에 저장합니다.
+        category: 'tech' 또는 'news'
+        """
         if not self.db:
             return
         try:
-            doc_ref = self.db.collection('system-metadata').document('wiki-id-map')
+            doc_id = f'wiki-id-map-{category}'
+            doc_ref = self.db.collection('system-metadata').document(doc_id)
             doc_ref.set(id_map, merge=True)
-            print("✅ ID map updated.")
+            print(f"✅ ID map updated (category: {category}).")
         except Exception as e:
             print(f"⚠️ Failed to save ID map: {e}")
 
@@ -117,25 +125,50 @@ class FirebaseService:
             print(f"❌ Image upload failed: {e}")
             return None
 
-    def save_wiki_content(self, wiki_id, title_ko, title_en, last_updated, html_ko, html_en, thumbnail_url):
-        """변환된 위키 콘텐츠를 Firestore에 저장합니다."""
+    def save_wiki_content(self, wiki_id, title_ko, title_en, last_updated, html_ko, html_en, thumbnail_url, category='tech'):
+        """
+        변환된 위키 콘텐츠를 Firestore에 저장합니다.
+        category: 'tech' (Tech Wiki -> static-wiki) 또는 'news' (Banya Official News -> banya-official-news)
+        
+        데이터 구조:
+        - id: wiki_id
+        - titles: { ko: title_ko, en: title_en }
+        - content: { ko: html_ko, en: html_en }
+        - thumbnailUrl: thumbnail_url
+        - lastUpdated: ISO 날짜 문자열 (예: "2025-01-15")
+        - type: 'firestore-content'
+        - createdAt: ISO 타임스탬프 문자열 (예: "2025-01-15T10:30:00.000Z")
+        """
         if not self.db:
+            print(f"❌ Firestore DB not initialized")
             return False
 
         try:
-            doc_ref = self.db.collection('static-wiki').document(wiki_id)
+            from datetime import datetime
+            
+            # 카테고리에 따라 컬렉션 선택
+            collection_name = 'banya-official-news' if category == 'news' else 'static-wiki'
+            print(f"📝 Saving to collection: {collection_name} (category: {category}, wiki_id: {wiki_id})")
+            doc_ref = self.db.collection(collection_name).document(wiki_id)
+            
+            # createdAt을 ISO 타임스탬프 문자열로 생성 (예시 코드와 동일한 형식)
+            created_at = datetime.utcnow().isoformat() + 'Z'
+            
             doc_data = {
                 'id': wiki_id,
                 'titles': { 'ko': title_ko, 'en': title_en },
                 'content': { 'ko': html_ko, 'en': html_en },
-                'thumbnailUrl': thumbnail_url,
+                'thumbnailUrl': thumbnail_url or '',
                 'lastUpdated': last_updated,
                 'type': 'firestore-content',
-                'createdAt': firestore.SERVER_TIMESTAMP
+                'createdAt': created_at
             }
             doc_ref.set(doc_data, merge=True)
+            print(f"✅ Content saved to {collection_name}/{wiki_id}")
             return True
         except Exception as e:
             print(f"❌ Firestore save failed: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 

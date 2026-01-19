@@ -293,11 +293,13 @@ async def process_content(
     content: str = Form(None),
     title: str = Form(None),
     image_mode: str = Form("auto"),
+    category: str = Form("tech"),
     user: models.User = Depends(get_current_user)
 ):
     """
     파일 업로드 또는 텍스트 직접 입력을 처리합니다.
     image_mode: 'auto' (자동 생성) 또는 'manual' (수동 삽입)
+    category: 'tech' (Tech Wiki) 또는 'news' (Banya Official News)
     """
     if not file and not content:
         return JSONResponse(status_code=400, content={"message": "No file or content provided"})
@@ -305,6 +307,10 @@ async def process_content(
     # image_mode 검증
     if image_mode not in ['auto', 'manual']:
         image_mode = 'auto'
+    
+    # category 검증
+    if category not in ['tech', 'news']:
+        category = 'tech'
 
     # 1. 파일 처리
     if file:
@@ -324,7 +330,7 @@ async def process_content(
         return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
     
     try:
-        result = await converter.process_markdown(markdown_text, filename, image_mode=image_mode)
+        result = await converter.process_markdown(markdown_text, filename, image_mode=image_mode, category=category)
         return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
