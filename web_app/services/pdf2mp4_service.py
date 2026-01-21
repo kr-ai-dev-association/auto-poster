@@ -131,8 +131,8 @@ class PDF2MP4Service:
 
         # 로고 합성 (영상 프레임 우측 하단 끝에 맞춤)
         if logo_img is not None:
-            # 로고 크기 조정 (문서 너비의 약 15%)
-            logo_target_width = int(new_width * 0.15)
+            # 로고 크기 조정 (문서 너비의 약 10%)
+            logo_target_width = int(new_width * 0.10)
             logo_ratio = logo_target_width / logo_img.width
             logo_new_height = int(logo_img.height * logo_ratio)
             logo_resized = logo_img.resize((logo_target_width, logo_new_height), Image.Resampling.LANCZOS)
