@@ -192,7 +192,6 @@ class PDF2MP4Service:
                 fps=fps,
                 codec='libx264',
                 audio_codec='aac',
-                verbose=False,
                 logger=None
             )
 
@@ -356,7 +355,6 @@ class PDF2MP4Service:
                 fps=fps,
                 codec='libx264',
                 audio_codec='aac',
-                verbose=False,
                 logger=None
             )
 
