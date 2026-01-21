@@ -102,16 +102,19 @@ pip install Pillow beautifulsoup4 python-multipart cryptography
 ```
 
 ### 4. 환경 변수 설정
+`.env.example` 파일을 참고하여 `.env` 파일을 생성하세요.
+
 ```bash
-# .env 파일 생성
-cat > .env << EOF
-ENVIRONMENT=development
-SUPER_ADMIN_ID=admin@yourdomain.com
-SUPER_ADMIN_PW=YourSecurePassword123!
-SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-GEMINI_API_KEY=your-gemini-api-key
-EOF
+cp .env.example .env
+# .env 파일을 열어 필요한 값을 설정
 ```
+
+**필수 환경 변수:**
+- `ENVIRONMENT`: 실행 환경 (`development` 또는 `production`)
+- `SECRET_KEY`: JWT 토큰 서명용 비밀키 (자동 생성: `python3 -c "import secrets; print(secrets.token_hex(32))"`)
+- `GEMINI_API_KEY`: Google Gemini API 키
+- `SUPER_ADMIN_ID`: 슈퍼 관리자 이메일
+- `SUPER_ADMIN_PW`: 슈퍼 관리자 비밀번호 (8자 이상, 대소문자/숫자/특수문자 포함)
 
 ### 5. 서버 실행
 ```bash
