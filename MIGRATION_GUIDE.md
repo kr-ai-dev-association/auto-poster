@@ -28,24 +28,10 @@ tar -czvf generated_videos_backup.tar.gz /home/ubuntu/auto-poster/generated_vide
 tar -xzvf generated_videos_backup.tar.gz -C /home/ubuntu/auto-poster/
 ```
 
-### 1.3 시스템 환경 변수 (중요!)
-프로덕션 모드에서 DB의 암호화된 파일을 복호화하는 데 필요한 마스터 키입니다.
+### 1.3 .env 파일
+로컬에 보관 중인 `.env` 파일을 백업해 두세요. 이 파일에는 API 키와 슈퍼 관리자 계정 정보가 포함되어 있습니다.
 
-**반드시 기록해 둘 환경 변수:**
-| 변수명 | 설명 |
-|--------|------|
-| `SUPER_ADMIN_ID` | 슈퍼 관리자 ID (암호화 키의 일부) |
-| `SUPER_ADMIN_PW` | 슈퍼 관리자 비밀번호 (암호화 키의 일부) |
-| `ENVIRONMENT` | 실행 환경 (`production` 또는 `development`) |
-
-```bash
-# 현재 값 확인
-echo $SUPER_ADMIN_ID
-echo $SUPER_ADMIN_PW
-echo $ENVIRONMENT
-```
-
-> **주의:** 이 값들이 없으면 DB에 저장된 암호화된 .env 파일을 복호화할 수 없습니다!
+> **참고:** 슈퍼 관리자 계정(`SUPER_ADMIN_ID`, `SUPER_ADMIN_PW`)은 DB의 암호화된 파일을 복호화하는 마스터 키로 사용됩니다.
 
 ---
 
@@ -146,23 +132,12 @@ cp -r backup_20260121/generated_videos /home/ubuntu/auto-poster/
 mkdir -p /home/ubuntu/auto-poster/generated_videos
 ```
 
-### 4.5 시스템 환경 변수 설정
+### 4.5 .env 파일 복원
+로컬에 백업해 둔 `.env` 파일을 새 서버의 `web_app` 디렉토리에 복사합니다.
+
 ```bash
-# /etc/environment 또는 ~/.bashrc에 추가
-export SUPER_ADMIN_ID="your_admin_id"
-export SUPER_ADMIN_PW="your_admin_password"
-export ENVIRONMENT="production"
-
-# 적용
-source ~/.bashrc
-```
-
-또는 systemd 서비스 파일에 환경 변수 추가:
-```ini
-[Service]
-Environment="SUPER_ADMIN_ID=your_admin_id"
-Environment="SUPER_ADMIN_PW=your_admin_password"
-Environment="ENVIRONMENT=production"
+# 로컬 PC에서 새 서버로 .env 파일 업로드
+scp -i <ssh_key_file> /path/to/local/.env ubuntu@<new_server_ip>:/home/ubuntu/auto-poster/web_app/
 ```
 
 ### 4.6 애플리케이션 실행
@@ -194,7 +169,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 ❌ [PRODUCTION] .env 파일이 DB에 없습니다.
 ```
-→ `SUPER_ADMIN_ID`와 `SUPER_ADMIN_PW` 환경 변수가 이전 서버와 동일한지 확인
+→ `.env` 파일이 `web_app` 디렉토리에 있는지 확인하고, `SUPER_ADMIN_ID`와 `SUPER_ADMIN_PW` 값이 이전 서버와 동일한지 확인
 
 ### Gen Video 변환 실패
 ```
@@ -212,7 +187,7 @@ Whisper not installed
 
 ## 7. 보안 주의사항
 
-1. **SUPER_ADMIN_ID/PW는 절대 공개 저장소에 커밋하지 마세요**
+1. **`.env` 파일은 절대 공개 저장소에 커밋하지 마세요**
 2. 백업 파일은 안전한 위치에 암호화하여 보관하세요
 3. 이관 완료 후 이전 서버의 데이터를 안전하게 삭제하세요
 4. 새 서버에서 방화벽 설정을 확인하세요
