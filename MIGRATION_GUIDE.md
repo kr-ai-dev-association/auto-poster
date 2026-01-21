@@ -17,16 +17,33 @@ cp /home/ubuntu/auto-poster/auto_poster.db ./backup/
 cp ./backup/auto_poster.db /home/ubuntu/auto-poster/
 ```
 
-### 1.2 생성된 영상 폴더
-Gen Video 기능으로 생성된 모든 MP4 파일이 저장되어 있습니다.
+### 1.2 생성된 영상 및 PDF 폴더
+Gen Video 기능으로 생성된 모든 MP4 파일과 업로드된 PDF 파일이 저장되어 있습니다.
 
 ```bash
-# 백업
+# 영상 백업
 tar -czvf generated_videos_backup.tar.gz /home/ubuntu/auto-poster/generated_videos/
+
+# PDF 백업
+tar -czvf generated_pdfs_backup.tar.gz /home/ubuntu/auto-poster/generated_pdfs/
 
 # 복원
 tar -xzvf generated_videos_backup.tar.gz -C /home/ubuntu/auto-poster/
+tar -xzvf generated_pdfs_backup.tar.gz -C /home/ubuntu/auto-poster/
 ```
+
+### 1.3 YouTube OAuth 토큰
+YouTube 업로드 기능에 필요한 인증 토큰입니다.
+
+```bash
+# 백업
+cp /home/ubuntu/auto-poster/youtube_poster/token.pickle ./backup/
+
+# 복원
+cp ./backup/token.pickle /home/ubuntu/auto-poster/youtube_poster/
+```
+
+> **참고:** token.pickle이 없으면 `youtube_poster/generate_token.py`를 로컬 PC에서 실행하여 재생성할 수 있습니다.
 
 ### 1.3 시스템 환경 변수 (중요!)
 프로덕션 모드에서 DB의 암호화된 파일을 복호화하는 데 필요한 마스터 키입니다.
@@ -68,6 +85,10 @@ cp /home/ubuntu/auto-poster/.env ./backup/
 # Ubuntu/Debian
 sudo apt-get update
 sudo apt-get install -y poppler-utils ffmpeg python3 python3-pip python3-venv
+
+# GPU 가속 사용 시 (선택사항)
+# NVIDIA 드라이버 및 CUDA 설치 필요
+nvidia-smi  # 드라이버 확인
 ```
 
 ### 3.2 프로젝트 클론
@@ -88,6 +109,9 @@ pip install -r requirements.txt
 
 # Whisper 설치 (Smart 모드용)
 pip install git+https://github.com/openai/whisper.git
+
+# PaddleOCR 설치 (이미지 기반 PDF 텍스트 추출용)
+pip install paddlepaddle paddleocr
 ```
 
 ### 3.4 백업 파일 복원
@@ -95,11 +119,16 @@ pip install git+https://github.com/openai/whisper.git
 # 데이터베이스 복원
 cp ./backup/auto_poster.db /home/ubuntu/auto-poster/
 
-# 생성된 영상 폴더 복원
+# 생성된 영상 및 PDF 폴더 복원
 tar -xzvf generated_videos_backup.tar.gz -C /home/ubuntu/auto-poster/
+tar -xzvf generated_pdfs_backup.tar.gz -C /home/ubuntu/auto-poster/
+
+# YouTube 토큰 복원 (있는 경우)
+cp ./backup/token.pickle /home/ubuntu/auto-poster/youtube_poster/
 
 # 디렉토리가 없으면 생성
 mkdir -p /home/ubuntu/auto-poster/generated_videos
+mkdir -p /home/ubuntu/auto-poster/generated_pdfs
 ```
 
 ### 3.5 시스템 환경 변수 설정
@@ -138,7 +167,8 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 - [ ] Wiki Poster 기능 테스트
 - [ ] YouTube Poster 기능 테스트
 - [ ] Gen Video Basic 모드 변환 테스트
-- [ ] Gen Video Smart 모드 변환 테스트
+- [ ] Gen Video Smart 모드 변환 테스트 (Whisper + PaddleOCR)
+- [ ] YouTube 썸네일 자동 업로드 테스트
 - [ ] 보안 파일 관리 페이지 접근 가능 여부
 - [ ] 기존 생성된 영상 목록 조회
 
@@ -163,6 +193,18 @@ pdf2image 또는 moviepy 관련 오류
 Whisper not installed
 ```
 → Whisper 재설치: `pip install git+https://github.com/openai/whisper.git`
+
+### PaddleOCR 관련 오류
+```
+PaddleOCR not installed 또는 OCR 오류
+```
+→ PaddleOCR 재설치: `pip install paddlepaddle paddleocr`
+
+### YouTube 썸네일 업로드 실패
+```
+Failed to set thumbnail
+```
+→ token.pickle 파일 확인 및 YouTube Data API 권한 확인
 
 ---
 

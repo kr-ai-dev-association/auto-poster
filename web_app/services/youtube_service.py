@@ -6,6 +6,8 @@ import re
 import importlib.util
 from fastapi.responses import FileResponse
 from google.genai import types
+from pdf2image import convert_from_bytes
+from PIL import Image
 
 # 루트 경로 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -502,7 +504,57 @@ class YouTubeService:
             # Fallback metadata는 사용하지 않고 에러를 전파
             raise Exception(f"메타데이터 생성 실패: {str(e)}")
 
-    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', gen_sub=False):
+    def generate_thumbnail_from_pdf(self, pdf_content, output_path):
+        """PDF 첫 페이지를 썸네일 이미지로 변환합니다."""
+        try:
+            print(f"🖼️ PDF 첫 페이지에서 썸네일 생성 중...")
+
+            # PDF 첫 페이지를 이미지로 변환 (300 DPI)
+            images = convert_from_bytes(pdf_content, first_page=1, last_page=1, dpi=300)
+
+            if not images:
+                print(f"⚠️ PDF에서 이미지를 추출할 수 없습니다.")
+                return None
+
+            img = images[0]
+
+            # YouTube 썸네일 권장 크기: 1280x720 (16:9 비율)
+            target_width = 1280
+            target_height = 720
+
+            # 원본 이미지 크기
+            orig_width, orig_height = img.size
+
+            # 비율 계산하여 리사이즈
+            ratio = max(target_width / orig_width, target_height / orig_height)
+            new_width = int(orig_width * ratio)
+            new_height = int(orig_height * ratio)
+
+            img = img.resize((new_width, new_height), Image.LANCZOS)
+
+            # 중앙 크롭하여 정확히 1280x720으로 맞춤
+            left = (new_width - target_width) // 2
+            top = (new_height - target_height) // 2
+            right = left + target_width
+            bottom = top + target_height
+
+            img = img.crop((left, top, right, bottom))
+
+            # JPEG로 저장 (YouTube 썸네일은 2MB 미만이어야 함)
+            img.save(output_path, 'JPEG', quality=95, optimize=True)
+
+            file_size = os.path.getsize(output_path)
+            print(f"✅ 썸네일 생성 완료: {output_path} ({file_size / 1024:.1f}KB)")
+
+            return output_path
+
+        except Exception as e:
+            print(f"⚠️ 썸네일 생성 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', gen_sub=False, use_thumbnail=True):
         """영상을 처리하고 유튜브에 업로드합니다."""
         v_dir = os.path.join(self.base_v_dir, category)
         if not os.path.exists(v_dir):
@@ -512,10 +564,16 @@ class YouTubeService:
         video_path = os.path.join(v_dir, f"raw_{filename}")
         with open(video_path, "wb") as f:
             f.write(video_content)
-        
+
         pdf_path = os.path.join(v_dir, "temp_metadata_source.pdf")
         with open(pdf_path, "wb") as f:
             f.write(pdf_content)
+
+        # 썸네일 생성
+        thumbnail_path = None
+        if use_thumbnail:
+            thumbnail_path = os.path.join(v_dir, "temp_thumbnail.jpg")
+            thumbnail_path = self.generate_thumbnail_from_pdf(pdf_content, thumbnail_path)
 
         try:
             # 2. 메타데이터 생성
@@ -601,20 +659,22 @@ class YouTubeService:
 
             # 5. 유튜브 업로드
             print(f"📤 YouTube 업로드 시작...")
+            if thumbnail_path:
+                print(f"   썸네일 경로: {thumbnail_path}")
             try:
-                video_id = self.poster.upload_video(final_video_path, metadata)
+                video_id = self.poster.upload_video(final_video_path, metadata, thumbnail_path=thumbnail_path)
                 print(f"✅ YouTube 업로드 완료: {video_id}")
             except Exception as e:
                 print(f"❌ YouTube 업로드 실패: {e}")
                 import traceback
                 traceback.print_exc()
                 raise
-            
+
             if not video_id:
                 raise Exception("YouTube upload failed")
 
             # 6. 정리
-            for f in [video_path, pdf_path, srt_path, final_video_path]:
+            for f in [video_path, pdf_path, srt_path, final_video_path, thumbnail_path]:
                 if f and os.path.exists(f):
                     os.remove(f)
 
@@ -627,7 +687,7 @@ class YouTubeService:
 
         except Exception as e:
             # 오류 발생 시에도 임시 파일 정리
-            for f in [video_path, pdf_path]:
+            for f in [video_path, pdf_path, thumbnail_path]:
                 if f and os.path.exists(f):
                     os.remove(f)
             raise e

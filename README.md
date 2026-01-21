@@ -25,7 +25,8 @@
 │   │   ├── converter_service.py  # 마크다운 변환
 │   │   ├── firebase_service.py   # Firebase/GCS 연동
 │   │   ├── linkedin_service.py   # LinkedIn 포스팅
-│   │   └── youtube_service.py    # YouTube 업로드
+│   │   ├── youtube_service.py    # YouTube 업로드 + 썸네일 자동 생성
+│   │   └── pdf2mp4_service.py    # PDF to MP4 변환 (Basic/Smart 모드)
 │   ├── templates/                # HTML 템플릿
 │   │   ├── index.html            # 메인 UI
 │   │   ├── login.html            # 로그인
@@ -99,6 +100,13 @@ pip install python-dotenv google-generativeai
 pip install google-cloud-storage google-cloud-firestore
 pip install google-auth google-auth-oauthlib google-api-python-client
 pip install Pillow beautifulsoup4 python-multipart cryptography
+
+# Gen Video 기능용
+pip install pdf2image moviepy
+pip install git+https://github.com/openai/whisper.git  # Smart 모드용
+
+# OCR 기능용 (이미지 기반 PDF 텍스트 추출)
+pip install paddlepaddle paddleocr
 ```
 
 ### 4. 환경 변수 설정
@@ -141,11 +149,18 @@ FastAPI 기반의 통합 웹 인터페이스로 모든 기능을 제공합니다
 
 #### 🎬 Youtube Poster
 - PDF 기반 메타데이터 자동 생성 (제목, 설명, 태그)
+- **썸네일 자동 생성**: PDF 첫 페이지를 YouTube 썸네일(1280x720)로 자동 변환 및 업로드
 - AI 자막 생성 (선택사항)
 - 로고 합성 및 비디오 편집
 - 카테고리별 리소스 관리 (tech/entertainment)
 - YouTube 자동 업로드
 - LinkedIn 소셜 홍보 통합
+
+#### 🎬 Gen Video (PDF to MP4)
+- **Basic 모드**: PDF를 균등 분배된 슬라이드 영상으로 변환
+- **Smart 모드**: Whisper 음성 인식 + PaddleOCR 키워드 매칭으로 PDF 페이지와 오디오 자동 동기화
+- NVENC GPU 가속 인코딩 (고속 변환)
+- 생성된 영상 및 PDF 목록 관리 (다운로드/삭제)
 
 #### 🔐 보안 파일 관리
 - 슈퍼 관리자 전용 암호화 시스템
@@ -223,10 +238,25 @@ FastAPI 기반의 통합 웹 인터페이스로 모든 기능을 제공합니다
 1. 메인 화면에서 "Youtube Poster" 선택
 2. 카테고리 선택 (tech/entertainment)
 3. 영상 파일 + PDF 메타데이터 소스 업로드
+   - 직접 업로드 또는 Gen Video에서 생성된 영상/PDF 선택 가능
 4. AI 메타데이터 미리보기 확인
-5. 자막 생성 옵션 선택
+5. 옵션 선택:
+   - **AI 자막 자동 생성**: Whisper 기반 자막 생성
+   - **PDF 첫 페이지를 썸네일로 사용**: PDF 첫 페이지를 1280x720 썸네일로 자동 변환
 6. "Final Edit & Upload" 버튼 클릭
 7. 완료 후 LinkedIn 소셜 홍보 가능
+
+### Gen Video (PDF to MP4) 사용법
+1. 메인 화면에서 "Gen Video" 선택
+2. 변환 모드 선택:
+   - **Basic**: 균등 분배 (오디오 없이도 가능)
+   - **Smart**: 오디오와 PDF 키워드 매칭 (오디오 필수)
+3. PDF 파일 업로드 (필수)
+4. 오디오 파일 업로드 (Smart 모드 필수)
+5. 해상도, 페이지당 시간 등 옵션 설정
+6. "변환 시작" 버튼 클릭
+7. 생성된 영상은 목록에서 다운로드/삭제 가능
+8. YouTube Poster에서 바로 업로드 가능
 
 ### 보안 파일 관리
 1. 슈퍼 관리자로 로그인

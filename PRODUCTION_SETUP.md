@@ -4,17 +4,30 @@
 
 ### 필수 패키지 설치
 
-YouTube 비디오 업로드 기능을 사용하려면 FFmpeg가 필요합니다:
+YouTube 비디오 업로드 및 Gen Video 기능을 사용하려면 다음 패키지가 필요합니다:
 
 ```bash
 sudo apt update
-sudo apt install -y ffmpeg
+sudo apt install -y ffmpeg poppler-utils
 ```
 
 설치 확인:
 ```bash
-which ffmpeg ffprobe
+which ffmpeg ffprobe pdftoppm
 ffmpeg -version
+```
+
+### Python 패키지 (Gen Video 기능)
+
+```bash
+# Gen Video 기능용
+pip install pdf2image moviepy
+
+# Smart 모드 (오디오-PDF 동기화)
+pip install git+https://github.com/openai/whisper.git
+
+# OCR 기능 (이미지 기반 PDF 텍스트 추출)
+pip install paddlepaddle paddleocr
 ```
 
 ## 현재 상태
@@ -113,3 +126,26 @@ cd /home/ubuntu/auto-poster/web_app
 1. `/admin/secure-files`에서 `.env` 파일이 있는지 확인
 2. 키 프레이즈가 올바른지 확인
 3. 서버 로그 확인: `tail -f /tmp/server.log`
+
+## 주요 기능별 설정
+
+### YouTube Poster 기능
+- **썸네일 자동 생성**: PDF 첫 페이지를 1280x720 썸네일로 자동 변환
+- YouTube Data API v3 `thumbnails().set()` 메서드 사용
+- `token.pickle` 파일 필요 (OAuth 인증)
+
+### Gen Video (PDF to MP4) 기능
+- **Basic 모드**: PDF 균등 분배 변환 (오디오 선택사항)
+- **Smart 모드**: Whisper 음성 인식 + PaddleOCR 키워드 매칭
+  - PyPDF2로 텍스트 추출 실패 시 PaddleOCR 자동 사용
+  - NVENC GPU 가속 인코딩 지원
+
+### GPU 가속 (선택사항)
+NVENC 인코딩을 사용하려면:
+```bash
+# NVIDIA 드라이버 확인
+nvidia-smi
+
+# FFmpeg NVENC 지원 확인
+ffmpeg -encoders | grep nvenc
+```

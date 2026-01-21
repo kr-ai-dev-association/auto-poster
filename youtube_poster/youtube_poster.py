@@ -147,7 +147,7 @@ class YouTubeAutoPoster:
             print(f"❌ Error generating metadata: {e}")
             return {"title": "Default Title", "description": desc_template, "tags": []}
 
-    def upload_video(self, video_path, metadata):
+    def upload_video(self, video_path, metadata, thumbnail_path=None):
         print(f"🚀 Uploading video to YouTube: {video_path}")
         body = {
             'snippet': {
@@ -163,15 +163,21 @@ class YouTubeAutoPoster:
         }
         media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
         request = self.youtube.videos().insert(part=','.join(body.keys()), body=body, media_body=media)
-        
+
         try:
             response = None
             while response is None:
                 status, response = request.next_chunk()
                 if status:
                     print(f"   - Uploaded {int(status.progress() * 100)}%")
-            print(f"✅ Video uploaded successfully! ID: {response['id']}")
-            return response['id']
+            video_id = response['id']
+            print(f"✅ Video uploaded successfully! ID: {video_id}")
+
+            # 썸네일 업로드 (있는 경우)
+            if thumbnail_path and os.path.exists(thumbnail_path):
+                self.set_thumbnail(video_id, thumbnail_path)
+
+            return video_id
         except Exception as e:
             if "uploadLimitExceeded" in str(e):
                 print("\n❌ YouTube Upload Limit Exceeded!")
@@ -180,6 +186,23 @@ class YouTubeAutoPoster:
             else:
                 print(f"\n❌ YouTube Upload Error: {e}")
             return None
+
+    def set_thumbnail(self, video_id, thumbnail_path):
+        """YouTube 비디오에 썸네일 설정"""
+        print(f"🖼️ Setting thumbnail for video {video_id}: {thumbnail_path}")
+        try:
+            media = MediaFileUpload(thumbnail_path, mimetype='image/jpeg')
+            request = self.youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=media
+            )
+            response = request.execute()
+            print(f"✅ Thumbnail set successfully!")
+            return True
+        except Exception as e:
+            print(f"⚠️ Failed to set thumbnail: {e}")
+            # 썸네일 실패해도 업로드는 성공으로 처리
+            return False
 
     def get_video_info(self, video_path):
         print(f"📹 비디오 정보 조회 시작: {video_path}")

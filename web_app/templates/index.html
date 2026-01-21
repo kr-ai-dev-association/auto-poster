@@ -164,7 +164,7 @@
     <div x-data="app()" class="min-h-screen flex bg-gray-900">
         
         <!-- Left Sidebar -->
-        <div class="w-64 bg-gray-900 text-white flex flex-col shadow-xl">
+        <div class="w-72 bg-gray-900 text-white flex flex-col shadow-xl">
             <div class="p-6">
                 <div class="flex items-center mb-3">
                     <img src="/static/imgs/ai_profile.jpeg" alt="Logo" class="w-10 h-10 rounded-full object-cover mr-3 border-2 border-gray-700">
@@ -695,35 +695,77 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-bold text-gray-300 mb-2">참조 PDF 파일 (Metadata Source)</label>
-                                    <div 
-                                        @dragover.prevent="pdfDragOver = true"
-                                        @dragleave.prevent="pdfDragOver = false"
-                                        @drop.prevent="handlePdfDrop($event)"
-                                        @click="$refs.pdfFileInput.click()"
-                                        :class="{'border-blue-500 bg-blue-900': pdfDragOver, 'border-gray-600 bg-gray-700': !pdfDragOver}"
-                                        class="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[120px] flex flex-col justify-center items-center"
-                                    >
-                                        <input type="file" x-ref="pdfFileInput" class="hidden" @change="handlePdfFile($event)" accept=".pdf">
-                                        
-                                        <template x-if="!pdfFile">
-                                            <div class="space-y-1">
-                                                <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                                                <p class="text-xs text-gray-300 font-medium">참조할 PDF 파일을 드래그하거나 클릭하세요</p>
-                                            </div>
-                                        </template>
 
-                                        <template x-if="pdfFile">
-                                            <div class="space-y-1">
-                                                <svg class="mx-auto h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                <p class="text-xs font-bold text-white" x-text="pdfFile.name"></p>
-                                                <button @click.stop="pdfFile = null" class="text-xs text-red-400 hover:text-red-300 underline">제거</button>
+                                    <!-- PDF 소스 선택 라디오 버튼 -->
+                                    <div class="flex gap-6 mb-3">
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" x-model="ytPdfSource" value="upload" class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
+                                            <span class="text-sm text-gray-300">📤 새 파일 업로드</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" x-model="ytPdfSource" value="genvideo" class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
+                                            <span class="text-sm text-gray-300">📁 Gen Video PDF 선택</span>
+                                        </label>
+                                    </div>
+
+                                    <!-- 직접 업로드 모드 -->
+                                    <div x-show="ytPdfSource === 'upload'">
+                                        <div
+                                            @dragover.prevent="pdfDragOver = true"
+                                            @dragleave.prevent="pdfDragOver = false"
+                                            @drop.prevent="handlePdfDrop($event)"
+                                            @click="$refs.pdfFileInput.click()"
+                                            :class="{'border-blue-500 bg-blue-900': pdfDragOver, 'border-gray-600 bg-gray-700': !pdfDragOver}"
+                                            class="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[120px] flex flex-col justify-center items-center"
+                                        >
+                                            <input type="file" x-ref="pdfFileInput" class="hidden" @change="handlePdfFile($event)" accept=".pdf">
+
+                                            <template x-if="!pdfFile">
+                                                <div class="space-y-1">
+                                                    <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                                    <p class="text-xs text-gray-300 font-medium">참조할 PDF 파일을 드래그하거나 클릭하세요</p>
+                                                </div>
+                                            </template>
+
+                                            <template x-if="pdfFile">
+                                                <div class="space-y-1">
+                                                    <svg class="mx-auto h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    <p class="text-xs font-bold text-white" x-text="pdfFile.name"></p>
+                                                    <button @click.stop="pdfFile = null" class="text-xs text-red-400 hover:text-red-300 underline">제거</button>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Gen Video PDF 선택 모드 -->
+                                    <div x-show="ytPdfSource === 'genvideo'">
+                                        <div class="space-y-3">
+                                            <select x-model="selectedGenPdf" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="">-- PDF 선택 --</option>
+                                                <template x-for="pdf in generatedPdfs" :key="pdf.id">
+                                                    <option :value="pdf.id" x-text="pdf.original_name + ' (' + formatBytes(pdf.file_size) + ')'"></option>
+                                                </template>
+                                            </select>
+                                            <div class="flex items-center gap-2 text-xs text-gray-400">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                <span>Gen Video에서 변환 시 사용한 PDF 파일 목록입니다.</span>
+                                                <button @click="refreshGenPdfList()" class="text-blue-400 hover:text-blue-300 underline">새로고침</button>
                                             </div>
-                                        </template>
+                                            <template x-if="selectedGenPdf">
+                                                <div class="mt-3 p-3 bg-blue-900/30 border border-blue-700 rounded text-sm">
+                                                    <p class="text-blue-200">✅ 선택된 PDF: <span class="font-medium text-white" x-text="generatedPdfs.find(p => p.id === selectedGenPdf)?.original_name"></span></p>
+                                                </div>
+                                            </template>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="flex items-center">
                                     <input type="checkbox" id="gen_sub" x-model="genSubtitles" class="h-4 w-4 text-red-600 focus:ring-red-500 bg-gray-700 border-gray-600 rounded">
                                     <label for="gen_sub" class="ml-2 block text-sm text-gray-300">AI 자막 자동 생성</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="use_thumbnail" x-model="useThumbnail" checked class="h-4 w-4 text-red-600 focus:ring-red-500 bg-gray-700 border-gray-600 rounded">
+                                    <label for="use_thumbnail" class="ml-2 block text-sm text-gray-300">PDF 첫 페이지를 썸네일로 사용</label>
                                 </div>
 
                                 <!-- Logo Management Area -->
@@ -769,19 +811,19 @@
                                     <li><strong>소셜 홍보:</strong> 업로드 완료 후, AI 요약 기술을 활용해 LinkedIn에 즉시 홍보 게시물을 작성할 수 있습니다.</li>
                                 </ul>
                                 <div class="pt-4 space-y-3">
-                                    <button 
+                                    <button
                                         @click="generateYoutubeMetadata()"
-                                        :disabled="!pdfFile || ytLoading"
-                                        :class="!pdfFile || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
+                                        :disabled="((ytPdfSource === 'upload' && !pdfFile) || (ytPdfSource === 'genvideo' && !selectedGenPdf)) || ytLoading"
+                                        :class="((ytPdfSource === 'upload' && !pdfFile) || (ytPdfSource === 'genvideo' && !selectedGenPdf)) || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
                                         class="w-full py-3 text-white font-bold rounded-lg transition shadow-md flex justify-center items-center"
                                     >
                                         <span x-show="!ytLoading">🔍 메타데이터 미리보기 생성</span>
                                         <svg x-show="ytLoading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                     </button>
-                                    <button 
+                                    <button
                                         @click="uploadYoutube()"
-                                        :disabled="!ytFile || !ytMetadata || ytLoading"
-                                        :class="!ytFile || !ytMetadata || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'"
+                                        :disabled="((ytVideoSource === 'upload' && !ytFile) || (ytVideoSource === 'genvideo' && !selectedGenVideo)) || !ytMetadata || ytLoading"
+                                        :class="((ytVideoSource === 'upload' && !ytFile) || (ytVideoSource === 'genvideo' && !selectedGenVideo)) || !ytMetadata || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'"
                                         class="w-full py-4 text-white font-bold rounded-lg transition shadow-lg flex justify-center items-center"
                                     >
                                         <span x-show="!ytLoading">🎬 최종 편집 및 업로드 시작</span>
@@ -1242,6 +1284,37 @@
                                 </template>
                             </div>
                         </div>
+
+                        <!-- Generated PDFs List -->
+                        <div class="mt-8 border-t border-gray-700 pt-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-lg font-bold text-white">📄 업로드된 PDF 목록</h4>
+                                <button @click="refreshGenPdfList()" class="text-sm text-purple-400 hover:text-purple-300 flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                    새로고침
+                                </button>
+                            </div>
+                            <div x-show="generatedPdfs.length === 0" class="text-center py-8 text-gray-400">
+                                <p>업로드된 PDF가 없습니다.</p>
+                            </div>
+                            <div x-show="generatedPdfs.length > 0" class="space-y-3">
+                                <template x-for="pdf in generatedPdfs" :key="pdf.id">
+                                    <div class="bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+                                        <div>
+                                            <p class="font-medium text-white" x-text="pdf.original_name"></p>
+                                            <p class="text-sm text-gray-400">
+                                                <span x-text="formatBytes(pdf.file_size)"></span> •
+                                                <span x-text="new Date(pdf.created_at).toLocaleString('ko-KR')"></span>
+                                            </p>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button @click="downloadGenPdf(pdf.id)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">다운로드</button>
+                                            <button @click="deleteGenPdf(pdf.id)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded">삭제</button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1282,6 +1355,7 @@
                 ytCategory: 'tech',
                 ytLang: 'ko',
                 genSubtitles: false,
+                useThumbnail: true,
                 ytLoading: false,
                 ytMetadata: null,
                 ytMetadataEditing: false,
@@ -1294,6 +1368,11 @@
                 // Youtube Poster - Gen Video Integration
                 ytVideoSource: 'upload', // 'upload' or 'genvideo'
                 selectedGenVideo: '',
+
+                // Youtube Poster - PDF Source Selection
+                ytPdfSource: 'upload', // 'upload' or 'genvideo'
+                selectedGenPdf: '',
+                generatedPdfs: [],
 
                 // Gen Video State
                 genVideoMode: 'smart', // 'basic' or 'smart'
@@ -1337,6 +1416,7 @@
                     // Gen Video 초기화
                     this.loadGenVideoInfo();
                     this.refreshGenVideoList();
+                    this.refreshGenPdfList();
 
                     // 마크다운 에디터 초기화 (tab이 'text'일 때)
                     this.$watch('tab', (value) => {
@@ -1744,11 +1824,25 @@
                 },
 
                 async generateYoutubeMetadata() {
-                    if (!this.pdfFile) return;
-                    
+                    // PDF 소스 검증
+                    if (this.ytPdfSource === 'upload' && !this.pdfFile) {
+                        alert('PDF 파일을 업로드해주세요.');
+                        return;
+                    }
+                    if (this.ytPdfSource === 'genvideo' && !this.selectedGenPdf) {
+                        alert('Gen Video에서 PDF를 선택해주세요.');
+                        return;
+                    }
+
                     this.ytLoading = true;
                     const formData = new FormData();
-                    formData.append('pdf', this.pdfFile);
+
+                    // PDF 소스에 따라 파라미터 설정
+                    if (this.ytPdfSource === 'genvideo') {
+                        formData.append('pdf_id', this.selectedGenPdf);
+                    } else {
+                        formData.append('pdf', this.pdfFile);
+                    }
                     formData.append('category', this.ytCategory);
                     formData.append('lang', this.ytLang);
 
@@ -2083,8 +2177,13 @@
                         alert('Gen Video에서 영상을 선택해주세요.');
                         return;
                     }
-                    if (!this.pdfFile) {
+                    // PDF 소스 검증
+                    if (this.ytPdfSource === 'upload' && !this.pdfFile) {
                         alert('PDF 파일을 업로드해주세요.');
+                        return;
+                    }
+                    if (this.ytPdfSource === 'genvideo' && !this.selectedGenPdf) {
+                        alert('Gen Video에서 PDF를 선택해주세요.');
                         return;
                     }
 
@@ -2098,10 +2197,17 @@
                             // Gen Video에서 선택한 경우 - 다른 API 사용
                             const formData = new FormData();
                             formData.append('video_id', this.selectedGenVideo);
-                            formData.append('pdf', this.pdfFile);
+
+                            // PDF 소스에 따라 파라미터 설정
+                            if (this.ytPdfSource === 'genvideo') {
+                                formData.append('pdf_id', this.selectedGenPdf);
+                            } else {
+                                formData.append('pdf', this.pdfFile);
+                            }
                             formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
                             formData.append('gen_sub', this.genSubtitles);
+                            formData.append('use_thumbnail', this.useThumbnail);
 
                             response = await fetch('/api/youtube/upload-from-genvideo', {
                                 method: 'POST',
@@ -2112,10 +2218,17 @@
                             // 직접 업로드한 경우 - 기존 API 사용
                             const formData = new FormData();
                             formData.append('video', this.ytFile);
-                            formData.append('pdf', this.pdfFile);
+
+                            // PDF 소스에 따라 파라미터 설정
+                            if (this.ytPdfSource === 'genvideo') {
+                                formData.append('pdf_id', this.selectedGenPdf);
+                            } else {
+                                formData.append('pdf', this.pdfFile);
+                            }
                             formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
                             formData.append('gen_sub', this.genSubtitles);
+                            formData.append('use_thumbnail', this.useThumbnail);
 
                             response = await fetch('/api/youtube/upload', {
                                 method: 'POST',
@@ -2316,6 +2429,21 @@
                     }
                 },
 
+                async refreshGenPdfList() {
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch('/api/genvideo/pdfs', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.generatedPdfs = data.pdfs;
+                        }
+                    } catch (error) {
+                        console.error('Failed to refresh PDF list:', error);
+                    }
+                },
+
                 async downloadGenVideo(videoId) {
                     try {
                         const token = localStorage.getItem('access_token');
@@ -2339,6 +2467,37 @@
                         const data = await response.json();
                         if (data.status === 'success') {
                             await this.refreshGenVideoList();
+                        } else {
+                            alert('삭제 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('삭제 중 오류가 발생했습니다.');
+                    }
+                },
+
+                async downloadGenPdf(pdfId) {
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        window.open(`/api/genvideo/pdf/${pdfId}?token=${token}`, '_blank');
+                    } catch (error) {
+                        alert('다운로드 중 오류가 발생했습니다.');
+                    }
+                },
+
+                async deleteGenPdf(pdfId) {
+                    if (!confirm('이 PDF를 삭제하시겠습니까?')) {
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch(`/api/genvideo/pdf/${pdfId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            await this.refreshGenPdfList();
                         } else {
                             alert('삭제 실패: ' + data.message);
                         }

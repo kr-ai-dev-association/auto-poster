@@ -24,6 +24,14 @@ try:
 except ImportError:
     PYPDF_AVAILABLE = False
 
+# PaddleOCR for image-based PDF text extraction
+try:
+    from paddleocr import PaddleOCR
+    PADDLEOCR_AVAILABLE = True
+except ImportError:
+    PADDLEOCR_AVAILABLE = False
+    print("Warning: PaddleOCR not installed. OCR-based text extraction will not be available.")
+
 from PIL import Image
 import numpy as np
 import re
@@ -62,8 +70,22 @@ class PDF2MP4Service:
             os.path.dirname(__file__),
             '..', '..', 'generated_videos'
         )
+        self.pdf_dir = os.path.join(
+            os.path.dirname(__file__),
+            '..', '..', 'generated_pdfs'
+        )
         os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.pdf_dir, exist_ok=True)
         self._whisper_model = None
+        self._paddleocr = None
+
+    @property
+    def paddleocr(self):
+        """PaddleOCR 모델 (지연 로딩)"""
+        if self._paddleocr is None and PADDLEOCR_AVAILABLE:
+            print("Loading PaddleOCR model...")
+            self._paddleocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
+        return self._paddleocr
 
     @classmethod
     def get_progress(cls, video_id: str) -> Optional[Dict[str, Any]]:
@@ -109,22 +131,70 @@ class PDF2MP4Service:
         return np.array(background)
 
     def _extract_pdf_page_texts(self, pdf_content: bytes) -> List[str]:
-        """PDF 각 페이지에서 텍스트 추출"""
-        if not PYPDF_AVAILABLE:
+        """PDF 각 페이지에서 텍스트 추출 (PyPDF2 실패 시 OCR 사용)"""
+        page_texts = []
+
+        # 1. PyPDF2로 텍스트 추출 시도
+        if PYPDF_AVAILABLE:
+            try:
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+                for page in pdf_reader.pages:
+                    text = page.extract_text() or ""
+                    text = text.lower()
+                    text = re.sub(r'[^\w\s]', ' ', text)
+                    text = ' '.join(text.split())
+                    page_texts.append(text)
+
+                # 텍스트가 추출되었는지 확인
+                total_text = ''.join(page_texts)
+                if len(total_text) > 50:  # 충분한 텍스트가 있으면 반환
+                    print(f"PyPDF2로 텍스트 추출 성공: {len(total_text)} 문자")
+                    return page_texts
+                else:
+                    print(f"PyPDF2 텍스트 부족 ({len(total_text)} 문자), OCR 시도...")
+                    page_texts = []  # 리셋
+            except Exception as e:
+                print(f"PyPDF2 텍스트 추출 오류: {e}")
+
+        return page_texts
+
+    def _extract_text_with_ocr(self, images: List[Image.Image], video_id: str = "") -> List[str]:
+        """PaddleOCR을 사용하여 이미지에서 텍스트 추출"""
+        if not PADDLEOCR_AVAILABLE or self.paddleocr is None:
+            print(f"[{video_id}] PaddleOCR 사용 불가")
             return []
 
         page_texts = []
-        try:
-            pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
-            for page in pdf_reader.pages:
-                text = page.extract_text() or ""
-                # 정규화: 소문자, 특수문자 제거, 공백 정리
-                text = text.lower()
-                text = re.sub(r'[^\w\s]', ' ', text)
-                text = ' '.join(text.split())
-                page_texts.append(text)
-        except Exception as e:
-            print(f"PDF 텍스트 추출 오류: {e}")
+        print(f"[{video_id}] 🔍 PaddleOCR로 {len(images)}개 페이지 텍스트 추출 시작")
+
+        for i, img in enumerate(images):
+            try:
+                # PIL Image를 numpy array로 변환
+                img_array = np.array(img.convert('RGB'))
+
+                # OCR 수행 (PaddleOCR 2.x)
+                result = self.paddleocr.ocr(img_array, cls=True)
+
+                # 텍스트 추출
+                texts = []
+                if result and result[0]:
+                    for line in result[0]:
+                        if line and len(line) >= 2:
+                            text = line[1][0] if isinstance(line[1], tuple) else line[1]
+                            texts.append(text)
+
+                # 정규화
+                page_text = ' '.join(texts).lower()
+                page_text = re.sub(r'[^\w\s]', ' ', page_text)
+                page_text = ' '.join(page_text.split())
+                page_texts.append(page_text)
+
+                if (i + 1) % 5 == 0 or i == len(images) - 1:
+                    print(f"[{video_id}]   OCR 진행: {i + 1}/{len(images)} 페이지")
+
+            except Exception as e:
+                print(f"[{video_id}] OCR 오류 (페이지 {i + 1}): {e}")
+                page_texts.append("")
 
         return page_texts
 
@@ -190,6 +260,73 @@ class PDF2MP4Service:
                         return segment['start']
 
         return None
+
+    def _find_best_segment_for_keywords(
+        self,
+        keywords: List[str],
+        segments: List[Dict],
+        search_start: float = 0,
+        window_size: int = 5
+    ) -> tuple[Optional[float], List[str], int]:
+        """
+        여러 키워드를 검색하여 가장 많은 키워드가 매칭되는 구간 찾기
+
+        Args:
+            keywords: 검색할 키워드 목록
+            segments: Whisper 세그먼트 목록
+            search_start: 검색 시작 시간
+            window_size: 연속 세그먼트 윈도우 크기
+
+        Returns:
+            (매칭 시간, 매칭된 키워드 목록, 매칭 수)
+        """
+        if not keywords or not segments:
+            return None, [], 0
+
+        best_time = None
+        best_matched_keywords = []
+        best_match_count = 0
+
+        # 검색 시작 위치 찾기
+        start_idx = 0
+        for i, seg in enumerate(segments):
+            if seg['start'] >= search_start:
+                start_idx = i
+                break
+
+        # 슬라이딩 윈도우로 연속 세그먼트 검색
+        for i in range(start_idx, len(segments)):
+            # 윈도우 내 텍스트 결합
+            window_end = min(i + window_size, len(segments))
+            window_text = ' '.join(
+                seg.get('text', '') for seg in segments[i:window_end]
+            ).lower()
+            window_text = re.sub(r'[^\w\s]', ' ', window_text)
+            window_words = set(window_text.split())
+
+            # 키워드 매칭 수 계산
+            matched_keywords = []
+            for kw in keywords:
+                kw_lower = kw.lower()
+                # 정확 매칭
+                if kw_lower in window_text:
+                    matched_keywords.append(kw)
+                    continue
+                # 부분 매칭 (fuzzy)
+                for word in window_words:
+                    if len(word) >= 4:
+                        ratio = SequenceMatcher(None, kw_lower, word).ratio()
+                        if ratio > 0.8:
+                            matched_keywords.append(kw)
+                            break
+
+            # 최소 2개 이상 매칭되어야 유효한 결과
+            if len(matched_keywords) >= 2 and len(matched_keywords) > best_match_count:
+                best_match_count = len(matched_keywords)
+                best_matched_keywords = matched_keywords
+                best_time = segments[i]['start']
+
+        return best_time, best_matched_keywords, best_match_count
 
     def _encode_video_nvenc(
         self,
@@ -378,10 +515,18 @@ class PDF2MP4Service:
             if not success:
                 raise Exception("NVENC encoding failed")
 
+            # 6. 원본 PDF 저장 (YouTube Poster에서 재사용 가능)
+            pdf_filename = f"{os.path.splitext(filename)[0]}_{video_id}.pdf"
+            pdf_path = os.path.join(self.pdf_dir, pdf_filename)
+            with open(pdf_path, 'wb') as f:
+                f.write(pdf_content)
+            print(f"[{video_id}] 📄 원본 PDF 저장: {pdf_filename}")
+
             video_info = {
                 'id': video_id,
                 'filename': output_filename,
                 'original_pdf': filename,
+                'pdf_path': pdf_path,
                 'mode': 'basic',
                 'page_count': len(images),
                 'duration': video_duration,
@@ -463,7 +608,15 @@ class PDF2MP4Service:
             self.update_progress(video_id, 'text_extract', 42, '📝 PDF 텍스트 추출 중...', None)
             print(f"[{video_id}] Extracting text from PDF pages...")
             page_texts = self._extract_pdf_page_texts(pdf_content)
-            print(f"[{video_id}] Extracted text from {len(page_texts)} pages")
+
+            # PyPDF2가 실패했거나 텍스트가 부족하면 OCR 사용
+            total_text_len = sum(len(t) for t in page_texts)
+            if total_text_len < 50 and PADDLEOCR_AVAILABLE:
+                print(f"[{video_id}] PyPDF2 텍스트 부족 ({total_text_len} 문자), OCR 사용")
+                self.update_progress(video_id, 'ocr', 43, '🔍 OCR로 텍스트 추출 중...', None)
+                page_texts = self._extract_text_with_ocr(images, video_id)
+
+            print(f"[{video_id}] Extracted text from {len(page_texts)} pages (총 {sum(len(t) for t in page_texts)} 문자)")
 
             # 4. 이미지 리사이즈
             resized_images = []
@@ -513,12 +666,20 @@ class PDF2MP4Service:
             if not success:
                 raise Exception("NVENC encoding failed")
 
+            # 6. 원본 PDF 저장 (YouTube Poster에서 재사용 가능)
+            pdf_filename = f"{os.path.splitext(filename)[0]}_{video_id}.pdf"
+            pdf_path = os.path.join(self.pdf_dir, pdf_filename)
+            with open(pdf_path, 'wb') as f:
+                f.write(pdf_content)
+            print(f"[{video_id}] 📄 원본 PDF 저장: {pdf_filename}")
+
             self.update_progress(video_id, 'complete', 100, '✅ 변환 완료!', 0)
 
             video_info = {
                 'id': video_id,
                 'filename': output_filename,
                 'original_pdf': filename,
+                'pdf_path': pdf_path,
                 'mode': 'smart',
                 'page_count': num_pages,
                 'duration': video_duration,
@@ -603,27 +764,43 @@ class PDF2MP4Service:
                 page_start_times.append(None)
                 continue
 
-            # 키워드들 중에서 트랜스크립트에서 발견되는 첫 번째 시간 찾기
-            best_match_time = None
-            matched_keyword = None
+            # 1차 시도: 다중 키워드 매칭 (더 정확한 방법)
+            multi_match_time, matched_kws, match_count = self._find_best_segment_for_keywords(
+                available_keywords[:20],  # 상위 20개 키워드 사용
+                segments,
+                search_start=last_match_time + min_page_duration,
+                window_size=5  # 5개 연속 세그먼트 윈도우
+            )
 
-            for keyword in available_keywords[:15]:  # 상위 15개 키워드만 검색
-                match_time = self._find_keyword_in_transcript(
-                    keyword, segments, search_start=last_match_time + min_page_duration
-                )
-                if match_time is not None:
-                    if best_match_time is None or match_time < best_match_time:
-                        best_match_time = match_time
-                        matched_keyword = keyword
-
-            if best_match_time is not None:
-                print(f"[{video_id}]   페이지 {page_idx + 1}: '{matched_keyword}' @ {best_match_time:.1f}초")
-                page_start_times.append(best_match_time)
-                last_match_time = best_match_time
-                # 매칭된 키워드를 사용됨으로 표시
-                used_keywords.add(matched_keyword)
+            if multi_match_time is not None and match_count >= 2:
+                # 다중 키워드 매칭 성공
+                print(f"[{video_id}]   페이지 {page_idx + 1}: {matched_kws[:3]} ({match_count}개 매칭) @ {multi_match_time:.1f}초")
+                page_start_times.append(multi_match_time)
+                last_match_time = multi_match_time
+                # 매칭된 키워드들을 사용됨으로 표시
+                for kw in matched_kws:
+                    used_keywords.add(kw)
             else:
-                page_start_times.append(None)  # 매칭 실패, 나중에 보간
+                # 2차 시도: 단일 키워드 매칭 (폴백)
+                best_match_time = None
+                matched_keyword = None
+
+                for keyword in available_keywords[:15]:
+                    match_time = self._find_keyword_in_transcript(
+                        keyword, segments, search_start=last_match_time + min_page_duration
+                    )
+                    if match_time is not None:
+                        if best_match_time is None or match_time < best_match_time:
+                            best_match_time = match_time
+                            matched_keyword = keyword
+
+                if best_match_time is not None:
+                    print(f"[{video_id}]   페이지 {page_idx + 1}: '{matched_keyword}' (단일) @ {best_match_time:.1f}초")
+                    page_start_times.append(best_match_time)
+                    last_match_time = best_match_time
+                    used_keywords.add(matched_keyword)
+                else:
+                    page_start_times.append(None)  # 매칭 실패, 나중에 보간
 
         # 매칭되지 않은 페이지들 보간 처리
         page_start_times = self._interpolate_missing_times(
@@ -782,8 +959,58 @@ class PDF2MP4Service:
         path = self.get_video_path(video_id)
         if path and os.path.exists(path):
             os.remove(path)
+            # 연관된 PDF도 삭제
+            pdf_path = self.get_pdf_path(video_id)
+            if pdf_path and os.path.exists(pdf_path):
+                os.remove(pdf_path)
             return True
         return False
+
+    def get_pdf_list(self) -> List[Dict[str, Any]]:
+        """저장된 PDF 목록 조회"""
+        pdfs = []
+        if os.path.exists(self.pdf_dir):
+            for f in os.listdir(self.pdf_dir):
+                if f.endswith('.pdf'):
+                    path = os.path.join(self.pdf_dir, f)
+                    parts = f.rsplit('_', 1)
+                    pdf_id = parts[1].replace('.pdf', '') if len(parts) > 1 else f.replace('.pdf', '')
+
+                    pdfs.append({
+                        'id': pdf_id,
+                        'filename': f,
+                        'original_name': parts[0] + '.pdf' if len(parts) > 1 else f,
+                        'file_path': path,
+                        'file_size': os.path.getsize(path),
+                        'created_at': datetime.fromtimestamp(os.path.getctime(path)).isoformat()
+                    })
+
+        return sorted(pdfs, key=lambda x: x['created_at'], reverse=True)
+
+    def get_pdf_path(self, pdf_id: str) -> Optional[str]:
+        """PDF 파일 경로 조회"""
+        if not os.path.exists(self.pdf_dir):
+            return None
+        for f in os.listdir(self.pdf_dir):
+            if pdf_id in f and f.endswith('.pdf'):
+                return os.path.join(self.pdf_dir, f)
+        return None
+
+    def get_pdf_info(self, pdf_id: str) -> Optional[Dict[str, Any]]:
+        """PDF 파일 정보 조회"""
+        path = self.get_pdf_path(pdf_id)
+        if path and os.path.exists(path):
+            filename = os.path.basename(path)
+            parts = filename.rsplit('_', 1)
+            return {
+                'id': pdf_id,
+                'filename': filename,
+                'original_name': parts[0] + '.pdf' if len(parts) > 1 else filename,
+                'file_path': path,
+                'file_size': os.path.getsize(path),
+                'created_at': datetime.fromtimestamp(os.path.getctime(path)).isoformat()
+            }
+        return None
 
     def get_transitions(self) -> List[str]:
         return self.TRANSITIONS.copy()

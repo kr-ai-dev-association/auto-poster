@@ -32,6 +32,10 @@
 - Git
 - FFmpeg (영상 처리용)
 - SQLite3
+- Poppler (PDF 이미지 변환용)
+
+### 권장 소프트웨어 (GPU 가속)
+- NVIDIA GPU + CUDA (NVENC 인코딩 가속)
 
 ---
 
@@ -82,30 +86,48 @@ pip install google-api-python-client
 pip install Pillow beautifulsoup4 python-multipart
 pip install cryptography
 
-# 2. 설치 확인
-pip list | grep -E "fastapi|sqlalchemy|google"
+# 2. Gen Video 기능용 추가 패키지
+pip install pdf2image moviepy
+pip install git+https://github.com/openai/whisper.git  # Smart 모드용
+pip install paddlepaddle paddleocr  # OCR 기능용
+
+# 3. 설치 확인
+pip list | grep -E "fastapi|sqlalchemy|google|whisper|paddle"
 ```
 
-### 4. FFmpeg 설치
+### 4. FFmpeg 및 Poppler 설치
 
 **macOS (Homebrew):**
 ```bash
-brew install ffmpeg
+brew install ffmpeg poppler
 ffmpeg -version
 ```
 
 **Ubuntu/Debian:**
 ```bash
 sudo apt update
-sudo apt install ffmpeg
+sudo apt install ffmpeg poppler-utils
 ffmpeg -version
+pdftoppm -v
 ```
 
 **CentOS/RHEL:**
 ```bash
 sudo yum install epel-release
-sudo yum install ffmpeg
+sudo yum install ffmpeg poppler-utils
 ffmpeg -version
+```
+
+### 4-1. GPU 가속 설정 (선택사항)
+
+NVENC GPU 인코딩을 사용하려면 NVIDIA 드라이버와 CUDA가 필요합니다:
+
+```bash
+# NVIDIA 드라이버 설치 확인
+nvidia-smi
+
+# FFmpeg NVENC 지원 확인
+ffmpeg -encoders | grep nvenc
 ```
 
 ### 5. 환경 변수 설정
@@ -724,7 +746,9 @@ services:
 - [ ] 웹 UI 접속 테스트
 - [ ] 슈퍼 관리자 로그인 테스트
 - [ ] Wiki 변환/배포 테스트
-- [ ] YouTube 업로드 테스트
+- [ ] YouTube 업로드 테스트 (썸네일 자동 생성 포함)
+- [ ] Gen Video Basic 모드 테스트
+- [ ] Gen Video Smart 모드 테스트 (Whisper + PaddleOCR)
 - [ ] 보안 파일 관리 페이지 접속 테스트
 - [ ] 로그 확인
 - [ ] 성능 모니터링 설정

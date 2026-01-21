@@ -397,24 +397,40 @@ async def upload_youtube_logo(
 
 @app.post("/api/youtube/metadata")
 async def generate_youtube_metadata(
-    pdf: UploadFile = File(...),
+    pdf: UploadFile = File(None),
+    pdf_id: str = Form(None),
     category: str = Form(...),
     lang: str = Form("ko"),
     user: models.User = Depends(get_current_user)
 ):
-    """PDF 분석을 통해 유튜브 메타데이터를 생성합니다."""
+    """PDF 분석을 통해 유튜브 메타데이터를 생성합니다.
+    pdf 파일을 직접 업로드하거나, pdf_id를 통해 Gen Video에서 사용된 PDF를 참조할 수 있습니다.
+    """
     if not youtube:
         return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
-    
+
     try:
         from web_app.services.youtube_service import YouTubeMetadataValidator
-        
-        content = await pdf.read()
+
+        # PDF 내용 가져오기 (업로드 또는 Gen Video에서 선택)
+        if pdf_id and pdf2mp4:
+            # Gen Video에서 선택한 PDF 사용
+            pdf_path = pdf2mp4.get_pdf_path(pdf_id)
+            if not pdf_path or not os.path.exists(pdf_path):
+                return JSONResponse(status_code=404, content={"status": "error", "message": "Selected PDF not found"})
+            with open(pdf_path, 'rb') as f:
+                content = f.read()
+        elif pdf:
+            # 직접 업로드한 PDF 사용
+            content = await pdf.read()
+        else:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
+
         metadata = await youtube.generate_metadata(content, category, lang)
-        
+
         # 검증 결과 포함
         is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
-        
+
         return JSONResponse(content={
             "status": "success",
             "metadata": metadata,
@@ -463,21 +479,39 @@ async def validate_youtube_metadata(
 @app.post("/api/youtube/upload")
 async def youtube_upload(
     video: UploadFile = File(...),
-    pdf: UploadFile = File(...),
+    pdf: UploadFile = File(None),
+    pdf_id: str = Form(None),
     category: str = Form(...),
     lang: str = Form("ko"),
     gen_sub: bool = Form(False),
+    use_thumbnail: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
-    """영상을 처리하고 유튜브에 업로드합니다."""
+    """영상을 처리하고 유튜브에 업로드합니다.
+    pdf 파일을 직접 업로드하거나, pdf_id를 통해 Gen Video에서 사용된 PDF를 참조할 수 있습니다.
+    """
     if not youtube:
         return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
-    
+
     try:
         video_content = await video.read()
-        pdf_content = await pdf.read()
+
+        # PDF 내용 가져오기 (업로드 또는 Gen Video에서 선택)
+        if pdf_id and pdf2mp4:
+            # Gen Video에서 선택한 PDF 사용
+            pdf_path = pdf2mp4.get_pdf_path(pdf_id)
+            if not pdf_path or not os.path.exists(pdf_path):
+                return JSONResponse(status_code=404, content={"status": "error", "message": "Selected PDF not found"})
+            with open(pdf_path, 'rb') as f:
+                pdf_content = f.read()
+        elif pdf:
+            # 직접 업로드한 PDF 사용
+            pdf_content = await pdf.read()
+        else:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
+
         result = await youtube.process_and_upload(
-            video_content, video.filename, pdf_content, category, lang, gen_sub
+            video_content, video.filename, pdf_content, category, lang, gen_sub, use_thumbnail
         )
         return JSONResponse(content=result)
     except Exception as e:
@@ -672,16 +706,96 @@ async def delete_generated_video(
         content={"status": "error", "message": "Video not found"}
     )
 
+# --- Gen Video PDF Endpoints ---
+
+@app.get("/api/genvideo/pdfs")
+async def list_generated_pdfs(
+    user: models.User = Depends(get_current_user)
+):
+    """Gen Video에서 사용된 PDF 목록을 조회합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    pdfs = pdf2mp4.get_pdf_list()
+    return JSONResponse(content={"status": "success", "pdfs": pdfs})
+
+@app.get("/api/genvideo/pdf/{pdf_id}")
+async def get_generated_pdf(
+    pdf_id: str,
+    token: str = None,
+    db: Session = Depends(database.get_db)
+):
+    """저장된 PDF 파일 내용을 반환합니다. (다운로드 또는 메타데이터 생성용)"""
+    # 토큰 검증
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        user = get_current_user(token, db)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    pdf_path = pdf2mp4.get_pdf_path(pdf_id)
+    if pdf_path and os.path.exists(pdf_path):
+        return FileResponse(
+            pdf_path,
+            media_type="application/pdf",
+            filename=os.path.basename(pdf_path)
+        )
+
+    return JSONResponse(
+        status_code=404,
+        content={"status": "error", "message": "PDF not found"}
+    )
+
+@app.delete("/api/genvideo/pdf/{pdf_id}")
+async def delete_generated_pdf(pdf_id: str, user: models.User = Depends(get_current_user)):
+    """저장된 PDF 파일을 삭제합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    pdf_path = pdf2mp4.get_pdf_path(pdf_id)
+    if pdf_path and os.path.exists(pdf_path):
+        try:
+            os.remove(pdf_path)
+            return JSONResponse(content={"status": "success", "message": "PDF deleted"})
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": str(e)}
+            )
+
+    return JSONResponse(
+        status_code=404,
+        content={"status": "error", "message": "PDF not found"}
+    )
+
 @app.post("/api/youtube/upload-from-genvideo")
 async def youtube_upload_from_genvideo(
     video_id: str = Form(...),
-    pdf: UploadFile = File(...),
+    pdf: UploadFile = File(None),
+    pdf_id: str = Form(None),
     category: str = Form(...),
     lang: str = Form("ko"),
     gen_sub: bool = Form(False),
+    use_thumbnail: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
-    """Gen Video에서 생성된 영상을 YouTube에 업로드합니다."""
+    """Gen Video에서 생성된 영상을 YouTube에 업로드합니다.
+    pdf 파일을 직접 업로드하거나, pdf_id를 통해 Gen Video에서 사용된 PDF를 참조할 수 있습니다.
+    """
     if not youtube or not pdf2mp4:
         return JSONResponse(
             status_code=503,
@@ -701,7 +815,19 @@ async def youtube_upload_from_genvideo(
         with open(video_path, 'rb') as f:
             video_content = f.read()
 
-        pdf_content = await pdf.read()
+        # PDF 내용 가져오기 (업로드 또는 Gen Video에서 선택)
+        if pdf_id:
+            # Gen Video에서 선택한 PDF 사용
+            pdf_path = pdf2mp4.get_pdf_path(pdf_id)
+            if not pdf_path or not os.path.exists(pdf_path):
+                return JSONResponse(status_code=404, content={"status": "error", "message": "Selected PDF not found"})
+            with open(pdf_path, 'rb') as f:
+                pdf_content = f.read()
+        elif pdf:
+            # 직접 업로드한 PDF 사용
+            pdf_content = await pdf.read()
+        else:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
 
         result = await youtube.process_and_upload(
             video_content,
@@ -709,7 +835,8 @@ async def youtube_upload_from_genvideo(
             pdf_content,
             category,
             lang,
-            gen_sub
+            gen_sub,
+            use_thumbnail
         )
 
         return JSONResponse(content=result)
