@@ -54,6 +54,9 @@ class PDF2MP4Service:
     # 지원하는 오디오 포맷
     AUDIO_FORMATS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg']
 
+    # 진행률 저장소 (video_id -> progress_info)
+    _progress_store: Dict[str, Dict[str, Any]] = {}
+
     def __init__(self):
         # 출력 디렉토리 설정
         self.output_dir = os.path.join(
@@ -65,12 +68,37 @@ class PDF2MP4Service:
         # Whisper 모델 (지연 로딩)
         self._whisper_model = None
 
+    @classmethod
+    def get_progress(cls, video_id: str) -> Optional[Dict[str, Any]]:
+        """진행률 조회"""
+        return cls._progress_store.get(video_id)
+
+    @classmethod
+    def update_progress(cls, video_id: str, stage: str, progress: int, message: str, eta: Optional[int] = None):
+        """진행률 업데이트"""
+        cls._progress_store[video_id] = {
+            'video_id': video_id,
+            'stage': stage,
+            'progress': progress,
+            'message': message,
+            'eta': eta,
+            'timestamp': datetime.now().isoformat()
+        }
+
+    @classmethod
+    def clear_progress(cls, video_id: str):
+        """진행률 정보 삭제"""
+        if video_id in cls._progress_store:
+            del cls._progress_store[video_id]
+
     @property
     def whisper_model(self):
         """Whisper 모델 지연 로딩"""
         if self._whisper_model is None and WHISPER_AVAILABLE:
-            print("Loading Whisper model (base)...")
-            self._whisper_model = whisper.load_model("base")
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"Loading Whisper model (base) on {device}...")
+            self._whisper_model = whisper.load_model("base", device=device)
         return self._whisper_model
 
     async def convert_basic(
@@ -187,12 +215,17 @@ class PDF2MP4Service:
             # duration 저장 (close 전에)
             video_duration = final_clip.duration
 
+            print(f"[{video_id}] 🎬 영상 인코딩 시작 (NVENC GPU 가속)")
+            print(f"[{video_id}] 📊 영상 길이: {video_duration:.1f}초, 예상 소요 시간: {video_duration * 0.1:.0f}~{video_duration * 0.2:.0f}초")
+
             final_clip.write_videofile(
                 output_path,
                 fps=fps,
-                codec='libx264',
+                codec='h264_nvenc',
                 audio_codec='aac',
-                logger=None
+                pixel_format='yuv420p',
+                ffmpeg_params=['-preset', 'fast', '-rc', 'vbr', '-cq', '23'],
+                logger='bar'
             )
 
             # 7. 리소스 정리
@@ -282,6 +315,7 @@ class PDF2MP4Service:
 
         try:
             print(f"[{video_id}] Starting Smart conversion for: {filename}")
+            self.update_progress(video_id, 'init', 0, '변환 시작...', None)
 
             # 1. 오디오 파일 저장 및 전사
             audio_ext = os.path.splitext(audio_filename)[1].lower()
@@ -289,17 +323,21 @@ class PDF2MP4Service:
             with open(audio_path, 'wb') as f:
                 f.write(audio_content)
 
+            self.update_progress(video_id, 'whisper', 10, '🎤 Whisper로 오디오 분석 중...', None)
             print(f"[{video_id}] Transcribing audio with Whisper...")
             result = self.whisper_model.transcribe(audio_path)
             transcript_text = result.get('text', '')
             segments = result.get('segments', [])
             print(f"[{video_id}] Transcription complete: {len(segments)} segments")
+            self.update_progress(video_id, 'whisper_done', 30, f'✅ 오디오 분석 완료 ({len(segments)}개 세그먼트)', None)
 
             # 2. PDF를 이미지로 변환
+            self.update_progress(video_id, 'pdf', 35, '📄 PDF를 이미지로 변환 중...', None)
             print(f"[{video_id}] Converting PDF to images...")
             images = convert_from_bytes(pdf_content, dpi=dpi)
             num_pages = len(images)
             print(f"[{video_id}] Extracted {num_pages} pages")
+            self.update_progress(video_id, 'pdf_done', 45, f'✅ PDF 변환 완료 ({num_pages}페이지)', None)
 
             # 3. 이미지 리사이즈
             resized_images = []
@@ -318,8 +356,10 @@ class PDF2MP4Service:
                 total_duration
             )
             print(f"[{video_id}] Page timings: {page_timings}")
+            self.update_progress(video_id, 'timing', 50, '⏱️ 페이지 타이밍 계산 완료', None)
 
             # 6. 비디오 클립 생성 (타이밍 기반)
+            self.update_progress(video_id, 'compose', 55, '🎞️ 비디오 클립 생성 중...', None)
             final_clip = self._create_video_with_timings(
                 resized_images,
                 page_timings,
@@ -344,19 +384,31 @@ class PDF2MP4Service:
 
             # 8. 오디오 추가
             final_clip = final_clip.with_audio(audio_clip)
+            self.update_progress(video_id, 'audio', 60, '🔊 오디오 추가 완료', None)
 
             # 8. 영상 출력
             output_filename = f"{os.path.splitext(filename)[0]}_smart_{video_id}.mp4"
             output_path = os.path.join(self.output_dir, output_filename)
 
+            # 예상 인코딩 시간 계산 (NVENC: 약 0.1~0.15배)
+            eta_seconds = int(total_duration * 0.15)
+            self.update_progress(video_id, 'encoding', 65, f'🎬 영상 인코딩 중... (예상 {eta_seconds}초)', eta_seconds)
+
             print(f"[{video_id}] Rendering video to: {output_path}")
+            print(f"[{video_id}] 🎬 영상 인코딩 시작 (NVENC GPU 가속)")
+            print(f"[{video_id}] 📊 영상 길이: {total_duration:.1f}초, 예상 소요 시간: {total_duration * 0.1:.0f}~{total_duration * 0.2:.0f}초")
+
             final_clip.write_videofile(
                 output_path,
                 fps=fps,
-                codec='libx264',
+                codec='h264_nvenc',
                 audio_codec='aac',
-                logger=None
+                pixel_format='yuv420p',
+                ffmpeg_params=['-preset', 'fast', '-rc', 'vbr', '-cq', '23'],
+                logger='bar'
             )
+
+            self.update_progress(video_id, 'complete', 100, '✅ 변환 완료!', 0)
 
             # 9. 리소스 정리
             final_clip.close()

@@ -574,6 +574,18 @@ async def convert_pdf_to_video(
             content={"status": "error", "message": str(e)}
         )
 
+@app.get("/api/genvideo/progress/{video_id}")
+async def get_conversion_progress(
+    video_id: str,
+    user: models.User = Depends(get_current_user)
+):
+    """변환 진행률을 조회합니다."""
+    from services.pdf2mp4_service import PDF2MP4Service
+    progress = PDF2MP4Service.get_progress(video_id)
+    if progress:
+        return JSONResponse(content={"status": "success", **progress})
+    return JSONResponse(content={"status": "not_found", "message": "No progress found for this video_id"})
+
 @app.get("/api/genvideo/list")
 async def list_generated_videos(
     user: models.User = Depends(get_current_user)

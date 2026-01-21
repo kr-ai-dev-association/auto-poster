@@ -1173,6 +1173,23 @@
                                     </span>
                                 </button>
 
+                                <!-- Progress Bar -->
+                                <template x-if="genVideoLoading && genVideoProgress">
+                                    <div class="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-sm text-gray-300" x-text="genVideoProgress.message"></span>
+                                            <span class="text-sm text-purple-400 font-bold" x-text="genVideoProgress.progress + '%'"></span>
+                                        </div>
+                                        <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                                            <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500 ease-out"
+                                                 :style="'width: ' + genVideoProgress.progress + '%'"></div>
+                                        </div>
+                                        <template x-if="genVideoProgress.eta && genVideoProgress.eta > 0">
+                                            <p class="text-xs text-gray-400 mt-2">예상 남은 시간: <span x-text="genVideoProgress.eta"></span>초</p>
+                                        </template>
+                                    </div>
+                                </template>
+
                                 <!-- Result -->
                                 <template x-if="genVideoResult">
                                     <div class="p-4 rounded-lg" :class="genVideoResult.status === 'success' ? 'bg-green-900/50 border border-green-700' : 'bg-red-900/50 border border-red-700'">
@@ -1291,6 +1308,8 @@
                 genVideoAutoDuration: false,
                 genVideoLoading: false,
                 genVideoResult: null,
+                genVideoProgress: null,
+                genVideoProgressInterval: null,
                 generatedVideos: [],
                 smartModeAvailable: true,
 
@@ -2191,6 +2210,10 @@
 
                     this.genVideoLoading = true;
                     this.genVideoResult = null;
+                    this.genVideoProgress = { progress: 0, message: '🚀 변환 준비 중...', eta: null };
+
+                    // 예상 진행률 시뮬레이션 시작
+                    this.startProgressSimulation();
 
                     const formData = new FormData();
                     formData.append('pdf', this.genVideoPdf);
@@ -2218,6 +2241,7 @@
 
                         const data = await response.json();
                         this.genVideoResult = data;
+                        this.genVideoProgress = { progress: 100, message: '✅ 변환 완료!', eta: 0 };
 
                         if (data.status === 'success') {
                             await this.refreshGenVideoList();
@@ -2229,6 +2253,51 @@
                         };
                     } finally {
                         this.genVideoLoading = false;
+                        this.stopProgressSimulation();
+                        setTimeout(() => { this.genVideoProgress = null; }, 2000);
+                    }
+                },
+
+                startProgressSimulation() {
+                    this.stopProgressSimulation();
+                    const stages = this.genVideoMode === 'smart' ? [
+                        { progress: 5, message: '🚀 변환 시작...', duration: 1000 },
+                        { progress: 15, message: '🎤 Whisper 모델 로딩 중...', duration: 3000 },
+                        { progress: 30, message: '🎤 오디오 분석 중 (Whisper AI)...', duration: 15000 },
+                        { progress: 45, message: '📄 PDF를 이미지로 변환 중...', duration: 5000 },
+                        { progress: 55, message: '⏱️ 페이지 타이밍 계산 중...', duration: 2000 },
+                        { progress: 65, message: '🎞️ 비디오 클립 생성 중...', duration: 5000 },
+                        { progress: 75, message: '🎬 영상 인코딩 중 (GPU 가속)...', duration: 30000 },
+                        { progress: 90, message: '🎬 영상 인코딩 마무리 중...', duration: 60000 },
+                        { progress: 95, message: '💾 파일 저장 중...', duration: 120000 }
+                    ] : [
+                        { progress: 10, message: '🚀 변환 시작...', duration: 1000 },
+                        { progress: 30, message: '📄 PDF를 이미지로 변환 중...', duration: 3000 },
+                        { progress: 50, message: '🎞️ 비디오 클립 생성 중...', duration: 5000 },
+                        { progress: 70, message: '🎬 영상 인코딩 중 (GPU 가속)...', duration: 10000 },
+                        { progress: 90, message: '💾 파일 저장 중...', duration: 30000 }
+                    ];
+
+                    let stageIndex = 0;
+                    const updateProgress = () => {
+                        if (stageIndex < stages.length && this.genVideoLoading) {
+                            const stage = stages[stageIndex];
+                            this.genVideoProgress = {
+                                progress: stage.progress,
+                                message: stage.message,
+                                eta: Math.round((stages.slice(stageIndex).reduce((sum, s) => sum + s.duration, 0)) / 1000)
+                            };
+                            stageIndex++;
+                            this.genVideoProgressInterval = setTimeout(updateProgress, stage.duration);
+                        }
+                    };
+                    updateProgress();
+                },
+
+                stopProgressSimulation() {
+                    if (this.genVideoProgressInterval) {
+                        clearTimeout(this.genVideoProgressInterval);
+                        this.genVideoProgressInterval = null;
                     }
                 },
 
