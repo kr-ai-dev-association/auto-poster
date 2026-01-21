@@ -182,15 +182,23 @@
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2zM12 14v4M12 14a2 2 0 110-4 2 2 0 010 4z"/></svg>
                     Wiki Auto Poster
                 </button>
-                <button 
-                    @click="mainTab = 'youtube'" 
+                <button
+                    @click="mainTab = 'youtube'"
                     :class="mainTab === 'youtube' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
                     class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group"
                 >
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                     Youtube Poster
                 </button>
-                
+                <button
+                    @click="mainTab = 'genvideo'"
+                    :class="mainTab === 'genvideo' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
+                    class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group"
+                >
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
+                    Gen Video
+                </button>
+
                 <!-- Admin Menu (Conditional) -->
                 <template x-if="user?.is_super_admin">
                     <div class="mt-4 space-y-2">
@@ -606,32 +614,81 @@
                                         <option value="en">영어 (English)</option>
                                     </select>
                                 </div>
+                                <!-- Video Source Selection -->
                                 <div>
-                                    <label class="block text-sm font-bold text-gray-300 mb-2">영상 파일 (Source Video)</label>
-                                    <div 
-                                        @dragover.prevent="ytDragOver = true"
-                                        @dragleave.prevent="ytDragOver = false"
-                                        @drop.prevent="handleYtDrop($event)"
-                                        @click="$refs.ytFileInput.click()"
-                                        :class="{'border-red-500 bg-red-900': ytDragOver, 'border-gray-600 bg-gray-700': !ytDragOver}"
-                                        class="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[150px] flex flex-col justify-center items-center"
-                                    >
-                                        <input type="file" x-ref="ytFileInput" class="hidden" @change="handleYtFile($event)" accept="video/*">
-                                        
-                                        <template x-if="!ytFile">
-                                            <div class="space-y-2">
-                                                <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                                <p class="text-sm text-gray-300 font-medium">클릭하거나 영상을 드래그하세요</p>
-                                                <p class="text-xs text-gray-400">MP4, MOV, AVI 등 영상 파일</p>
-                                            </div>
-                                        </template>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">영상 소스</label>
+                                    <div class="space-y-2 mb-4">
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" x-model="ytVideoSource" value="upload" class="w-4 h-4 text-red-600 bg-gray-700 border-gray-600 focus:ring-red-500">
+                                            <span class="ml-3 text-sm text-gray-300">
+                                                <span class="font-medium">📤 직접 업로드</span>
+                                            </span>
+                                        </label>
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="radio" x-model="ytVideoSource" value="genvideo" class="w-4 h-4 text-red-600 bg-gray-700 border-gray-600 focus:ring-red-500">
+                                            <span class="ml-3 text-sm text-gray-300">
+                                                <span class="font-medium">🎬 Gen Video에서 선택</span>
+                                                <span class="text-gray-400 text-xs ml-1">(<span x-text="generatedVideos.length"></span>개 영상)</span>
+                                            </span>
+                                        </label>
+                                    </div>
 
-                                        <template x-if="ytFile">
-                                            <div class="space-y-2">
-                                                <svg class="mx-auto h-10 w-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                <p class="text-sm font-bold text-white" x-text="ytFile.name"></p>
-                                                <p class="text-xs text-gray-400" x-text="formatBytes(ytFile.size)"></p>
-                                                <button @click.stop="ytFile = null" class="text-xs text-red-400 hover:text-red-300 underline font-medium">제거</button>
+                                    <!-- Direct Upload -->
+                                    <div x-show="ytVideoSource === 'upload'">
+                                        <label class="block text-xs font-medium text-gray-400 mb-2">영상 파일 (Source Video)</label>
+                                        <div
+                                            @dragover.prevent="ytDragOver = true"
+                                            @dragleave.prevent="ytDragOver = false"
+                                            @drop.prevent="handleYtDrop($event)"
+                                            @click="$refs.ytFileInput.click()"
+                                            :class="{'border-red-500 bg-red-900': ytDragOver, 'border-gray-600 bg-gray-700': !ytDragOver}"
+                                            class="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[150px] flex flex-col justify-center items-center"
+                                        >
+                                            <input type="file" x-ref="ytFileInput" class="hidden" @change="handleYtFile($event)" accept="video/*">
+
+                                            <template x-if="!ytFile">
+                                                <div class="space-y-2">
+                                                    <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                                    <p class="text-sm text-gray-300 font-medium">클릭하거나 영상을 드래그하세요</p>
+                                                    <p class="text-xs text-gray-400">MP4, MOV, AVI 등 영상 파일</p>
+                                                </div>
+                                            </template>
+
+                                            <template x-if="ytFile">
+                                                <div class="space-y-2">
+                                                    <svg class="mx-auto h-10 w-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    <p class="text-sm font-bold text-white" x-text="ytFile.name"></p>
+                                                    <p class="text-xs text-gray-400" x-text="formatBytes(ytFile.size)"></p>
+                                                    <button @click.stop="ytFile = null" class="text-xs text-red-400 hover:text-red-300 underline font-medium">제거</button>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Gen Video Selection -->
+                                    <div x-show="ytVideoSource === 'genvideo'">
+                                        <label class="block text-xs font-medium text-gray-400 mb-2">생성된 영상 선택</label>
+                                        <div class="space-y-2">
+                                            <select x-model="selectedGenVideo" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                <option value="">-- 영상을 선택하세요 --</option>
+                                                <template x-for="video in generatedVideos" :key="video.id">
+                                                    <option :value="video.id" x-text="video.filename + ' (' + formatBytes(video.file_size) + ')'"></option>
+                                                </template>
+                                            </select>
+                                            <div class="flex items-center gap-2">
+                                                <button @click="refreshGenVideoList()" class="text-xs text-purple-400 hover:text-purple-300 flex items-center">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                                    목록 새로고침
+                                                </button>
+                                                <span class="text-gray-500">|</span>
+                                                <button @click="mainTab = 'genvideo'" class="text-xs text-purple-400 hover:text-purple-300">
+                                                    Gen Video로 이동 →
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <template x-if="selectedGenVideo">
+                                            <div class="mt-3 p-3 bg-purple-900/30 border border-purple-700 rounded text-sm">
+                                                <p class="text-purple-200">✅ 선택된 영상: <span class="font-medium text-white" x-text="generatedVideos.find(v => v.id === selectedGenVideo)?.filename"></span></p>
                                             </div>
                                         </template>
                                     </div>
@@ -939,13 +996,245 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Gen Video Section -->
+            <div x-show="mainTab === 'genvideo'" class="flex flex-col h-full" x-cloak>
+                <!-- Header -->
+                <div class="bg-purple-600 p-6 text-white shadow-md">
+                    <div class="w-full px-6">
+                        <h2 class="text-2xl font-bold">🎬 Gen Video</h2>
+                        <p class="text-purple-100 text-sm mt-1">PDF를 AI 기반으로 MP4 영상으로 변환</p>
+                    </div>
+                </div>
+
+                <div class="w-full px-6 py-10 flex-grow overflow-y-auto">
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 p-8 shadow-sm">
+                        <h3 class="text-xl font-bold text-white mb-6">📄 PDF to Video 변환</h3>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Left: Input Area -->
+                            <div class="space-y-6">
+                                <!-- Mode Selection -->
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">변환 모드</label>
+                                    <select x-model="genVideoMode" class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                        <option value="basic">Basic (고정 시간 슬라이드)</option>
+                                        <option value="smart">Smart (AI 자동 타이밍)</option>
+                                    </select>
+                                    <p x-show="genVideoMode === 'smart' && !smartModeAvailable" class="mt-2 text-xs text-yellow-400">
+                                        ⚠️ Smart 모드는 Whisper 설치가 필요합니다.
+                                    </p>
+                                </div>
+
+                                <!-- PDF File Upload -->
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">PDF 파일 *</label>
+                                    <div
+                                        @dragover.prevent="genVideoPdfDragOver = true"
+                                        @dragleave.prevent="genVideoPdfDragOver = false"
+                                        @drop.prevent="handleGenVideoPdfDrop($event)"
+                                        :class="{'border-purple-500 bg-purple-900/30': genVideoPdfDragOver, 'border-gray-600 bg-gray-700': !genVideoPdfDragOver}"
+                                        class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors"
+                                        @click="$refs.genVideoPdfInput.click()"
+                                    >
+                                        <input type="file" x-ref="genVideoPdfInput" class="hidden" @change="handleGenVideoPdf($event)" accept=".pdf">
+                                        <template x-if="!genVideoPdf">
+                                            <div class="space-y-2">
+                                                <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                                <p class="text-sm text-gray-300">PDF 파일을 선택하거나 드래그</p>
+                                            </div>
+                                        </template>
+                                        <template x-if="genVideoPdf">
+                                            <div class="space-y-2">
+                                                <svg class="mx-auto h-10 w-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                <p class="text-sm font-medium text-white" x-text="genVideoPdf.name"></p>
+                                                <p class="text-xs text-gray-400" x-text="formatBytes(genVideoPdf.size)"></p>
+                                                <button @click.stop="genVideoPdf = null" class="text-xs text-red-400 hover:text-red-300">제거</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- Audio File Upload (Optional) -->
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">오디오 파일 (옵션)</label>
+                                    <div
+                                        @dragover.prevent="genVideoAudioDragOver = true"
+                                        @dragleave.prevent="genVideoAudioDragOver = false"
+                                        @drop.prevent="handleGenVideoAudioDrop($event)"
+                                        :class="{'border-purple-500 bg-purple-900/30': genVideoAudioDragOver, 'border-gray-600 bg-gray-700': !genVideoAudioDragOver}"
+                                        class="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors"
+                                        @click="$refs.genVideoAudioInput.click()"
+                                    >
+                                        <input type="file" x-ref="genVideoAudioInput" class="hidden" @change="handleGenVideoAudio($event)" accept=".mp3,.wav,.m4a,.aac,.ogg">
+                                        <template x-if="!genVideoAudio">
+                                            <div class="space-y-1">
+                                                <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                                                </svg>
+                                                <p class="text-xs text-gray-400">MP3, WAV, M4A 지원</p>
+                                            </div>
+                                        </template>
+                                        <template x-if="genVideoAudio">
+                                            <div class="space-y-1">
+                                                <svg class="mx-auto h-8 w-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                <p class="text-xs font-medium text-white" x-text="genVideoAudio.name"></p>
+                                                <button @click.stop="genVideoAudio = null" class="text-xs text-red-400 hover:text-red-300">제거</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <p x-show="genVideoMode === 'smart' && !genVideoAudio" class="mt-2 text-xs text-yellow-400">
+                                        ⚠️ Smart 모드에서는 오디오 파일이 필수입니다.
+                                    </p>
+                                </div>
+
+                                <!-- Settings (Basic Mode Only) -->
+                                <div x-show="genVideoMode === 'basic'" class="space-y-4 pt-4 border-t border-gray-700">
+                                    <h4 class="text-sm font-bold text-gray-300">변환 설정</h4>
+
+                                    <!-- Page Duration -->
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-400 mb-1">페이지당 표시 시간</label>
+                                        <div class="flex items-center gap-3">
+                                            <input type="range" x-model="genVideoPageDuration" min="1" max="30" step="0.5" class="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                                            <span class="text-sm text-white w-12 text-right" x-text="genVideoPageDuration + '초'"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Auto Duration Checkbox -->
+                                    <div x-show="genVideoAudio" class="flex items-center gap-2">
+                                        <input type="checkbox" x-model="genVideoAutoDuration" id="autoDuration" class="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500">
+                                        <label for="autoDuration" class="text-sm text-gray-300">오디오 길이에 맞춰 자동 조절</label>
+                                    </div>
+
+                                    <!-- Transition Effect -->
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-400 mb-1">전환 효과</label>
+                                        <select x-model="genVideoTransition" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <option value="fade">Fade</option>
+                                            <option value="slide_left">Slide Left</option>
+                                            <option value="slide_right">Slide Right</option>
+                                            <option value="slide_up">Slide Up</option>
+                                            <option value="slide_down">Slide Down</option>
+                                            <option value="zoom">Zoom</option>
+                                            <option value="none">None</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Transition Duration -->
+                                    <div x-show="genVideoTransition !== 'none'">
+                                        <label class="block text-xs font-medium text-gray-400 mb-1">전환 시간</label>
+                                        <div class="flex items-center gap-3">
+                                            <input type="range" x-model="genVideoTransitionDuration" min="0.1" max="2" step="0.1" class="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                                            <span class="text-sm text-white w-12 text-right" x-text="genVideoTransitionDuration + '초'"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Resolution -->
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-400 mb-1">출력 해상도</label>
+                                    <select x-model="genVideoResolution" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                        <option value="1920x1080">1920x1080 (Full HD)</option>
+                                        <option value="1280x720">1280x720 (HD)</option>
+                                        <option value="3840x2160">3840x2160 (4K)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Right: Guide & Actions -->
+                            <div class="space-y-6">
+                                <div class="bg-gray-700 p-6 rounded-lg border border-gray-600">
+                                    <h4 class="font-bold text-white mb-4">📜 사용 가이드</h4>
+                                    <ul class="text-sm text-gray-300 space-y-3 list-disc ml-4">
+                                        <li><strong>Basic 모드:</strong> 각 PDF 페이지를 지정된 시간 동안 표시합니다.</li>
+                                        <li><strong>Smart 모드:</strong> 오디오를 Whisper로 분석하여 자동으로 페이지 전환 타이밍을 결정합니다.</li>
+                                        <li><strong>오디오:</strong> MP3, WAV, M4A, AAC, OGG 형식을 지원합니다.</li>
+                                        <li><strong>전환 효과:</strong> 페이지 간 자연스러운 전환을 위한 다양한 효과를 제공합니다.</li>
+                                    </ul>
+                                </div>
+
+                                <button
+                                    @click="generateVideo()"
+                                    :disabled="!genVideoPdf || genVideoLoading || (genVideoMode === 'smart' && !genVideoAudio)"
+                                    class="w-full py-4 text-white font-bold rounded-lg transition shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                    :class="genVideoLoading ? 'bg-gray-600' : 'bg-purple-600 hover:bg-purple-700'"
+                                >
+                                    <span x-show="!genVideoLoading">🎬 영상 생성 시작</span>
+                                    <span x-show="genVideoLoading" class="flex items-center justify-center">
+                                        <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        변환 중...
+                                    </span>
+                                </button>
+
+                                <!-- Result -->
+                                <template x-if="genVideoResult">
+                                    <div class="p-4 rounded-lg" :class="genVideoResult.status === 'success' ? 'bg-green-900/50 border border-green-700' : 'bg-red-900/50 border border-red-700'">
+                                        <p class="font-medium" :class="genVideoResult.status === 'success' ? 'text-green-300' : 'text-red-300'" x-text="genVideoResult.status === 'success' ? '✅ 변환 완료!' : '❌ 변환 실패'"></p>
+                                        <template x-if="genVideoResult.status === 'success' && genVideoResult.video">
+                                            <div class="mt-2 text-sm text-gray-300">
+                                                <p>파일명: <span class="text-white" x-text="genVideoResult.video.filename"></span></p>
+                                                <p>페이지 수: <span class="text-white" x-text="genVideoResult.video.page_count"></span></p>
+                                                <p>길이: <span class="text-white" x-text="Math.round(genVideoResult.video.duration) + '초'"></span></p>
+                                                <div class="mt-3 flex gap-2">
+                                                    <button @click="downloadGenVideo(genVideoResult.video.id)" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">다운로드</button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="genVideoResult.status === 'error'">
+                                            <p class="mt-2 text-sm text-red-300" x-text="genVideoResult.message"></p>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Generated Videos List -->
+                        <div class="mt-8 border-t border-gray-700 pt-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-lg font-bold text-white">📁 생성된 영상 목록</h4>
+                                <button @click="refreshGenVideoList()" class="text-sm text-purple-400 hover:text-purple-300 flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                    새로고침
+                                </button>
+                            </div>
+                            <div x-show="generatedVideos.length === 0" class="text-center py-8 text-gray-400">
+                                <p>생성된 영상이 없습니다.</p>
+                            </div>
+                            <div x-show="generatedVideos.length > 0" class="space-y-3">
+                                <template x-for="video in generatedVideos" :key="video.id">
+                                    <div class="bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+                                        <div>
+                                            <p class="font-medium text-white" x-text="video.filename"></p>
+                                            <p class="text-sm text-gray-400">
+                                                <span x-text="formatBytes(video.file_size)"></span> •
+                                                <span x-text="new Date(video.created_at).toLocaleString('ko-KR')"></span>
+                                            </p>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button @click="downloadGenVideo(video.id)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">다운로드</button>
+                                            <button @click="deleteGenVideo(video.id)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded">삭제</button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         function app() {
             return {
-                mainTab: 'wiki', // 'wiki' or 'youtube'
+                mainTab: 'wiki', // 'wiki', 'youtube', or 'genvideo'
                 tab: 'text',
                 wikiCategory: 'tech', // 'tech' (Tech Wiki) or 'news' (Banya Official News)
                 dragOver: false,
@@ -985,6 +1274,26 @@
                 logoTimestamp: Date.now(),
                 logoError: '',
 
+                // Youtube Poster - Gen Video Integration
+                ytVideoSource: 'upload', // 'upload' or 'genvideo'
+                selectedGenVideo: '',
+
+                // Gen Video State
+                genVideoMode: 'basic', // 'basic' or 'smart'
+                genVideoPdf: null,
+                genVideoPdfDragOver: false,
+                genVideoAudio: null,
+                genVideoAudioDragOver: false,
+                genVideoPageDuration: 5,
+                genVideoTransition: 'fade',
+                genVideoTransitionDuration: 0.5,
+                genVideoResolution: '1920x1080',
+                genVideoAutoDuration: false,
+                genVideoLoading: false,
+                genVideoResult: null,
+                generatedVideos: [],
+                smartModeAvailable: true,
+
                 async init() {
                     const token = localStorage.getItem('access_token');
                     if (!token) {
@@ -1005,7 +1314,11 @@
                     } catch (error) {
                         console.error('Failed to fetch user:', error);
                     }
-                    
+
+                    // Gen Video 초기화
+                    this.loadGenVideoInfo();
+                    this.refreshGenVideoList();
+
                     // 마크다운 에디터 초기화 (tab이 'text'일 때)
                     this.$watch('tab', (value) => {
                         if (value === 'text') {
@@ -1742,26 +2055,56 @@
                 },
 
                 async uploadYoutube() {
-                    if (!this.ytFile || !this.pdfFile) {
-                        alert('영상과 PDF 파일을 모두 업로드해주세요.');
+                    // 영상 소스 검증
+                    if (this.ytVideoSource === 'upload' && !this.ytFile) {
+                        alert('영상 파일을 업로드해주세요.');
+                        return;
+                    }
+                    if (this.ytVideoSource === 'genvideo' && !this.selectedGenVideo) {
+                        alert('Gen Video에서 영상을 선택해주세요.');
+                        return;
+                    }
+                    if (!this.pdfFile) {
+                        alert('PDF 파일을 업로드해주세요.');
                         return;
                     }
 
                     this.ytLoading = true;
                     this.ytResult = null;
-                    const formData = new FormData();
-                    formData.append('video', this.ytFile);
-                    formData.append('pdf', this.pdfFile);
-                    formData.append('category', this.ytCategory);
-                    formData.append('lang', this.ytLang);
-                    formData.append('gen_sub', this.genSubtitles);
 
                     try {
-                        const response = await fetch('/api/youtube/upload', {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-                            body: formData
-                        });
+                        let response;
+
+                        if (this.ytVideoSource === 'genvideo') {
+                            // Gen Video에서 선택한 경우 - 다른 API 사용
+                            const formData = new FormData();
+                            formData.append('video_id', this.selectedGenVideo);
+                            formData.append('pdf', this.pdfFile);
+                            formData.append('category', this.ytCategory);
+                            formData.append('lang', this.ytLang);
+                            formData.append('gen_sub', this.genSubtitles);
+
+                            response = await fetch('/api/youtube/upload-from-genvideo', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                                body: formData
+                            });
+                        } else {
+                            // 직접 업로드한 경우 - 기존 API 사용
+                            const formData = new FormData();
+                            formData.append('video', this.ytFile);
+                            formData.append('pdf', this.pdfFile);
+                            formData.append('category', this.ytCategory);
+                            formData.append('lang', this.ytLang);
+                            formData.append('gen_sub', this.genSubtitles);
+
+                            response = await fetch('/api/youtube/upload', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                                body: formData
+                            });
+                        }
+
                         this.ytResult = await response.json();
                     } catch (error) {
                         this.ytResult = { status: 'error', message: error.message };
@@ -1794,6 +2137,159 @@
                         this.shareMessage = '공유 중 오류가 발생했습니다: ' + error.message;
                     } finally {
                         this.sharing = null;
+                    }
+                },
+
+                // === Gen Video Functions ===
+
+                handleGenVideoPdf(event) {
+                    const file = event.target.files[0];
+                    if (file && file.type === 'application/pdf') {
+                        this.genVideoPdf = file;
+                    }
+                },
+
+                handleGenVideoPdfDrop(event) {
+                    this.genVideoPdfDragOver = false;
+                    const file = event.dataTransfer.files[0];
+                    if (file && file.type === 'application/pdf') {
+                        this.genVideoPdf = file;
+                    }
+                },
+
+                handleGenVideoAudio(event) {
+                    const file = event.target.files[0];
+                    const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/ogg'];
+                    const validExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg'];
+                    const ext = file ? file.name.toLowerCase().slice(file.name.lastIndexOf('.')) : '';
+                    if (file && (validTypes.includes(file.type) || validExtensions.includes(ext))) {
+                        this.genVideoAudio = file;
+                    }
+                },
+
+                handleGenVideoAudioDrop(event) {
+                    this.genVideoAudioDragOver = false;
+                    const file = event.dataTransfer.files[0];
+                    const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/ogg'];
+                    const validExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg'];
+                    const ext = file ? file.name.toLowerCase().slice(file.name.lastIndexOf('.')) : '';
+                    if (file && (validTypes.includes(file.type) || validExtensions.includes(ext))) {
+                        this.genVideoAudio = file;
+                    }
+                },
+
+                async generateVideo() {
+                    if (!this.genVideoPdf) {
+                        alert('PDF 파일을 선택해주세요.');
+                        return;
+                    }
+
+                    if (this.genVideoMode === 'smart' && !this.genVideoAudio) {
+                        alert('Smart 모드에서는 오디오 파일이 필수입니다.');
+                        return;
+                    }
+
+                    this.genVideoLoading = true;
+                    this.genVideoResult = null;
+
+                    const formData = new FormData();
+                    formData.append('pdf', this.genVideoPdf);
+                    formData.append('mode', this.genVideoMode);
+                    formData.append('resolution', this.genVideoResolution);
+
+                    if (this.genVideoAudio) {
+                        formData.append('audio', this.genVideoAudio);
+                    }
+
+                    if (this.genVideoMode === 'basic') {
+                        formData.append('page_duration', this.genVideoPageDuration);
+                        formData.append('transition', this.genVideoTransition);
+                        formData.append('transition_duration', this.genVideoTransitionDuration);
+                        formData.append('auto_duration', this.genVideoAutoDuration);
+                    }
+
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch('/api/genvideo/convert', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        this.genVideoResult = data;
+
+                        if (data.status === 'success') {
+                            await this.refreshGenVideoList();
+                        }
+                    } catch (error) {
+                        this.genVideoResult = {
+                            status: 'error',
+                            message: '변환 중 오류가 발생했습니다: ' + error.message
+                        };
+                    } finally {
+                        this.genVideoLoading = false;
+                    }
+                },
+
+                async refreshGenVideoList() {
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch('/api/genvideo/list', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.generatedVideos = data.videos;
+                        }
+                    } catch (error) {
+                        console.error('Failed to refresh video list:', error);
+                    }
+                },
+
+                async downloadGenVideo(videoId) {
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        window.open(`/api/genvideo/download/${videoId}?token=${token}`, '_blank');
+                    } catch (error) {
+                        alert('다운로드 중 오류가 발생했습니다.');
+                    }
+                },
+
+                async deleteGenVideo(videoId) {
+                    if (!confirm('이 영상을 삭제하시겠습니까?')) {
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch(`/api/genvideo/${videoId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            await this.refreshGenVideoList();
+                        } else {
+                            alert('삭제 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('삭제 중 오류가 발생했습니다.');
+                    }
+                },
+
+                async loadGenVideoInfo() {
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch('/api/genvideo/info', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.smartModeAvailable = data.smart_mode_available;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load gen video info:', error);
                     }
                 }
             }

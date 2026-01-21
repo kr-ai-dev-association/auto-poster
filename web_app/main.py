@@ -14,6 +14,7 @@ from services.converter_service import ConverterService
 from services.linkedin_service import LinkedinService
 from services.youtube_service import YouTubeService
 from services.crypto_service import CryptoService
+from services.pdf2mp4_service import PDF2MP4Service
 from services import auth_service
 from core import database, models
 
@@ -30,6 +31,7 @@ templates = Jinja2Templates(directory="templates")
 converter = None
 linkedin = None
 youtube = None
+pdf2mp4 = None
 
 # OAuth2 설정
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -47,16 +49,17 @@ class Token(BaseModel):
 # 의존성: DB 세션 및 수퍼 관리자 초기화
 @app.on_event("startup")
 async def startup_event():
-    global converter, linkedin, youtube
-    
+    global converter, linkedin, youtube, pdf2mp4
+
     # 1. 환경 변수 로드 (DB 우선, 로컬 폴백)
     CryptoService.load_env_from_db()
-    
+
     # 2. 서비스 인스턴스 초기화 (환경 변수 로드 후)
     converter = ConverterService()
     linkedin = LinkedinService()
     youtube = YouTubeService()
-    
+    pdf2mp4 = PDF2MP4Service()
+
     # 3. 수퍼 관리자 초기화
     db = database.SessionLocal()
     try:
@@ -505,6 +508,205 @@ async def get_me(user: models.User = Depends(get_current_user)):
         "email": user.email,
         "is_super_admin": user.is_super_admin
     }
+
+# --- Gen Video (PDF to MP4) Endpoints ---
+
+@app.post("/api/genvideo/convert")
+async def convert_pdf_to_video(
+    pdf: UploadFile = File(...),
+    audio: UploadFile = File(None),
+    mode: str = Form("basic"),
+    page_duration: float = Form(5.0),
+    transition: str = Form("fade"),
+    transition_duration: float = Form(0.5),
+    resolution: str = Form("1920x1080"),
+    fps: int = Form(30),
+    auto_duration: bool = Form(False),
+    user: models.User = Depends(get_current_user)
+):
+    """PDF를 MP4 영상으로 변환합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    try:
+        pdf_content = await pdf.read()
+        audio_content = await audio.read() if audio else None
+        audio_filename = audio.filename if audio else None
+
+        # 해상도 파싱
+        width, height = map(int, resolution.split('x'))
+
+        if mode == "smart":
+            result = await pdf2mp4.convert_smart(
+                pdf_content=pdf_content,
+                filename=pdf.filename,
+                audio_content=audio_content,
+                audio_filename=audio_filename,
+                transition=transition,
+                transition_duration=transition_duration,
+                width=width,
+                height=height,
+                fps=fps
+            )
+        else:
+            result = await pdf2mp4.convert_basic(
+                pdf_content=pdf_content,
+                filename=pdf.filename,
+                audio_content=audio_content,
+                audio_filename=audio_filename,
+                page_duration=page_duration,
+                transition=transition,
+                transition_duration=transition_duration,
+                width=width,
+                height=height,
+                fps=fps,
+                auto_duration=auto_duration
+            )
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+@app.get("/api/genvideo/list")
+async def list_generated_videos(
+    user: models.User = Depends(get_current_user)
+):
+    """생성된 영상 목록을 조회합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    videos = pdf2mp4.get_video_list()
+    return JSONResponse(content={"status": "success", "videos": videos})
+
+@app.get("/api/genvideo/info")
+async def get_genvideo_info(
+    user: models.User = Depends(get_current_user)
+):
+    """Gen Video 서비스 정보를 조회합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    return JSONResponse(content={
+        "status": "success",
+        "transitions": pdf2mp4.get_transitions(),
+        "smart_mode_available": pdf2mp4.is_smart_mode_available()
+    })
+
+@app.get("/api/genvideo/download/{video_id}")
+async def download_generated_video(
+    video_id: str,
+    token: str = None,
+    db: Session = Depends(database.get_db)
+):
+    """생성된 영상을 다운로드합니다. (쿼리 파라미터 토큰 지원)"""
+    # 토큰 검증
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        user = get_current_user(token, db)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    video_path = pdf2mp4.get_video_path(video_id)
+    if video_path and os.path.exists(video_path):
+        return FileResponse(
+            video_path,
+            media_type="video/mp4",
+            filename=os.path.basename(video_path)
+        )
+
+    return JSONResponse(
+        status_code=404,
+        content={"status": "error", "message": "Video not found"}
+    )
+
+@app.delete("/api/genvideo/{video_id}")
+async def delete_generated_video(
+    video_id: str,
+    user: models.User = Depends(get_current_user)
+):
+    """생성된 영상을 삭제합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    if pdf2mp4.delete_video(video_id):
+        return JSONResponse(content={"status": "success", "message": "Video deleted"})
+
+    return JSONResponse(
+        status_code=404,
+        content={"status": "error", "message": "Video not found"}
+    )
+
+@app.post("/api/youtube/upload-from-genvideo")
+async def youtube_upload_from_genvideo(
+    video_id: str = Form(...),
+    pdf: UploadFile = File(...),
+    category: str = Form(...),
+    lang: str = Form("ko"),
+    gen_sub: bool = Form(False),
+    user: models.User = Depends(get_current_user)
+):
+    """Gen Video에서 생성된 영상을 YouTube에 업로드합니다."""
+    if not youtube or not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    # Gen Video 파일 경로 조회
+    video_path = pdf2mp4.get_video_path(video_id)
+    if not video_path or not os.path.exists(video_path):
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "message": "Generated video not found"}
+        )
+
+    try:
+        # 영상 파일 읽기
+        with open(video_path, 'rb') as f:
+            video_content = f.read()
+
+        pdf_content = await pdf.read()
+
+        result = await youtube.process_and_upload(
+            video_content,
+            os.path.basename(video_path),
+            pdf_content,
+            category,
+            lang,
+            gen_sub
+        )
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

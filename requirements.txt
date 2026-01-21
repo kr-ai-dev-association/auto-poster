@@ -9,3 +9,9 @@ google-auth-oauthlib
 google-auth-httplib2
 PyPDF2
 
+# Gen Video (PDF to MP4)
+pdf2image
+moviepy
+numpy
+openai-whisper
+
