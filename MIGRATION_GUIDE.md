@@ -61,23 +61,50 @@ cp /home/ubuntu/auto-poster/.env ./backup/
 
 ---
 
-## 3. 새 서버 이관 절차
+## 3. 백업 파일 생성 및 다운로드
 
-### 3.1 시스템 패키지 설치
+### 3.1 서버에서 백업 파일 생성
+```bash
+# 서버에 SSH 접속 후 실행
+cd /home/ubuntu/auto-poster
+
+# 백업 디렉토리 생성 및 파일 복사
+mkdir -p backup_$(date +%Y%m%d)
+cp web_app/autoposter.db backup_$(date +%Y%m%d)/
+cp -r generated_videos backup_$(date +%Y%m%d)/
+
+# 압축 파일 생성
+tar -czvf migration_backup_$(date +%Y%m%d).tar.gz backup_$(date +%Y%m%d)/
+```
+
+### 3.2 로컬 PC로 다운로드
+```bash
+# 로컬 PC 터미널에서 실행 (SSH 키 파일 경로와 서버 주소를 수정하세요)
+scp -i <ssh_key_file> ubuntu@<server_ip>:/home/ubuntu/auto-poster/migration_backup_*.tar.gz /path/to/local/backup/
+
+# 예시:
+# scp -i rsa_id ubuntu@210.109.80.198:/home/ubuntu/auto-poster/migration_backup_20260121.tar.gz /Users/tony/Downloads/backup/
+```
+
+---
+
+## 4. 새 서버 이관 절차
+
+### 4.1 시스템 패키지 설치
 ```bash
 # Ubuntu/Debian
 sudo apt-get update
 sudo apt-get install -y poppler-utils ffmpeg python3 python3-pip python3-venv
 ```
 
-### 3.2 프로젝트 클론
+### 4.2 프로젝트 클론
 ```bash
 cd /home/ubuntu
-git clone https://github.com/your-repo/auto-poster.git
+git clone https://github.com/kr-ai-dev-association/auto-poster.git
 cd auto-poster
 ```
 
-### 3.3 Python 환경 설정
+### 4.3 Python 환경 설정
 ```bash
 # 가상환경 생성 (선택사항이지만 권장)
 python3 -m venv venv
@@ -90,19 +117,36 @@ pip install -r requirements.txt
 pip install git+https://github.com/openai/whisper.git
 ```
 
-### 3.4 백업 파일 복원
+### 4.4 백업 파일 업로드 및 복원
+
+#### 로컬 PC에서 새 서버로 백업 파일 업로드
 ```bash
-# 데이터베이스 복원
-cp ./backup/auto_poster.db /home/ubuntu/auto-poster/
+# 로컬 PC 터미널에서 실행
+scp -i <ssh_key_file> /path/to/local/backup/migration_backup_*.tar.gz ubuntu@<new_server_ip>:/home/ubuntu/
+
+# 예시:
+# scp -i rsa_id /Users/tony/Downloads/backup/migration_backup_20260121.tar.gz ubuntu@새서버IP:/home/ubuntu/
+```
+
+#### 새 서버에서 백업 파일 복원
+```bash
+# 새 서버에 SSH 접속 후 실행
+cd /home/ubuntu
+
+# 압축 해제
+tar -xzvf migration_backup_*.tar.gz
+
+# 데이터베이스 복원 (backup_YYYYMMDD 폴더명 확인 후 실행)
+cp backup_20260121/autoposter.db /home/ubuntu/auto-poster/web_app/
 
 # 생성된 영상 폴더 복원
-tar -xzvf generated_videos_backup.tar.gz -C /home/ubuntu/auto-poster/
+cp -r backup_20260121/generated_videos /home/ubuntu/auto-poster/
 
 # 디렉토리가 없으면 생성
 mkdir -p /home/ubuntu/auto-poster/generated_videos
 ```
 
-### 3.5 시스템 환경 변수 설정
+### 4.5 시스템 환경 변수 설정
 ```bash
 # /etc/environment 또는 ~/.bashrc에 추가
 export SUPER_ADMIN_ID="your_admin_id"
@@ -121,7 +165,7 @@ Environment="SUPER_ADMIN_PW=your_admin_password"
 Environment="ENVIRONMENT=production"
 ```
 
-### 3.6 애플리케이션 실행
+### 4.6 애플리케이션 실행
 ```bash
 cd /home/ubuntu/auto-poster/web_app
 uvicorn main:app --host 0.0.0.0 --port 8000
@@ -129,7 +173,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ---
 
-## 4. 검증 체크리스트
+## 5. 검증 체크리스트
 
 이관 완료 후 다음 항목을 확인하세요:
 
@@ -144,7 +188,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ---
 
-## 5. 문제 해결
+## 6. 문제 해결
 
 ### 암호화된 파일 복호화 실패
 ```
@@ -166,7 +210,7 @@ Whisper not installed
 
 ---
 
-## 6. 보안 주의사항
+## 7. 보안 주의사항
 
 1. **SUPER_ADMIN_ID/PW는 절대 공개 저장소에 커밋하지 마세요**
 2. 백업 파일은 안전한 위치에 암호화하여 보관하세요
