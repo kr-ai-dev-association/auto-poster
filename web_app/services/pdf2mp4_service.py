@@ -1,6 +1,7 @@
 """
 PDF to MP4 변환 서비스
 PDF 파일을 MP4 영상으로 변환하는 기능을 제공합니다.
+NVENC GPU 가속을 직접 사용합니다.
 """
 
 import os
@@ -10,19 +11,23 @@ import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
+import subprocess
 
 # PDF to Image
 from pdf2image import convert_from_bytes
+import io
 
-# Video processing (moviepy 2.x compatible)
-from moviepy import (
-    ImageClip,
-    concatenate_videoclips,
-    AudioFileClip,
-    CompositeVideoClip
-)
+# PDF text extraction
+try:
+    import PyPDF2
+    PYPDF_AVAILABLE = True
+except ImportError:
+    PYPDF_AVAILABLE = False
+
 from PIL import Image
 import numpy as np
+import re
+from difflib import SequenceMatcher
 
 # Whisper for Smart mode (optional)
 try:
@@ -36,46 +41,36 @@ except ImportError:
 @dataclass
 class ConversionConfig:
     """변환 설정"""
-    page_duration: float = 5.0          # 페이지당 표시 시간 (초)
-    transition_duration: float = 0.5     # 전환 효과 시간 (초)
-    transition_type: str = 'fade'        # 전환 효과 타입
-    fps: int = 30                        # 프레임 레이트
-    width: int = 1920                    # 출력 너비
-    height: int = 1080                   # 출력 높이
-    dpi: int = 200                       # PDF 렌더링 DPI
+    page_duration: float = 5.0
+    transition_duration: float = 0.5
+    transition_type: str = 'fade'
+    fps: int = 30
+    width: int = 1920
+    height: int = 1080
+    dpi: int = 200
 
 
 class PDF2MP4Service:
-    """PDF를 MP4 영상으로 변환하는 서비스"""
+    """PDF를 MP4 영상으로 변환하는 서비스 (NVENC 직접 사용)"""
 
-    # 지원하는 전환 효과
     TRANSITIONS = ['fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down', 'zoom', 'none']
-
-    # 지원하는 오디오 포맷
     AUDIO_FORMATS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg']
-
-    # 진행률 저장소 (video_id -> progress_info)
     _progress_store: Dict[str, Dict[str, Any]] = {}
 
     def __init__(self):
-        # 출력 디렉토리 설정
         self.output_dir = os.path.join(
             os.path.dirname(__file__),
             '..', '..', 'generated_videos'
         )
         os.makedirs(self.output_dir, exist_ok=True)
-
-        # Whisper 모델 (지연 로딩)
         self._whisper_model = None
 
     @classmethod
     def get_progress(cls, video_id: str) -> Optional[Dict[str, Any]]:
-        """진행률 조회"""
         return cls._progress_store.get(video_id)
 
     @classmethod
     def update_progress(cls, video_id: str, stage: str, progress: int, message: str, eta: Optional[int] = None):
-        """진행률 업데이트"""
         cls._progress_store[video_id] = {
             'video_id': video_id,
             'stage': stage,
@@ -87,19 +82,217 @@ class PDF2MP4Service:
 
     @classmethod
     def clear_progress(cls, video_id: str):
-        """진행률 정보 삭제"""
         if video_id in cls._progress_store:
             del cls._progress_store[video_id]
 
     @property
     def whisper_model(self):
-        """Whisper 모델 지연 로딩"""
         if self._whisper_model is None and WHISPER_AVAILABLE:
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
             print(f"Loading Whisper model (base) on {device}...")
             self._whisper_model = whisper.load_model("base", device=device)
         return self._whisper_model
+
+    def _resize_image(self, img: Image.Image, width: int, height: int) -> np.ndarray:
+        """이미지를 지정된 크기로 리사이즈 (종횡비 유지, 검은 배경)"""
+        orig_width, orig_height = img.size
+        ratio = min(width / orig_width, height / orig_height)
+        new_width = int(orig_width * ratio)
+        new_height = int(orig_height * ratio)
+
+        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        background = Image.new('RGB', (width, height), (0, 0, 0))
+        offset = ((width - new_width) // 2, (height - new_height) // 2)
+        background.paste(img_resized, offset)
+
+        return np.array(background)
+
+    def _extract_pdf_page_texts(self, pdf_content: bytes) -> List[str]:
+        """PDF 각 페이지에서 텍스트 추출"""
+        if not PYPDF_AVAILABLE:
+            return []
+
+        page_texts = []
+        try:
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+            for page in pdf_reader.pages:
+                text = page.extract_text() or ""
+                # 정규화: 소문자, 특수문자 제거, 공백 정리
+                text = text.lower()
+                text = re.sub(r'[^\w\s]', ' ', text)
+                text = ' '.join(text.split())
+                page_texts.append(text)
+        except Exception as e:
+            print(f"PDF 텍스트 추출 오류: {e}")
+
+        return page_texts
+
+    def _extract_keywords_from_page(self, text: str, min_length: int = 4) -> List[str]:
+        """페이지 텍스트에서 중요 키워드 추출"""
+        # 일반적인 불용어
+        stopwords = {
+            'the', 'and', 'for', 'that', 'this', 'with', 'from', 'have', 'has',
+            'are', 'was', 'were', 'been', 'being', 'will', 'would', 'could',
+            'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'does',
+            'did', 'done', 'doing', 'just', 'only', 'also', 'very', 'much',
+            'more', 'most', 'such', 'like', 'than', 'then', 'when', 'where',
+            'which', 'what', 'who', 'whom', 'whose', 'how', 'why', 'all',
+            'each', 'every', 'both', 'few', 'many', 'some', 'any', 'other',
+            'into', 'through', 'during', 'before', 'after', 'above', 'below',
+            'between', 'under', 'again', 'further', 'once', 'here', 'there',
+            'about', 'over', 'these', 'those', 'their', 'them', 'they', 'your',
+            'page', 'slide', 'copyright', 'reserved', 'rights'
+        }
+
+        words = text.split()
+        keywords = []
+
+        for word in words:
+            if len(word) >= min_length and word not in stopwords:
+                keywords.append(word)
+
+        # 중복 제거하면서 순서 유지
+        seen = set()
+        unique_keywords = []
+        for kw in keywords:
+            if kw not in seen:
+                seen.add(kw)
+                unique_keywords.append(kw)
+
+        return unique_keywords[:30]  # 상위 30개 키워드
+
+    def _find_keyword_in_transcript(
+        self,
+        keyword: str,
+        segments: List[Dict],
+        search_start: float = 0
+    ) -> Optional[float]:
+        """트랜스크립트에서 키워드가 처음 등장하는 시간 찾기"""
+        keyword_lower = keyword.lower()
+
+        for segment in segments:
+            if segment['start'] < search_start:
+                continue
+
+            segment_text = segment.get('text', '').lower()
+            # 정규화
+            segment_text = re.sub(r'[^\w\s]', ' ', segment_text)
+
+            if keyword_lower in segment_text:
+                return segment['start']
+
+            # 부분 매칭 (Fuzzy matching)
+            for word in segment_text.split():
+                if len(word) >= 4:
+                    ratio = SequenceMatcher(None, keyword_lower, word).ratio()
+                    if ratio > 0.8:  # 80% 이상 유사
+                        return segment['start']
+
+        return None
+
+    def _encode_video_nvenc(
+        self,
+        images: List[np.ndarray],
+        timings: List[Dict[str, float]],
+        audio_path: Optional[str],
+        output_path: str,
+        fps: int,
+        width: int,
+        height: int,
+        video_id: str
+    ) -> bool:
+        """NVENC를 직접 사용하여 영상 인코딩"""
+
+        # ffmpeg 명령어 구성
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',
+            '-f', 'rawvideo',
+            '-vcodec', 'rawvideo',
+            '-s', f'{width}x{height}',
+            '-pix_fmt', 'rgb24',
+            '-r', str(fps),
+            '-i', '-',
+        ]
+
+        if audio_path:
+            ffmpeg_cmd.extend(['-i', audio_path])
+
+        ffmpeg_cmd.extend([
+            '-c:v', 'h264_nvenc',
+            '-preset', 'p4',  # 빠른 프리셋
+            '-rc', 'vbr',
+            '-cq', '23',
+            '-pix_fmt', 'yuv420p',
+        ])
+
+        if audio_path:
+            ffmpeg_cmd.extend(['-c:a', 'aac', '-b:a', '192k'])
+        else:
+            ffmpeg_cmd.extend(['-an'])
+
+        ffmpeg_cmd.append(output_path)
+
+        # ffmpeg 프로세스 시작
+        process = subprocess.Popen(
+            ffmpeg_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        # 총 프레임 수 계산
+        total_duration = timings[-1]['start'] + timings[-1]['duration'] if timings else 0
+        total_frames = int(total_duration * fps)
+
+        print(f"[{video_id}] 🎬 NVENC 인코딩 시작: {total_frames} 프레임, {total_duration:.1f}초")
+
+        # 프레임 생성 및 전송
+        frame_count = 0
+        current_image_idx = 0
+
+        try:
+            for frame_idx in range(total_frames):
+                t = frame_idx / fps
+
+                # 현재 시간에 해당하는 이미지 찾기
+                while current_image_idx < len(timings) - 1:
+                    next_start = timings[current_image_idx + 1]['start']
+                    if t >= next_start:
+                        current_image_idx += 1
+                    else:
+                        break
+
+                # 이미지 프레임 쓰기
+                frame = images[min(current_image_idx, len(images) - 1)]
+                process.stdin.write(frame.astype(np.uint8).tobytes())
+                frame_count += 1
+
+                # 진행률 업데이트 (5% 단위)
+                if frame_count % max(1, total_frames // 20) == 0:
+                    progress = int((frame_count / total_frames) * 100)
+                    eta = int((total_frames - frame_count) / fps * 0.05)  # NVENC는 매우 빠름
+                    self.update_progress(video_id, 'encoding', min(95, 60 + progress * 0.35),
+                                       f'🎬 인코딩 중... {progress}%', eta)
+                    print(f"[{video_id}] 진행: {progress}% ({frame_count}/{total_frames})")
+        except BrokenPipeError:
+            # ffmpeg가 일찍 종료됨 - stderr 확인
+            stderr = process.stderr.read()
+            print(f"[{video_id}] FFmpeg가 조기 종료됨: {stderr.decode()}")
+            process.wait()
+            return False
+
+        process.stdin.close()
+        process.wait()
+
+        stderr_output = process.stderr.read().decode() if process.stderr else ""
+
+        if process.returncode != 0:
+            print(f"[{video_id}] FFmpeg 오류 (코드 {process.returncode}): {stderr_output}")
+            return False
+
+        print(f"[{video_id}] ✅ NVENC 인코딩 완료: {frame_count} 프레임")
+        return True
 
     async def convert_basic(
         self,
@@ -116,26 +309,7 @@ class PDF2MP4Service:
         dpi: int = 200,
         auto_duration: bool = False
     ) -> Dict[str, Any]:
-        """
-        Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환
-
-        Args:
-            pdf_content: PDF 파일 바이트
-            filename: 원본 파일명
-            audio_content: 오디오 파일 바이트 (옵션)
-            audio_filename: 오디오 파일명 (옵션)
-            page_duration: 페이지당 표시 시간 (초)
-            transition: 전환 효과 타입
-            transition_duration: 전환 효과 시간 (초)
-            width: 출력 너비
-            height: 출력 높이
-            fps: 프레임 레이트
-            dpi: PDF 렌더링 DPI
-            auto_duration: 오디오 길이에 맞춰 자동 조절
-
-        Returns:
-            변환 결과 딕셔너리
-        """
+        """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환"""
         video_id = str(uuid.uuid4())[:8]
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_{video_id}_')
 
@@ -144,96 +318,66 @@ class PDF2MP4Service:
 
             # 1. PDF를 이미지로 변환
             print(f"[{video_id}] Converting PDF to images (DPI: {dpi})...")
-            images = convert_from_bytes(
-                pdf_content,
-                dpi=dpi
-            )
+            images = convert_from_bytes(pdf_content, dpi=dpi)
             print(f"[{video_id}] Extracted {len(images)} pages")
 
             # 2. 이미지 리사이즈
             resized_images = []
-            for i, img in enumerate(images):
+            for img in images:
                 resized = self._resize_image(img, width, height)
                 resized_images.append(resized)
 
-            # 3. 오디오 처리 (있는 경우)
-            audio_clip = None
+            # 3. 오디오 처리
+            audio_path = None
+            audio_duration = 0
             if audio_content:
                 audio_ext = os.path.splitext(audio_filename or '.mp3')[1].lower()
                 audio_path = os.path.join(temp_dir, f'audio{audio_ext}')
                 with open(audio_path, 'wb') as f:
                     f.write(audio_content)
-                audio_clip = AudioFileClip(audio_path)
-                print(f"[{video_id}] Audio loaded: {audio_clip.duration:.2f}s")
 
-                # 오디오 길이에 맞춰 페이지 시간 자동 계산
-                if auto_duration:
-                    page_duration = self._calculate_page_duration(
-                        audio_clip.duration,
-                        len(images),
-                        transition_duration
-                    )
+                # ffprobe로 오디오 길이 확인
+                result = subprocess.run(
+                    ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                     '-of', 'default=noprint_wrappers=1:nokey=1', audio_path],
+                    capture_output=True, text=True
+                )
+                audio_duration = float(result.stdout.strip()) if result.stdout.strip() else 0
+                print(f"[{video_id}] Audio loaded: {audio_duration:.2f}s")
+
+                if auto_duration and audio_duration > 0:
+                    page_duration = audio_duration / len(images)
                     print(f"[{video_id}] Auto page duration: {page_duration:.2f}s")
 
-            # 4. 비디오 클립 생성
-            if transition != 'none' and transition_duration > 0:
-                final_clip = self._create_video_with_transitions(
-                    resized_images,
-                    page_duration,
-                    transition_duration,
-                    transition,
-                    width,
-                    height
-                )
-            else:
-                final_clip = self._create_video_simple(resized_images, page_duration)
+            # 4. 타이밍 계산
+            timings = []
+            for i in range(len(resized_images)):
+                start_time = i * page_duration
+                timings.append({'start': start_time, 'duration': page_duration})
 
-            # 5. 오디오 추가
-            if audio_clip:
-                audio_margin = 2.0  # 오디오 끝 부분 잘림 방지를 위한 마진
-                target_audio_duration = audio_clip.duration + audio_margin
+            # 오디오에 맞게 조정
+            if audio_duration > 0:
+                total_video_duration = len(images) * page_duration
+                if audio_duration > total_video_duration:
+                    # 마지막 이미지 연장
+                    extra = audio_duration - total_video_duration + 2.0  # 2초 마진
+                    timings[-1]['duration'] += extra
 
-                # 비디오와 오디오 길이 맞추기
-                if audio_clip.duration < final_clip.duration:
-                    # 오디오가 짧으면 비디오를 오디오 길이에 맞춤
-                    final_clip = final_clip.subclip(0, audio_clip.duration)
-                elif target_audio_duration > final_clip.duration:
-                    # 오디오 + 마진이 비디오보다 길면 마지막 이미지로 비디오 연장 (잘림 방지)
-                    print(f"[{video_id}] Extending video from {final_clip.duration:.2f}s to {target_audio_duration:.2f}s (audio: {audio_clip.duration:.2f}s + {audio_margin}s margin)")
-                    extension_duration = target_audio_duration - final_clip.duration
-                    last_img = resized_images[-1]
-                    extension_clip = ImageClip(last_img, duration=extension_duration).with_start(final_clip.duration)
-                    final_clip = CompositeVideoClip([final_clip, extension_clip])
-                final_clip = final_clip.with_audio(audio_clip)
-
-            # 6. 영상 출력
+            # 5. 영상 출력
             output_filename = f"{os.path.splitext(filename)[0]}_{video_id}.mp4"
             output_path = os.path.join(self.output_dir, output_filename)
+            video_duration = timings[-1]['start'] + timings[-1]['duration']
 
-            print(f"[{video_id}] Rendering video to: {output_path}")
+            print(f"[{video_id}] 🎬 NVENC GPU 가속 인코딩 시작")
+            print(f"[{video_id}] 📊 영상 길이: {video_duration:.1f}초")
 
-            # duration 저장 (close 전에)
-            video_duration = final_clip.duration
-
-            print(f"[{video_id}] 🎬 영상 인코딩 시작 (NVENC GPU 가속)")
-            print(f"[{video_id}] 📊 영상 길이: {video_duration:.1f}초, 예상 소요 시간: {video_duration * 0.1:.0f}~{video_duration * 0.2:.0f}초")
-
-            final_clip.write_videofile(
-                output_path,
-                fps=fps,
-                codec='h264_nvenc',
-                audio_codec='aac',
-                pixel_format='yuv420p',
-                ffmpeg_params=['-preset', 'fast', '-rc', 'vbr', '-cq', '23'],
-                logger='bar'
+            success = self._encode_video_nvenc(
+                resized_images, timings, audio_path, output_path, fps, width, height, video_id
             )
 
-            # 7. 리소스 정리
-            final_clip.close()
-            if audio_clip:
-                audio_clip.close()
+            if not success:
+                raise Exception("NVENC encoding failed")
 
-            # 8. 결과 반환
             video_info = {
                 'id': video_id,
                 'filename': output_filename,
@@ -250,21 +394,14 @@ class PDF2MP4Service:
             }
 
             print(f"[{video_id}] Conversion completed successfully")
-            return {
-                'status': 'success',
-                'video': video_info
-            }
+            return {'status': 'success', 'video': video_info}
 
         except Exception as e:
             print(f"[{video_id}] Conversion failed: {str(e)}")
             import traceback
             traceback.print_exc()
-            return {
-                'status': 'error',
-                'message': str(e)
-            }
+            return {'status': 'error', 'message': str(e)}
         finally:
-            # 임시 디렉토리 정리
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     async def convert_smart(
@@ -280,24 +417,7 @@ class PDF2MP4Service:
         fps: int = 30,
         dpi: int = 200
     ) -> Dict[str, Any]:
-        """
-        Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정
-
-        Args:
-            pdf_content: PDF 파일 바이트
-            filename: 원본 파일명
-            audio_content: 오디오 파일 바이트 (필수)
-            audio_filename: 오디오 파일명
-            transition: 전환 효과 타입
-            transition_duration: 전환 효과 시간 (초)
-            width: 출력 너비
-            height: 출력 높이
-            fps: 프레임 레이트
-            dpi: PDF 렌더링 DPI
-
-        Returns:
-            변환 결과 딕셔너리
-        """
+        """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정"""
         if not WHISPER_AVAILABLE:
             return {
                 'status': 'error',
@@ -337,91 +457,71 @@ class PDF2MP4Service:
             images = convert_from_bytes(pdf_content, dpi=dpi)
             num_pages = len(images)
             print(f"[{video_id}] Extracted {num_pages} pages")
-            self.update_progress(video_id, 'pdf_done', 45, f'✅ PDF 변환 완료 ({num_pages}페이지)', None)
+            self.update_progress(video_id, 'pdf_done', 40, f'✅ PDF 변환 완료 ({num_pages}페이지)', None)
 
-            # 3. 이미지 리사이즈
+            # 3. PDF 텍스트 추출 (키워드 매칭용)
+            self.update_progress(video_id, 'text_extract', 42, '📝 PDF 텍스트 추출 중...', None)
+            print(f"[{video_id}] Extracting text from PDF pages...")
+            page_texts = self._extract_pdf_page_texts(pdf_content)
+            print(f"[{video_id}] Extracted text from {len(page_texts)} pages")
+
+            # 4. 이미지 리사이즈
             resized_images = []
             for img in images:
                 resized = self._resize_image(img, width, height)
                 resized_images.append(resized)
 
-            # 4. 오디오 클립 로드
-            audio_clip = AudioFileClip(audio_path)
-            total_duration = audio_clip.duration
+            # 5. 오디오 길이 확인
+            result_probe = subprocess.run(
+                ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                 '-of', 'default=noprint_wrappers=1:nokey=1', audio_path],
+                capture_output=True, text=True
+            )
+            total_duration = float(result_probe.stdout.strip()) if result_probe.stdout.strip() else 0
 
-            # 5. 페이지 타이밍 계산 (세그먼트 기반)
+            # 6. 페이지 타이밍 계산 (키워드 기반)
+            self.update_progress(video_id, 'timing', 45, '🔍 키워드 기반 타이밍 계산 중...', None)
             page_timings = self._calculate_smart_timings(
-                segments,
-                num_pages,
-                total_duration
+                segments, num_pages, total_duration, page_texts, video_id
             )
             print(f"[{video_id}] Page timings: {page_timings}")
-            self.update_progress(video_id, 'timing', 50, '⏱️ 페이지 타이밍 계산 완료', None)
+            self.update_progress(video_id, 'timing_done', 50, '⏱️ 페이지 타이밍 계산 완료', None)
 
-            # 6. 비디오 클립 생성 (타이밍 기반)
-            self.update_progress(video_id, 'compose', 55, '🎞️ 비디오 클립 생성 중...', None)
-            final_clip = self._create_video_with_timings(
-                resized_images,
-                page_timings,
-                transition,
-                transition_duration,
-                width,
-                height
-            )
-
-            # 7. 비디오 길이를 오디오 길이에 맞춤 (잘림 방지, 2초 마진)
-            audio_margin = 2.0  # 오디오 끝 부분 잘림 방지를 위한 마진
+            # 6. 마지막 페이지 연장 (오디오 끝까지 + 마진)
+            audio_margin = 2.0
             target_duration = total_duration + audio_margin
+            if page_timings:
+                last_end = page_timings[-1]['start'] + page_timings[-1]['duration']
+                if last_end < target_duration:
+                    page_timings[-1]['duration'] = target_duration - page_timings[-1]['start']
 
-            if final_clip.duration < target_duration:
-                # 비디오가 목표 길이보다 짧으면 마지막 프레임을 연장
-                print(f"[{video_id}] Extending video from {final_clip.duration:.2f}s to {target_duration:.2f}s (audio: {total_duration:.2f}s + {audio_margin}s margin)")
-                # 마지막 이미지로 나머지 시간 채우기
-                last_img = resized_images[-1]
-                extension_duration = target_duration - final_clip.duration
-                extension_clip = ImageClip(last_img, duration=extension_duration).with_start(final_clip.duration)
-                final_clip = CompositeVideoClip([final_clip, extension_clip])
-
-            # 8. 오디오 추가
-            final_clip = final_clip.with_audio(audio_clip)
-            self.update_progress(video_id, 'audio', 60, '🔊 오디오 추가 완료', None)
-
-            # 8. 영상 출력
+            # 7. 영상 출력
             output_filename = f"{os.path.splitext(filename)[0]}_smart_{video_id}.mp4"
             output_path = os.path.join(self.output_dir, output_filename)
 
-            # 예상 인코딩 시간 계산 (NVENC: 약 0.1~0.15배)
-            eta_seconds = int(total_duration * 0.15)
-            self.update_progress(video_id, 'encoding', 65, f'🎬 영상 인코딩 중... (예상 {eta_seconds}초)', eta_seconds)
+            video_duration = page_timings[-1]['start'] + page_timings[-1]['duration'] if page_timings else 0
+            eta_seconds = int(video_duration * 0.05)  # NVENC는 빠름
+            self.update_progress(video_id, 'encoding', 55, f'🎬 NVENC 인코딩 중... (예상 {eta_seconds}초)', eta_seconds)
 
-            print(f"[{video_id}] Rendering video to: {output_path}")
-            print(f"[{video_id}] 🎬 영상 인코딩 시작 (NVENC GPU 가속)")
-            print(f"[{video_id}] 📊 영상 길이: {total_duration:.1f}초, 예상 소요 시간: {total_duration * 0.1:.0f}~{total_duration * 0.2:.0f}초")
+            print(f"[{video_id}] 🎬 NVENC GPU 가속 인코딩 시작")
+            print(f"[{video_id}] 📊 영상 길이: {video_duration:.1f}초")
 
-            final_clip.write_videofile(
-                output_path,
-                fps=fps,
-                codec='h264_nvenc',
-                audio_codec='aac',
-                pixel_format='yuv420p',
-                ffmpeg_params=['-preset', 'fast', '-rc', 'vbr', '-cq', '23'],
-                logger='bar'
+            success = self._encode_video_nvenc(
+                resized_images, page_timings, audio_path, output_path, fps, width, height, video_id
             )
+
+            if not success:
+                raise Exception("NVENC encoding failed")
 
             self.update_progress(video_id, 'complete', 100, '✅ 변환 완료!', 0)
 
-            # 9. 리소스 정리
-            final_clip.close()
-            audio_clip.close()
-
-            # 10. 결과 반환
             video_info = {
                 'id': video_id,
                 'filename': output_filename,
                 'original_pdf': filename,
                 'mode': 'smart',
                 'page_count': num_pages,
-                'duration': total_duration,
+                'duration': video_duration,
                 'resolution': f'{width}x{height}',
                 'transition': transition,
                 'page_timings': page_timings,
@@ -432,168 +532,127 @@ class PDF2MP4Service:
             }
 
             print(f"[{video_id}] Smart conversion completed successfully")
-            return {
-                'status': 'success',
-                'video': video_info
-            }
+            return {'status': 'success', 'video': video_info}
 
         except Exception as e:
             print(f"[{video_id}] Smart conversion failed: {str(e)}")
             import traceback
             traceback.print_exc()
-            return {
-                'status': 'error',
-                'message': str(e)
-            }
+            return {'status': 'error', 'message': str(e)}
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
-
-    def _resize_image(self, img: Image.Image, width: int, height: int) -> np.ndarray:
-        """이미지를 지정된 크기로 리사이즈 (종횡비 유지, 검은 배경)"""
-        # 원본 크기
-        orig_width, orig_height = img.size
-
-        # 종횡비 계산
-        ratio = min(width / orig_width, height / orig_height)
-        new_width = int(orig_width * ratio)
-        new_height = int(orig_height * ratio)
-
-        # 리사이즈
-        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-        # 검은 배경에 중앙 정렬
-        background = Image.new('RGB', (width, height), (0, 0, 0))
-        offset = ((width - new_width) // 2, (height - new_height) // 2)
-        background.paste(img_resized, offset)
-
-        return np.array(background)
-
-    def _create_video_simple(
-        self,
-        images: List[np.ndarray],
-        page_duration: float
-    ) -> CompositeVideoClip:
-        """전환 효과 없이 단순 영상 생성"""
-        clips = []
-        for img in images:
-            clip = ImageClip(img, duration=page_duration)
-            clips.append(clip)
-        return concatenate_videoclips(clips, method="compose")
-
-    def _create_video_with_transitions(
-        self,
-        images: List[np.ndarray],
-        page_duration: float,
-        transition_duration: float,
-        transition_type: str,
-        width: int,
-        height: int
-    ) -> CompositeVideoClip:
-        """전환 효과를 적용한 영상 생성 (moviepy 2.x 호환)"""
-        clips = []
-
-        for i, img in enumerate(images):
-            clip = ImageClip(img, duration=page_duration)
-
-            # 시작 시간 설정 (전환 겹침 고려)
-            if i > 0:
-                start_time = i * (page_duration - transition_duration)
-                clip = clip.with_start(start_time)
-
-            clips.append(clip)
-
-        # moviepy 2.x에서는 crossfade를 다르게 처리해야 함
-        # 단순 합성으로 처리 (오버랩 방식)
-        return CompositeVideoClip(clips)
-
-    def _create_video_with_timings(
-        self,
-        images: List[np.ndarray],
-        timings: List[Dict[str, float]],
-        transition: str,
-        transition_duration: float,
-        width: int,
-        height: int
-    ) -> CompositeVideoClip:
-        """타이밍 기반 영상 생성 (Smart 모드용)"""
-        clips = []
-
-        for i, (img, timing) in enumerate(zip(images, timings)):
-            start_time = timing['start']
-            duration = timing['duration']
-
-            clip = ImageClip(img, duration=duration).with_start(start_time)
-
-            # 전환 효과 적용 (moviepy 2.x에서는 crossfadein이 다르게 동작)
-            # 단순화를 위해 전환 효과는 생략
-
-            clips.append(clip)
-
-        return CompositeVideoClip(clips)
-
-    def _apply_zoom_in(
-        self,
-        clip,
-        duration: float,
-        width: int,
-        height: int
-    ):
-        """줌 인 전환 효과 적용"""
-        def zoom_effect(get_frame, t):
-            frame = get_frame(t)
-            if t < duration:
-                # 1.2배에서 1.0배로 줌 아웃
-                scale = 1.2 - (0.2 * t / duration)
-                h, w = frame.shape[:2]
-                new_h, new_w = int(h * scale), int(w * scale)
-
-                # 크기 조정
-                from PIL import Image
-                img = Image.fromarray(frame)
-                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
-                # 중앙 크롭
-                left = (new_w - w) // 2
-                top = (new_h - h) // 2
-                img = img.crop((left, top, left + w, top + h))
-
-                return np.array(img)
-            return frame
-
-        return clip.fl(zoom_effect)
-
-    def _calculate_page_duration(
-        self,
-        audio_duration: float,
-        num_pages: int,
-        transition_duration: float
-    ) -> float:
-        """오디오 길이에 맞춰 페이지 시간 계산"""
-        # 전환 겹침을 고려한 계산
-        # 총 시간 = n * page_duration - (n-1) * transition_duration
-        # page_duration = (총 시간 + (n-1) * transition_duration) / n
-        if num_pages <= 1:
-            return audio_duration
-
-        page_duration = (audio_duration + (num_pages - 1) * transition_duration) / num_pages
-        return max(1.0, page_duration)  # 최소 1초
 
     def _calculate_smart_timings(
         self,
         segments: List[Dict],
         num_pages: int,
-        total_duration: float
+        total_duration: float,
+        page_texts: Optional[List[str]] = None,
+        video_id: str = ""
     ) -> List[Dict[str, float]]:
-        """Whisper 세그먼트를 기반으로 페이지 타이밍 계산"""
+        """PDF 페이지 키워드와 Whisper 트랜스크립트를 매칭하여 페이지 타이밍 계산"""
+
+        # 기본 폴백: 균등 분배
         if not segments or num_pages <= 0:
-            # 세그먼트가 없으면 균등 분배
-            page_duration = total_duration / num_pages
+            page_duration = total_duration / max(num_pages, 1)
             return [
                 {'start': i * page_duration, 'duration': page_duration}
                 for i in range(num_pages)
             ]
 
-        # 간단한 방식: 세그먼트를 페이지 수로 나누어 배분
+        # 키워드 기반 매칭이 불가능한 경우 균등 분배
+        if not page_texts or len(page_texts) != num_pages:
+            print(f"[{video_id}] 키워드 매칭 불가 - 균등 분배 사용")
+            return self._calculate_equal_timings(segments, num_pages, total_duration)
+
+        print(f"[{video_id}] 🔍 키워드 기반 페이지 매칭 시작")
+
+        # 디버그: 첫 3개 세그먼트 출력
+        print(f"[{video_id}] 📝 Whisper 세그먼트 샘플:")
+        for seg in segments[:5]:
+            print(f"[{video_id}]   [{seg['start']:.1f}s] {seg.get('text', '')[:80]}")
+
+        # 디버그: 각 페이지 키워드 출력
+        print(f"[{video_id}] 📄 페이지별 키워드:")
+        for i, pt in enumerate(page_texts[:3]):
+            kws = self._extract_keywords_from_page(pt)[:10]
+            print(f"[{video_id}]   페이지 {i+1}: {kws}")
+
+        # 각 페이지별 매칭 시간 찾기
+        page_start_times = [0.0]  # 첫 페이지는 항상 0초부터 시작
+        last_match_time = 0.0
+        min_page_duration = 3.0  # 최소 페이지 표시 시간 (초)
+
+        # 이미 사용된 키워드 추적 (같은 키워드로 여러 페이지가 매칭되는 것 방지)
+        used_keywords = set()
+
+        for page_idx in range(1, num_pages):
+            page_text = page_texts[page_idx]
+            keywords = self._extract_keywords_from_page(page_text)
+
+            if not keywords:
+                # 키워드 없으면 이전 페이지 이후 적절한 시간에 배치
+                page_start_times.append(None)  # 나중에 보간
+                continue
+
+            # 이미 사용된 키워드 제외
+            available_keywords = [kw for kw in keywords if kw not in used_keywords]
+
+            if not available_keywords:
+                # 모든 키워드가 이미 사용됨, 보간으로 처리
+                page_start_times.append(None)
+                continue
+
+            # 키워드들 중에서 트랜스크립트에서 발견되는 첫 번째 시간 찾기
+            best_match_time = None
+            matched_keyword = None
+
+            for keyword in available_keywords[:15]:  # 상위 15개 키워드만 검색
+                match_time = self._find_keyword_in_transcript(
+                    keyword, segments, search_start=last_match_time + min_page_duration
+                )
+                if match_time is not None:
+                    if best_match_time is None or match_time < best_match_time:
+                        best_match_time = match_time
+                        matched_keyword = keyword
+
+            if best_match_time is not None:
+                print(f"[{video_id}]   페이지 {page_idx + 1}: '{matched_keyword}' @ {best_match_time:.1f}초")
+                page_start_times.append(best_match_time)
+                last_match_time = best_match_time
+                # 매칭된 키워드를 사용됨으로 표시
+                used_keywords.add(matched_keyword)
+            else:
+                page_start_times.append(None)  # 매칭 실패, 나중에 보간
+
+        # 매칭되지 않은 페이지들 보간 처리
+        page_start_times = self._interpolate_missing_times(
+            page_start_times, total_duration, min_page_duration, video_id
+        )
+
+        # 타이밍 생성
+        timings = []
+        for i in range(num_pages):
+            start_time = page_start_times[i]
+            if i < num_pages - 1:
+                end_time = page_start_times[i + 1]
+            else:
+                end_time = total_duration
+
+            timings.append({
+                'start': start_time,
+                'duration': max(end_time - start_time, min_page_duration)
+            })
+
+        return timings
+
+    def _calculate_equal_timings(
+        self,
+        segments: List[Dict],
+        num_pages: int,
+        total_duration: float
+    ) -> List[Dict[str, float]]:
+        """세그먼트 균등 분배 방식 (폴백)"""
         segment_count = len(segments)
         segments_per_page = max(1, segment_count // num_pages)
 
@@ -603,7 +662,6 @@ class PDF2MP4Service:
             end_idx = min(start_idx + segments_per_page, segment_count)
 
             if i == num_pages - 1:
-                # 마지막 페이지는 남은 모든 세그먼트 포함
                 end_idx = segment_count
 
             if start_idx < segment_count:
@@ -611,7 +669,6 @@ class PDF2MP4Service:
                 if end_idx < segment_count:
                     end_time = segments[end_idx]['start']
                 else:
-                    # 마지막 페이지: 오디오 전체 길이까지 연장 (마진 추가)
                     end_time = total_duration
 
                 timings.append({
@@ -619,7 +676,6 @@ class PDF2MP4Service:
                     'duration': end_time - start_time
                 })
             else:
-                # 세그먼트가 부족한 경우
                 if timings:
                     last_end = timings[-1]['start'] + timings[-1]['duration']
                     remaining = total_duration - last_end
@@ -630,15 +686,56 @@ class PDF2MP4Service:
                         'duration': duration
                     })
 
-        # 마지막 페이지의 duration을 오디오 끝까지 연장 (잘림 방지)
-        if timings:
-            last_timing = timings[-1]
-            expected_end = last_timing['start'] + last_timing['duration']
-            if expected_end < total_duration:
-                # 마지막 페이지를 오디오 전체 길이까지 연장
-                timings[-1]['duration'] = total_duration - last_timing['start']
-
         return timings
+
+    def _interpolate_missing_times(
+        self,
+        page_start_times: List[Optional[float]],
+        total_duration: float,
+        min_duration: float,
+        video_id: str
+    ) -> List[float]:
+        """매칭되지 않은 페이지 시간을 보간"""
+        result = page_start_times.copy()
+        num_pages = len(result)
+
+        # None 값들을 선형 보간
+        i = 0
+        while i < num_pages:
+            if result[i] is None:
+                # None 시퀀스의 시작과 끝 찾기
+                start_idx = i
+                while i < num_pages and result[i] is None:
+                    i += 1
+                end_idx = i
+
+                # 보간을 위한 시작/끝 시간 결정
+                if start_idx == 0:
+                    prev_time = 0.0
+                else:
+                    prev_time = result[start_idx - 1]
+
+                if end_idx >= num_pages:
+                    next_time = total_duration
+                else:
+                    next_time = result[end_idx]
+
+                # 선형 보간
+                gap_count = end_idx - start_idx + 1
+                time_step = (next_time - prev_time) / gap_count
+
+                for j in range(start_idx, end_idx):
+                    result[j] = prev_time + time_step * (j - start_idx + 1)
+                    print(f"[{video_id}]   페이지 {j + 1}: (보간) @ {result[j]:.1f}초")
+            else:
+                i += 1
+
+        # 최소 간격 보장
+        for i in range(1, num_pages):
+            if result[i] < result[i-1] + min_duration:
+                result[i] = result[i-1] + min_duration
+
+        return result
 
     def get_video_list(self) -> List[Dict[str, Any]]:
         """생성된 영상 목록 조회"""
@@ -647,7 +744,6 @@ class PDF2MP4Service:
             for f in os.listdir(self.output_dir):
                 if f.endswith('.mp4'):
                     path = os.path.join(self.output_dir, f)
-                    # 파일명에서 ID 추출 (예: filename_abc12345.mp4)
                     parts = f.rsplit('_', 1)
                     video_id = parts[1].replace('.mp4', '') if len(parts) > 1 else f.replace('.mp4', '')
 
@@ -662,17 +758,14 @@ class PDF2MP4Service:
         return sorted(videos, key=lambda x: x['created_at'], reverse=True)
 
     def get_video_path(self, video_id: str) -> Optional[str]:
-        """영상 파일 경로 조회"""
         if not os.path.exists(self.output_dir):
             return None
-
         for f in os.listdir(self.output_dir):
             if video_id in f and f.endswith('.mp4'):
                 return os.path.join(self.output_dir, f)
         return None
 
     def get_video_info(self, video_id: str) -> Optional[Dict[str, Any]]:
-        """영상 정보 조회"""
         path = self.get_video_path(video_id)
         if path and os.path.exists(path):
             filename = os.path.basename(path)
@@ -686,7 +779,6 @@ class PDF2MP4Service:
         return None
 
     def delete_video(self, video_id: str) -> bool:
-        """영상 삭제"""
         path = self.get_video_path(video_id)
         if path and os.path.exists(path):
             os.remove(path)
@@ -694,9 +786,7 @@ class PDF2MP4Service:
         return False
 
     def get_transitions(self) -> List[str]:
-        """지원하는 전환 효과 목록"""
         return self.TRANSITIONS.copy()
 
     def is_smart_mode_available(self) -> bool:
-        """Smart 모드 사용 가능 여부"""
         return WHISPER_AVAILABLE
