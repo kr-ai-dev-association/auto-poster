@@ -657,6 +657,32 @@ async def get_conversion_progress(
         return JSONResponse(content={"status": "success", **progress})
     return JSONResponse(content={"status": "not_found", "message": "No progress found for this video_id"})
 
+@app.get("/api/genvideo/progress")
+async def get_all_conversion_progress(
+    user: models.User = Depends(get_current_user)
+):
+    """진행 중인 모든 변환의 진행률을 조회합니다."""
+    from services.pdf2mp4_service import PDF2MP4Service
+    all_progress = PDF2MP4Service._progress_store
+    if all_progress:
+        return JSONResponse(content={"status": "success", "conversions": list(all_progress.values())})
+    return JSONResponse(content={"status": "success", "conversions": []})
+
+@app.post("/api/genvideo/cancel/{video_id}")
+async def cancel_conversion(
+    video_id: str,
+    user: models.User = Depends(get_current_user)
+):
+    """진행 중인 변환을 취소합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    result = pdf2mp4.cancel_conversion(video_id)
+    return JSONResponse(content=result)
+
 @app.get("/api/genvideo/list")
 async def list_generated_videos(
     user: models.User = Depends(get_current_user)

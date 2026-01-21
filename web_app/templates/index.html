@@ -1237,7 +1237,15 @@
                                     <div class="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
                                         <div class="flex justify-between items-center mb-2">
                                             <span class="text-sm text-gray-300" x-text="genVideoProgress.message"></span>
-                                            <span class="text-sm text-purple-400 font-bold" x-text="genVideoProgress.progress + '%'"></span>
+                                            <div class="flex items-center gap-3">
+                                                <span class="text-sm text-purple-400 font-bold" x-text="genVideoProgress.progress + '%'"></span>
+                                                <button @click="cancelGenVideo()"
+                                                        class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                                        :disabled="genVideoCancelling">
+                                                    <span x-show="!genVideoCancelling">취소</span>
+                                                    <span x-show="genVideoCancelling">취소 중...</span>
+                                                </button>
+                                            </div>
                                         </div>
                                         <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
                                             <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500 ease-out"
@@ -1407,6 +1415,8 @@
                 genVideoResult: null,
                 genVideoProgress: null,
                 genVideoProgressInterval: null,
+                genVideoCancelling: false,
+                genVideoCurrentId: null,
                 generatedVideos: [],
                 smartModeAvailable: true,
                 categories: [], // 카테고리 목록
@@ -2327,6 +2337,8 @@
 
                     this.genVideoLoading = true;
                     this.genVideoResult = null;
+                    this.genVideoCancelling = false;
+                    this.genVideoCurrentId = null;
                     this.genVideoProgress = { progress: 0, message: '🚀 변환 준비 중...', eta: null };
 
                     // 예상 진행률 시뮬레이션 시작
@@ -2363,11 +2375,15 @@
 
                         const data = await response.json();
                         this.genVideoResult = data;
-                        this.genVideoProgress = { progress: 100, message: '✅ 변환 완료!', eta: 0 };
 
                         if (data.status === 'success') {
+                            this.genVideoProgress = { progress: 100, message: '✅ 변환 완료!', eta: 0 };
                             await this.refreshGenVideoList();
                             await this.refreshGenPdfList();
+                        } else if (data.status === 'cancelled') {
+                            this.genVideoProgress = { progress: 0, message: '❌ 변환이 취소되었습니다.', eta: 0 };
+                        } else {
+                            this.genVideoProgress = { progress: 0, message: '❌ 변환 실패', eta: 0 };
                         }
                     } catch (error) {
                         this.genVideoResult = {
@@ -2376,8 +2392,42 @@
                         };
                     } finally {
                         this.genVideoLoading = false;
+                        this.genVideoCancelling = false;
+                        this.genVideoCurrentId = null;
                         this.stopProgressSimulation();
                         setTimeout(() => { this.genVideoProgress = null; }, 2000);
+                    }
+                },
+
+                async cancelGenVideo() {
+                    if (this.genVideoCancelling) return;
+
+                    this.genVideoCancelling = true;
+                    this.genVideoProgress.message = '❌ 취소 요청 중...';
+
+                    try {
+                        const token = localStorage.getItem('access_token');
+
+                        // 진행 중인 모든 변환 조회
+                        const progressResponse = await fetch('/api/genvideo/progress', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const progressData = await progressResponse.json();
+
+                        if (progressData.status === 'success' && progressData.conversions.length > 0) {
+                            // 모든 진행 중인 변환 취소
+                            for (const conversion of progressData.conversions) {
+                                if (conversion.stage !== 'cancelled' && conversion.stage !== 'complete') {
+                                    await fetch(`/api/genvideo/cancel/${conversion.video_id}`, {
+                                        method: 'POST',
+                                        headers: { 'Authorization': `Bearer ${token}` }
+                                    });
+                                    console.log(`Cancelled conversion: ${conversion.video_id}`);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Cancel failed:', error);
                     }
                 },
 

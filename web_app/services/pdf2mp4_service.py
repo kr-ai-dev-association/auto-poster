@@ -64,6 +64,8 @@ class PDF2MP4Service:
     TRANSITIONS = ['fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down', 'zoom', 'none']
     AUDIO_FORMATS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg']
     _progress_store: Dict[str, Dict[str, Any]] = {}
+    _cancel_store: Dict[str, bool] = {}  # 취소 요청 저장소
+    _temp_dirs: Dict[str, str] = {}  # video_id -> temp_dir 매핑
 
     def __init__(self):
         self.output_dir = os.path.join(
@@ -106,6 +108,74 @@ class PDF2MP4Service:
     def clear_progress(cls, video_id: str):
         if video_id in cls._progress_store:
             del cls._progress_store[video_id]
+
+    @classmethod
+    def request_cancel(cls, video_id: str) -> bool:
+        """변환 취소 요청"""
+        if video_id in cls._progress_store:
+            cls._cancel_store[video_id] = True
+            return True
+        return False
+
+    @classmethod
+    def is_cancelled(cls, video_id: str) -> bool:
+        """취소 요청 여부 확인"""
+        return cls._cancel_store.get(video_id, False)
+
+    @classmethod
+    def clear_cancel(cls, video_id: str):
+        """취소 상태 정리"""
+        if video_id in cls._cancel_store:
+            del cls._cancel_store[video_id]
+
+    @classmethod
+    def register_temp_dir(cls, video_id: str, temp_dir: str):
+        """임시 디렉토리 등록"""
+        cls._temp_dirs[video_id] = temp_dir
+
+    @classmethod
+    def cleanup_temp_dir(cls, video_id: str):
+        """임시 디렉토리 정리"""
+        if video_id in cls._temp_dirs:
+            temp_dir = cls._temp_dirs[video_id]
+            if os.path.exists(temp_dir):
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                print(f"[{video_id}] 🗑️ 임시 디렉토리 삭제: {temp_dir}")
+            del cls._temp_dirs[video_id]
+
+    def cancel_conversion(self, video_id: str) -> Dict[str, Any]:
+        """변환 취소 및 정리"""
+        if not self.request_cancel(video_id):
+            return {'status': 'error', 'message': '진행 중인 변환을 찾을 수 없습니다.'}
+
+        # 임시 파일 정리
+        self.cleanup_temp_dir(video_id)
+
+        # 생성된 출력 파일 삭제
+        for f in os.listdir(self.output_dir):
+            if video_id in f:
+                file_path = os.path.join(self.output_dir, f)
+                try:
+                    os.remove(file_path)
+                    print(f"[{video_id}] 🗑️ 출력 파일 삭제: {f}")
+                except Exception as e:
+                    print(f"[{video_id}] ⚠️ 파일 삭제 실패: {f} - {e}")
+
+        # 생성된 PDF 파일 삭제
+        for f in os.listdir(self.pdf_dir):
+            if video_id in f:
+                file_path = os.path.join(self.pdf_dir, f)
+                try:
+                    os.remove(file_path)
+                    print(f"[{video_id}] 🗑️ PDF 파일 삭제: {f}")
+                except Exception as e:
+                    print(f"[{video_id}] ⚠️ PDF 삭제 실패: {f} - {e}")
+
+        # 진행 상태 업데이트
+        self.update_progress(video_id, 'cancelled', 0, '❌ 변환이 취소되었습니다.', None)
+
+        return {'status': 'success', 'message': '변환이 취소되었습니다.'}
 
     @property
     def whisper_model(self):
@@ -356,7 +426,8 @@ class PDF2MP4Service:
         fps: int,
         width: int,
         height: int,
-        video_id: str
+        video_id: str,
+        cancel_check: callable = None
     ) -> bool:
         """NVENC를 직접 사용하여 영상 인코딩"""
 
@@ -409,6 +480,17 @@ class PDF2MP4Service:
 
         try:
             for frame_idx in range(total_frames):
+                # 취소 확인 (100프레임마다)
+                if cancel_check and frame_idx % 100 == 0 and cancel_check():
+                    print(f"[{video_id}] ❌ 인코딩 취소됨")
+                    process.stdin.close()
+                    process.terminate()
+                    process.wait()
+                    # 출력 파일 삭제
+                    if os.path.exists(output_path):
+                        os.remove(output_path)
+                    return False
+
                 t = frame_idx / fps
 
                 # 현재 시간에 해당하는 이미지 찾기
@@ -469,14 +551,22 @@ class PDF2MP4Service:
         """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환"""
         video_id = str(uuid.uuid4())[:8]
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_{video_id}_')
+        self.register_temp_dir(video_id, temp_dir)
 
         try:
             print(f"[{video_id}] Starting Basic conversion for: {filename}")
+
+            # 취소 확인 헬퍼 함수
+            def check_cancelled():
+                if self.is_cancelled(video_id):
+                    raise Exception("CANCELLED")
 
             # 1. PDF를 이미지로 변환
             print(f"[{video_id}] Converting PDF to images (DPI: {dpi})...")
             images = convert_from_bytes(pdf_content, dpi=dpi)
             print(f"[{video_id}] Extracted {len(images)} pages")
+
+            check_cancelled()
 
             # 로고 이미지 로드
             logo_img = None
@@ -486,9 +576,14 @@ class PDF2MP4Service:
 
             # 2. 이미지 리사이즈 (로고 합성 포함)
             resized_images = []
-            for img in images:
+            for i, img in enumerate(images):
+                check_cancelled()
                 resized = self._resize_image(img, width, height, logo_img)
                 resized_images.append(resized)
+                self.update_progress(video_id, 'processing', int(10 + (i / len(images)) * 30),
+                                   f'📄 이미지 처리 중... ({i+1}/{len(images)})', None)
+
+            check_cancelled()
 
             # 3. 오디오 처리
             audio_path = None
@@ -526,6 +621,8 @@ class PDF2MP4Service:
                     extra = audio_duration - total_video_duration + 2.0  # 2초 마진
                     timings[-1]['duration'] += extra
 
+            check_cancelled()
+
             # 5. 영상 출력
             output_filename = f"{os.path.splitext(filename)[0]}_{video_id}.mp4"
             output_path = os.path.join(self.output_dir, output_filename)
@@ -535,8 +632,12 @@ class PDF2MP4Service:
             print(f"[{video_id}] 📊 영상 길이: {video_duration:.1f}초")
 
             success = self._encode_video_nvenc(
-                resized_images, timings, audio_path, output_path, fps, width, height, video_id
+                resized_images, timings, audio_path, output_path, fps, width, height, video_id,
+                cancel_check=lambda: self.is_cancelled(video_id)
             )
+
+            if self.is_cancelled(video_id):
+                raise Exception("CANCELLED")
 
             if not success:
                 raise Exception("NVENC encoding failed")
@@ -568,12 +669,18 @@ class PDF2MP4Service:
             return {'status': 'success', 'video': video_info}
 
         except Exception as e:
-            print(f"[{video_id}] Conversion failed: {str(e)}")
+            error_msg = str(e)
+            if error_msg == "CANCELLED":
+                print(f"[{video_id}] ❌ 변환 취소됨")
+                return {'status': 'cancelled', 'message': '변환이 취소되었습니다.', 'video_id': video_id}
+            print(f"[{video_id}] Conversion failed: {error_msg}")
             import traceback
             traceback.print_exc()
-            return {'status': 'error', 'message': str(e)}
+            return {'status': 'error', 'message': error_msg}
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+            self.cleanup_temp_dir(video_id)
+            self.clear_cancel(video_id)
 
     async def convert_smart(
         self,
@@ -604,10 +711,16 @@ class PDF2MP4Service:
 
         video_id = str(uuid.uuid4())[:8]
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_smart_{video_id}_')
+        self.register_temp_dir(video_id, temp_dir)
 
         try:
             print(f"[{video_id}] Starting Smart conversion for: {filename}")
             self.update_progress(video_id, 'init', 0, '변환 시작...', None)
+
+            # 취소 확인 헬퍼 함수
+            def check_cancelled():
+                if self.is_cancelled(video_id):
+                    raise Exception("CANCELLED")
 
             # 1. 오디오 파일 저장 및 전사
             audio_ext = os.path.splitext(audio_filename)[1].lower()
@@ -615,6 +728,7 @@ class PDF2MP4Service:
             with open(audio_path, 'wb') as f:
                 f.write(audio_content)
 
+            check_cancelled()
             self.update_progress(video_id, 'whisper', 10, '🎤 Whisper로 오디오 분석 중...', None)
             print(f"[{video_id}] Transcribing audio with Whisper...")
             result = self.whisper_model.transcribe(audio_path)
@@ -623,6 +737,7 @@ class PDF2MP4Service:
             print(f"[{video_id}] Transcription complete: {len(segments)} segments")
             self.update_progress(video_id, 'whisper_done', 30, f'✅ 오디오 분석 완료 ({len(segments)}개 세그먼트)', None)
 
+            check_cancelled()
             # 2. PDF를 이미지로 변환
             self.update_progress(video_id, 'pdf', 35, '📄 PDF를 이미지로 변환 중...', None)
             print(f"[{video_id}] Converting PDF to images...")
@@ -645,6 +760,8 @@ class PDF2MP4Service:
 
             print(f"[{video_id}] Extracted text from {len(page_texts)} pages (총 {sum(len(t) for t in page_texts)} 문자)")
 
+            check_cancelled()
+
             # 로고 이미지 로드
             logo_img = None
             if logo_path and os.path.exists(logo_path):
@@ -653,9 +770,12 @@ class PDF2MP4Service:
 
             # 4. 이미지 리사이즈 (로고 합성 포함)
             resized_images = []
-            for img in images:
+            for i, img in enumerate(images):
+                check_cancelled()
                 resized = self._resize_image(img, width, height, logo_img)
                 resized_images.append(resized)
+                self.update_progress(video_id, 'processing', int(45 + (i / len(images)) * 10),
+                                   f'📄 이미지 처리 중... ({i+1}/{len(images)})', None)
 
             # 5. 오디오 길이 확인
             result_probe = subprocess.run(
@@ -689,12 +809,18 @@ class PDF2MP4Service:
             eta_seconds = int(video_duration * 0.05)  # NVENC는 빠름
             self.update_progress(video_id, 'encoding', 55, f'🎬 NVENC 인코딩 중... (예상 {eta_seconds}초)', eta_seconds)
 
+            check_cancelled()
+
             print(f"[{video_id}] 🎬 NVENC GPU 가속 인코딩 시작")
             print(f"[{video_id}] 📊 영상 길이: {video_duration:.1f}초")
 
             success = self._encode_video_nvenc(
-                resized_images, page_timings, audio_path, output_path, fps, width, height, video_id
+                resized_images, page_timings, audio_path, output_path, fps, width, height, video_id,
+                cancel_check=lambda: self.is_cancelled(video_id)
             )
+
+            if self.is_cancelled(video_id):
+                raise Exception("CANCELLED")
 
             if not success:
                 raise Exception("NVENC encoding failed")
@@ -729,12 +855,18 @@ class PDF2MP4Service:
             return {'status': 'success', 'video': video_info}
 
         except Exception as e:
-            print(f"[{video_id}] Smart conversion failed: {str(e)}")
+            error_msg = str(e)
+            if error_msg == "CANCELLED":
+                print(f"[{video_id}] ❌ Smart 변환 취소됨")
+                return {'status': 'cancelled', 'message': '변환이 취소되었습니다.', 'video_id': video_id}
+            print(f"[{video_id}] Smart conversion failed: {error_msg}")
             import traceback
             traceback.print_exc()
-            return {'status': 'error', 'message': str(e)}
+            return {'status': 'error', 'message': error_msg}
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
+            self.cleanup_temp_dir(video_id)
+            self.clear_cancel(video_id)
 
     def _calculate_smart_timings(
         self,
