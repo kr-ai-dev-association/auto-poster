@@ -359,42 +359,6 @@ async def share_linkedin(
 
 # --- Youtube Poster Endpoints ---
 
-@app.get("/api/youtube/logo/{category}")
-async def get_youtube_logo(category: str, token: str = None, db: Session = Depends(database.get_db)):
-    """카테고리별 현재 로고 이미지를 반환합니다. (이미지 태그용 토큰 지원)"""
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-    
-    try:
-        user = get_current_user(token, db)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    if not youtube:
-        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
-    
-    logo_path = youtube.get_logo_path(category)
-    if logo_path and os.path.exists(logo_path):
-        return FileResponse(logo_path)
-    return JSONResponse(status_code=404, content={"message": "Logo not found"})
-
-@app.post("/api/youtube/logo/upload")
-async def upload_youtube_logo(
-    logo: UploadFile = File(...),
-    category: str = Form(...),
-    user: models.User = Depends(get_current_user)
-):
-    """새로운 로고 이미지를 업로드하고 교체합니다."""
-    if not youtube:
-        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
-    
-    try:
-        content = await logo.read()
-        youtube.save_logo(category, content, logo.filename)
-        return JSONResponse(content={"status": "success", "message": "Logo uploaded successfully"})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
 @app.post("/api/youtube/metadata")
 async def generate_youtube_metadata(
     pdf: UploadFile = File(None),
@@ -545,6 +509,66 @@ async def get_me(user: models.User = Depends(get_current_user)):
 
 # --- Gen Video (PDF to MP4) Endpoints ---
 
+@app.get("/api/genvideo/logo/{category}")
+async def get_genvideo_logo(category: str, token: str = None, db: Session = Depends(database.get_db)):
+    """카테고리별 현재 로고 이미지를 반환합니다."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        user = get_current_user(token, db)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized"})
+
+    logo_path = youtube.get_logo_path(category)
+    if logo_path and os.path.exists(logo_path):
+        return FileResponse(logo_path)
+    return JSONResponse(status_code=404, content={"message": "Logo not found"})
+
+@app.post("/api/genvideo/logo/upload")
+async def upload_genvideo_logo(
+    logo: UploadFile = File(...),
+    category: str = Form(...),
+    user: models.User = Depends(get_current_user)
+):
+    """새로운 로고 이미지를 업로드합니다."""
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized"})
+
+    try:
+        content = await logo.read()
+
+        # 로고 저장 경로
+        v_dir = os.path.join(youtube.base_v_dir, category)
+        if not os.path.exists(v_dir):
+            os.makedirs(v_dir, exist_ok=True)
+
+        # 기존 로고 삭제
+        existing_logos = [f for f in os.listdir(v_dir) if f.lower().endswith('.png') and 'logo' in f.lower()]
+        for f in existing_logos:
+            os.remove(os.path.join(v_dir, f))
+
+        # 새 로고 저장
+        save_path = os.path.join(v_dir, f"logo_{logo.filename}")
+        with open(save_path, "wb") as f:
+            f.write(content)
+
+        return JSONResponse(content={"status": "success", "message": "Logo uploaded successfully"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+@app.get("/api/genvideo/categories")
+async def get_genvideo_categories(user: models.User = Depends(get_current_user)):
+    """사용 가능한 카테고리 목록을 반환합니다."""
+    if not youtube:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized"})
+
+    categories = youtube.get_categories()
+    return JSONResponse(content={"status": "success", "categories": categories})
+
 @app.post("/api/genvideo/convert")
 async def convert_pdf_to_video(
     pdf: UploadFile = File(...),
@@ -556,6 +580,7 @@ async def convert_pdf_to_video(
     resolution: str = Form("1920x1080"),
     fps: int = Form(30),
     auto_duration: bool = Form(False),
+    category: str = Form(None),
     user: models.User = Depends(get_current_user)
 ):
     """PDF를 MP4 영상으로 변환합니다."""
@@ -573,6 +598,16 @@ async def convert_pdf_to_video(
         # 해상도 파싱
         width, height = map(int, resolution.split('x'))
 
+        # 로고 경로 가져오기
+        logo_path = None
+        if category:
+            logo_path = youtube.get_logo_path(category)
+        else:
+            # 카테고리가 지정되지 않으면 첫 번째 카테고리의 로고 사용
+            categories = youtube.get_categories()
+            if categories:
+                logo_path = youtube.get_logo_path(categories[0])
+
         if mode == "smart":
             result = await pdf2mp4.convert_smart(
                 pdf_content=pdf_content,
@@ -583,7 +618,8 @@ async def convert_pdf_to_video(
                 transition_duration=transition_duration,
                 width=width,
                 height=height,
-                fps=fps
+                fps=fps,
+                logo_path=logo_path
             )
         else:
             result = await pdf2mp4.convert_basic(
@@ -597,7 +633,8 @@ async def convert_pdf_to_video(
                 width=width,
                 height=height,
                 fps=fps,
-                auto_duration=auto_duration
+                auto_duration=auto_duration,
+                logo_path=logo_path
             )
 
         return JSONResponse(content=result)
@@ -770,17 +807,14 @@ async def delete_generated_pdf(pdf_id: str, user: models.User = Depends(get_curr
     if pdf_path and os.path.exists(pdf_path):
         try:
             os.remove(pdf_path)
-            return JSONResponse(content={"status": "success", "message": "PDF deleted"})
         except Exception as e:
             return JSONResponse(
                 status_code=500,
                 content={"status": "error", "message": str(e)}
             )
 
-    return JSONResponse(
-        status_code=404,
-        content={"status": "error", "message": "PDF not found"}
-    )
+    # 파일이 없어도 성공으로 처리 (이미 삭제된 것으로 간주)
+    return JSONResponse(content={"status": "success", "message": "PDF deleted"})
 
 @app.post("/api/youtube/upload-from-genvideo")
 async def youtube_upload_from_genvideo(
@@ -836,7 +870,8 @@ async def youtube_upload_from_genvideo(
             category,
             lang,
             gen_sub,
-            use_thumbnail
+            use_thumbnail,
+            skip_logo=True  # Gen Video에서 이미 로고가 합성됨
         )
 
         return JSONResponse(content=result)

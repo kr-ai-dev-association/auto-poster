@@ -116,8 +116,8 @@ class PDF2MP4Service:
             self._whisper_model = whisper.load_model("base", device=device)
         return self._whisper_model
 
-    def _resize_image(self, img: Image.Image, width: int, height: int) -> np.ndarray:
-        """이미지를 지정된 크기로 리사이즈 (종횡비 유지, 검은 배경)"""
+    def _resize_image(self, img: Image.Image, width: int, height: int, logo_img: Image.Image = None) -> np.ndarray:
+        """이미지를 지정된 크기로 리사이즈 (종횡비 유지, 검은 배경, 로고 합성)"""
         orig_width, orig_height = img.size
         ratio = min(width / orig_width, height / orig_height)
         new_width = int(orig_width * ratio)
@@ -125,8 +125,27 @@ class PDF2MP4Service:
 
         img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         background = Image.new('RGB', (width, height), (0, 0, 0))
-        offset = ((width - new_width) // 2, (height - new_height) // 2)
-        background.paste(img_resized, offset)
+        offset_x = (width - new_width) // 2
+        offset_y = (height - new_height) // 2
+        background.paste(img_resized, (offset_x, offset_y))
+
+        # 로고 합성 (영상 프레임 우측 하단 끝에 맞춤)
+        if logo_img is not None:
+            # 로고 크기 조정 (문서 너비의 약 15%)
+            logo_target_width = int(new_width * 0.15)
+            logo_ratio = logo_target_width / logo_img.width
+            logo_new_height = int(logo_img.height * logo_ratio)
+            logo_resized = logo_img.resize((logo_target_width, logo_new_height), Image.Resampling.LANCZOS)
+
+            # 영상 프레임 우측 하단 끝에 로고 배치
+            logo_x = width - logo_target_width
+            logo_y = height - logo_new_height
+
+            # 알파 채널이 있으면 투명도 적용하여 합성
+            if logo_resized.mode == 'RGBA':
+                background.paste(logo_resized, (logo_x, logo_y), logo_resized)
+            else:
+                background.paste(logo_resized, (logo_x, logo_y))
 
         return np.array(background)
 
@@ -444,7 +463,8 @@ class PDF2MP4Service:
         height: int = 1080,
         fps: int = 30,
         dpi: int = 200,
-        auto_duration: bool = False
+        auto_duration: bool = False,
+        logo_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환"""
         video_id = str(uuid.uuid4())[:8]
@@ -458,10 +478,16 @@ class PDF2MP4Service:
             images = convert_from_bytes(pdf_content, dpi=dpi)
             print(f"[{video_id}] Extracted {len(images)} pages")
 
-            # 2. 이미지 리사이즈
+            # 로고 이미지 로드
+            logo_img = None
+            if logo_path and os.path.exists(logo_path):
+                logo_img = Image.open(logo_path).convert('RGBA')
+                print(f"[{video_id}] Logo loaded: {logo_path}")
+
+            # 2. 이미지 리사이즈 (로고 합성 포함)
             resized_images = []
             for img in images:
-                resized = self._resize_image(img, width, height)
+                resized = self._resize_image(img, width, height, logo_img)
                 resized_images.append(resized)
 
             # 3. 오디오 처리
@@ -560,7 +586,8 @@ class PDF2MP4Service:
         width: int = 1920,
         height: int = 1080,
         fps: int = 30,
-        dpi: int = 200
+        dpi: int = 200,
+        logo_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정"""
         if not WHISPER_AVAILABLE:
@@ -618,10 +645,16 @@ class PDF2MP4Service:
 
             print(f"[{video_id}] Extracted text from {len(page_texts)} pages (총 {sum(len(t) for t in page_texts)} 문자)")
 
-            # 4. 이미지 리사이즈
+            # 로고 이미지 로드
+            logo_img = None
+            if logo_path and os.path.exists(logo_path):
+                logo_img = Image.open(logo_path).convert('RGBA')
+                print(f"[{video_id}] Logo loaded: {logo_path}")
+
+            # 4. 이미지 리사이즈 (로고 합성 포함)
             resized_images = []
             for img in images:
-                resized = self._resize_image(img, width, height)
+                resized = self._resize_image(img, width, height, logo_img)
                 resized_images.append(resized)
 
             # 5. 오디오 길이 확인
