@@ -45,6 +45,14 @@ except ImportError:
     WHISPER_AVAILABLE = False
     print("Warning: openai-whisper not installed. Smart mode will not be available.")
 
+# Sentence Transformers for semantic similarity (optional)
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    print("Warning: sentence-transformers not installed. Semantic similarity will not be available.")
+
 
 @dataclass
 class ConversionConfig:
@@ -80,6 +88,7 @@ class PDF2MP4Service:
         os.makedirs(self.pdf_dir, exist_ok=True)
         self._whisper_model = None
         self._paddleocr = None
+        self._sentence_model = None
 
     @property
     def paddleocr(self):
@@ -185,6 +194,16 @@ class PDF2MP4Service:
             print(f"Loading Whisper model (base) on {device}...")
             self._whisper_model = whisper.load_model("base", device=device)
         return self._whisper_model
+
+    @property
+    def sentence_model(self):
+        """Sentence Transformer 모델 (지연 로딩)"""
+        if self._sentence_model is None and SENTENCE_TRANSFORMERS_AVAILABLE:
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(f"Loading Sentence Transformer model on {device}...")
+            self._sentence_model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
+        return self._sentence_model
 
     def _resize_image(self, img: Image.Image, width: int, height: int, logo_img: Image.Image = None) -> np.ndarray:
         """이미지를 지정된 크기로 리사이즈 (종횡비 유지, 검은 배경, 로고 합성)"""
@@ -416,6 +435,114 @@ class PDF2MP4Service:
                 best_time = segments[i]['start']
 
         return best_time, best_matched_keywords, best_match_count
+
+    def _compute_semantic_similarity(
+        self,
+        page_text: str,
+        segment_text: str
+    ) -> float:
+        """두 텍스트 간의 의미적 유사도 계산 (0~1)"""
+        if not SENTENCE_TRANSFORMERS_AVAILABLE or self.sentence_model is None:
+            return 0.0
+
+        if not page_text.strip() or not segment_text.strip():
+            return 0.0
+
+        try:
+            embeddings = self.sentence_model.encode([page_text, segment_text])
+            # 코사인 유사도 계산
+            similarity = np.dot(embeddings[0], embeddings[1]) / (
+                np.linalg.norm(embeddings[0]) * np.linalg.norm(embeddings[1])
+            )
+            return float(max(0, similarity))  # 음수 방지
+        except Exception as e:
+            print(f"Semantic similarity error: {e}")
+            return 0.0
+
+    def _find_best_segment_with_semantic(
+        self,
+        page_text: str,
+        keywords: List[str],
+        segments: List[Dict],
+        search_start: float,
+        search_end: float,
+        window_seconds: float = 30.0,
+        video_id: str = ""
+    ) -> tuple[Optional[float], float, int]:
+        """
+        키워드 매칭과 의미적 유사도를 결합하여 최적의 세그먼트 찾기
+
+        Args:
+            page_text: 페이지 전체 텍스트
+            keywords: 페이지에서 추출한 키워드 목록
+            segments: Whisper 세그먼트 목록
+            search_start: 검색 시작 시간
+            search_end: 검색 종료 시간
+            window_seconds: 윈도우 크기 (초)
+            video_id: 로깅용 비디오 ID
+
+        Returns:
+            (매칭 시간, 결합 점수, 키워드 매칭 수)
+        """
+        if not segments:
+            return None, 0.0, 0
+
+        best_time = None
+        best_score = 0.0
+        best_keyword_count = 0
+
+        # 검색 범위 내 세그먼트들을 윈도우로 그룹화
+        current_window_start = search_start
+        while current_window_start < search_end:
+            window_end_time = min(current_window_start + window_seconds, search_end)
+
+            # 윈도우 내 세그먼트 텍스트 수집
+            window_segments = []
+            window_text_parts = []
+            for seg in segments:
+                seg_start = seg['start']
+                if seg_start >= current_window_start and seg_start < window_end_time:
+                    window_segments.append(seg)
+                    window_text_parts.append(seg.get('text', ''))
+
+            if not window_segments:
+                current_window_start += window_seconds / 2  # 50% 오버랩
+                continue
+
+            window_text = ' '.join(window_text_parts).lower()
+            window_text_normalized = re.sub(r'[^\w\s]', ' ', window_text)
+
+            # 1. 키워드 매칭 점수 (0~1)
+            keyword_matches = 0
+            for kw in keywords:
+                kw_lower = kw.lower()
+                if kw_lower in window_text_normalized:
+                    keyword_matches += 1
+                else:
+                    # Fuzzy 매칭
+                    for word in window_text_normalized.split():
+                        if len(word) >= 4:
+                            ratio = SequenceMatcher(None, kw_lower, word).ratio()
+                            if ratio > 0.8:
+                                keyword_matches += 1
+                                break
+
+            keyword_score = min(keyword_matches / max(len(keywords), 1), 1.0)
+
+            # 2. 의미적 유사도 점수 (0~1)
+            semantic_score = self._compute_semantic_similarity(page_text, window_text)
+
+            # 3. 결합 점수 계산 (키워드 50%, 의미적 유사도 50%)
+            combined_score = (keyword_score * 0.5) + (semantic_score * 0.5)
+
+            if combined_score > best_score:
+                best_score = combined_score
+                best_time = window_segments[0]['start']
+                best_keyword_count = keyword_matches
+
+            current_window_start += window_seconds / 2  # 50% 오버랩으로 다음 윈도우
+
+        return best_time, best_score, best_keyword_count
 
     def _encode_video_nvenc(
         self,
@@ -876,7 +1003,13 @@ class PDF2MP4Service:
         page_texts: Optional[List[str]] = None,
         video_id: str = ""
     ) -> List[Dict[str, float]]:
-        """PDF 페이지 키워드와 Whisper 트랜스크립트를 매칭하여 페이지 타이밍 계산"""
+        """PDF 페이지 키워드와 Whisper 트랜스크립트를 매칭하여 페이지 타이밍 계산
+
+        개선된 알고리즘:
+        1. 각 페이지에 예상 시간 범위를 할당 (균등 분배 기반)
+        2. 해당 범위 내에서 키워드 + 의미적 유사도를 결합하여 최적의 전환 시점 찾기
+        3. 순차적 제약 조건 유지 (페이지 순서 보장)
+        """
 
         # 기본 폴백: 균등 분배
         if not segments or num_pages <= 0:
@@ -886,86 +1019,112 @@ class PDF2MP4Service:
                 for i in range(num_pages)
             ]
 
-        # 키워드 기반 매칭이 불가능한 경우 균등 분배
+        # 텍스트가 없으면 균등 분배
         if not page_texts or len(page_texts) != num_pages:
-            print(f"[{video_id}] 키워드 매칭 불가 - 균등 분배 사용")
+            print(f"[{video_id}] 텍스트 없음 - 균등 분배 사용")
             return self._calculate_equal_timings(segments, num_pages, total_duration)
 
-        print(f"[{video_id}] 🔍 키워드 기반 페이지 매칭 시작")
+        print(f"[{video_id}] 🔍 키워드 + 의미적 유사도 기반 페이지 매칭 시작")
 
-        # 디버그: 첫 3개 세그먼트 출력
+        # 디버그: Whisper 세그먼트 샘플
         print(f"[{video_id}] 📝 Whisper 세그먼트 샘플:")
         for seg in segments[:5]:
             print(f"[{video_id}]   [{seg['start']:.1f}s] {seg.get('text', '')[:80]}")
 
-        # 디버그: 각 페이지 키워드 출력
+        # 각 페이지별 키워드 추출
+        page_keywords = []
         print(f"[{video_id}] 📄 페이지별 키워드:")
-        for i, pt in enumerate(page_texts[:3]):
-            kws = self._extract_keywords_from_page(pt)[:10]
-            print(f"[{video_id}]   페이지 {i+1}: {kws}")
+        for i, pt in enumerate(page_texts):
+            kws = self._extract_keywords_from_page(pt)
+            page_keywords.append(kws)
+            if i < 3:
+                print(f"[{video_id}]   페이지 {i+1}: {kws[:10]}")
 
-        # 각 페이지별 매칭 시간 찾기
-        page_start_times = [0.0]  # 첫 페이지는 항상 0초부터 시작
-        last_match_time = 0.0
-        min_page_duration = 3.0  # 최소 페이지 표시 시간 (초)
+        # 기본 예상 시간 범위 계산 (균등 분배 기반, 탐색 범위용)
+        base_page_duration = total_duration / num_pages
+        min_page_duration = 5.0  # 최소 페이지 표시 시간
+        search_margin = base_page_duration * 1.0  # 탐색 여유 범위 (앞뒤 100% - 완화됨)
 
-        # 이미 사용된 키워드 추적 (같은 키워드로 여러 페이지가 매칭되는 것 방지)
-        used_keywords = set()
+        # 첫 페이지는 항상 0초
+        page_start_times = [0.0]
+
+        # Semantic similarity 사용 가능 여부 확인
+        use_semantic = SENTENCE_TRANSFORMERS_AVAILABLE and self.sentence_model is not None
+        if use_semantic:
+            print(f"[{video_id}] ✅ Semantic similarity 활성화")
+        else:
+            print(f"[{video_id}] ⚠️ Semantic similarity 비활성화 (키워드만 사용)")
 
         for page_idx in range(1, num_pages):
             page_text = page_texts[page_idx]
-            keywords = self._extract_keywords_from_page(page_text)
+            keywords = page_keywords[page_idx]
 
-            if not keywords:
-                # 키워드 없으면 이전 페이지 이후 적절한 시간에 배치
-                page_start_times.append(None)  # 나중에 보간
-                continue
+            # 예상 시작 시간 (균등 분배 기준)
+            expected_start = page_idx * base_page_duration
 
-            # 이미 사용된 키워드 제외
-            available_keywords = [kw for kw in keywords if kw not in used_keywords]
+            # 이전 페이지의 실제 시작 시간 (None이면 예상값 사용)
+            last_valid_time = page_start_times[-1]
+            if last_valid_time is None:
+                # None인 경우 이전 페이지들 중 마지막 유효한 값 찾기
+                for t in reversed(page_start_times):
+                    if t is not None:
+                        last_valid_time = t
+                        break
+                if last_valid_time is None:
+                    last_valid_time = (page_idx - 1) * base_page_duration
 
-            if not available_keywords:
-                # 모든 키워드가 이미 사용됨, 보간으로 처리
+            # 검색 범위: 이전 페이지 시작 + 최소 간격 ~ 예상 시작 + 마진
+            search_start = max(last_valid_time + min_page_duration, expected_start - search_margin)
+            search_end = min(expected_start + search_margin, total_duration - (num_pages - page_idx - 1) * min_page_duration)
+
+            # 검색 범위가 유효하지 않으면 보간으로 처리
+            if search_start >= search_end:
                 page_start_times.append(None)
+                print(f"[{video_id}]   페이지 {page_idx + 1}: (검색 범위 없음, 보간 예정)")
                 continue
 
-            # 1차 시도: 다중 키워드 매칭 (더 정확한 방법)
-            multi_match_time, matched_kws, match_count = self._find_best_segment_for_keywords(
-                available_keywords[:20],  # 상위 20개 키워드 사용
-                segments,
-                search_start=last_match_time + min_page_duration,
-                window_size=5  # 5개 연속 세그먼트 윈도우
-            )
+            best_time = None
+            best_score = 0.0
+            match_info = ""
 
-            if multi_match_time is not None and match_count >= 2:
-                # 다중 키워드 매칭 성공
-                print(f"[{video_id}]   페이지 {page_idx + 1}: {matched_kws[:3]} ({match_count}개 매칭) @ {multi_match_time:.1f}초")
-                page_start_times.append(multi_match_time)
-                last_match_time = multi_match_time
-                # 매칭된 키워드들을 사용됨으로 표시
-                for kw in matched_kws:
-                    used_keywords.add(kw)
+            if use_semantic and page_text.strip():
+                # 의미적 유사도 + 키워드 결합 방식
+                match_time, score, kw_count = self._find_best_segment_with_semantic(
+                    page_text,
+                    keywords[:20],
+                    segments,
+                    search_start,
+                    search_end,
+                    window_seconds=20.0,
+                    video_id=video_id
+                )
+
+                if match_time is not None and score > 0.15:  # 최소 점수 임계값
+                    best_time = match_time
+                    best_score = score
+                    match_info = f"semantic+kw (score={score:.2f}, kw={kw_count})"
+
+            # Semantic 매칭 실패 시 키워드만 사용
+            if best_time is None and keywords:
+                multi_match_time, matched_kws, match_count = self._find_best_segment_for_keywords(
+                    keywords[:20],
+                    segments,
+                    search_start=search_start,
+                    window_size=5
+                )
+
+                # 매칭 시간이 검색 범위 내에 있는지 확인
+                if multi_match_time is not None and search_start <= multi_match_time <= search_end:
+                    if match_count >= 2:
+                        best_time = multi_match_time
+                        match_info = f"keyword ({match_count}개: {matched_kws[:3]})"
+
+            if best_time is not None:
+                page_start_times.append(best_time)
+                print(f"[{video_id}]   페이지 {page_idx + 1}: {match_info} @ {best_time:.1f}초 (범위: {search_start:.1f}~{search_end:.1f}초)")
             else:
-                # 2차 시도: 단일 키워드 매칭 (폴백)
-                best_match_time = None
-                matched_keyword = None
-
-                for keyword in available_keywords[:15]:
-                    match_time = self._find_keyword_in_transcript(
-                        keyword, segments, search_start=last_match_time + min_page_duration
-                    )
-                    if match_time is not None:
-                        if best_match_time is None or match_time < best_match_time:
-                            best_match_time = match_time
-                            matched_keyword = keyword
-
-                if best_match_time is not None:
-                    print(f"[{video_id}]   페이지 {page_idx + 1}: '{matched_keyword}' (단일) @ {best_match_time:.1f}초")
-                    page_start_times.append(best_match_time)
-                    last_match_time = best_match_time
-                    used_keywords.add(matched_keyword)
-                else:
-                    page_start_times.append(None)  # 매칭 실패, 나중에 보간
+                page_start_times.append(None)
+                print(f"[{video_id}]   페이지 {page_idx + 1}: (매칭 실패, 보간 예정) (범위: {search_start:.1f}~{search_end:.1f}초)")
 
         # 매칭되지 않은 페이지들 보간 처리
         page_start_times = self._interpolate_missing_times(
