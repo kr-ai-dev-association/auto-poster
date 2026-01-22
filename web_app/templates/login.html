@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,12 +8,15 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body class="bg-gray-900 min-h-screen flex items-center justify-center">
-    <div x-data="loginForm()" class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-700">
+
+<body class="min-h-screen flex items-center justify-center">
+    <div x-data="loginForm()" class="glass-panel p-8 rounded-xl shadow-lg w-full max-w-md">
         <div class="text-center mb-8">
             <div class="flex justify-center items-center mb-4">
-                <img src="/static/imgs/ai_profile.jpeg" alt="Logo" class="w-16 h-16 rounded-full object-cover mr-3 border-2 border-indigo-600 shadow-lg">
+                <img src="/static/imgs/ai_profile.jpeg" alt="Logo"
+                    class="w-16 h-16 rounded-full object-cover mr-3 border-2 border-indigo-600 shadow-lg">
                 <h1 class="text-3xl font-bold text-white">Auto Poster</h1>
             </div>
             <p class="text-gray-400 mt-2">서비스 이용을 위해 로그인해주세요</p>
@@ -21,28 +25,42 @@
         <form @submit.prevent="submitLogin" class="space-y-6">
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">이메일 주소</label>
-                <input type="email" x-model="email" required class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-500" placeholder="example@email.com">
+                <input type="email" x-model="email" required
+                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-500"
+                    placeholder="example@email.com">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">비밀번호</label>
-                <input type="password" x-model="password" required class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-500" placeholder="••••••••">
+                <input type="password" x-model="password" required
+                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-500"
+                    placeholder="••••••••">
             </div>
 
             <div class="flex items-center">
-                <input type="checkbox" x-model="saveEmail" id="saveEmail" class="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500">
+                <input type="checkbox" x-model="saveEmail" id="saveEmail"
+                    class="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500">
                 <label for="saveEmail" class="ml-2 text-sm text-gray-300 cursor-pointer">ID 저장</label>
             </div>
 
-            <div x-show="errorMessage" x-text="errorMessage" class="text-red-400 text-sm font-medium text-center" x-cloak></div>
+            <div x-show="errorMessage" x-text="errorMessage" class="text-red-400 text-sm font-medium text-center"
+                x-cloak></div>
 
-            <button type="submit" :disabled="loading" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-lg flex justify-center items-center">
+            <button type="submit" :disabled="loading"
+                class="w-full py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-lg flex justify-center items-center">
                 <span x-show="!loading">로그인</span>
-                <svg x-show="loading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <svg x-show="loading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
             </button>
         </form>
 
         <div class="mt-6 text-center text-sm text-gray-400">
-            계정이 없으신가요? <a href="/signup" class="text-indigo-400 font-bold hover:text-indigo-300 hover:underline">회원가입</a>
+            계정이 없으신가요? <a href="/signup"
+                class="text-indigo-400 font-bold hover:text-indigo-300 hover:underline">회원가입</a>
         </div>
     </div>
 
@@ -65,7 +83,7 @@
                 async submitLogin() {
                     this.loading = true;
                     this.errorMessage = '';
-                    
+
                     const formData = new URLSearchParams();
                     formData.append('username', this.email); // OAuth2 password flow uses 'username'
                     formData.append('password', this.password);
@@ -76,7 +94,7 @@
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                             body: formData
                         });
-                        
+
                         const data = await response.json();
                         if (response.ok) {
                             // ID 저장 옵션 처리
@@ -85,7 +103,7 @@
                             } else {
                                 localStorage.removeItem('saved_email');
                             }
-                            
+
                             localStorage.setItem('access_token', data.access_token);
                             window.location.href = '/';
                         } else {
@@ -101,4 +119,5 @@
         }
     </script>
 </body>
+
 </html>
