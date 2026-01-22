@@ -19,8 +19,9 @@
 
     <div x-data="app()" class="min-h-screen flex bg-gray-900">
 
-        <!-- Left Sidebar -->
-        <div class="w-72 glass-sidebar text-white flex flex-col shadow-xl">
+        <!-- Left Sidebar (Resizable) -->
+        <div class="glass-sidebar text-white flex flex-col shadow-xl flex-shrink-0"
+            :style="'width: ' + sidebarWidth + 'px'">
             <div class="p-6">
                 <div class="flex items-center mb-3">
                     <img src="/static/imgs/ai_profile.jpeg" alt="Logo"
@@ -88,6 +89,10 @@
                 &copy; 2026 Banya AI
             </div>
         </div>
+
+        <!-- Sidebar Resize Handle -->
+        <div class="w-1 bg-gray-700 hover:bg-indigo-500 cursor-col-resize flex-shrink-0 transition-colors"
+            @mousedown="startSidebarResize($event)"></div>
 
         <!-- Main Content Area -->
         <div class="flex-grow flex flex-col min-h-0 overflow-hidden relative">
@@ -586,8 +591,19 @@
             <!-- Youtube Poster Section (Placeholder) -->
             <div x-show="mainTab === 'youtube'" class="flex flex-col h-full animate-fade-in">
 
+                <!-- Reset Button (Top Right) -->
+                <div class="w-full px-6 pt-4 pb-4 flex justify-end">
+                    <button @click="resetYoutube()"
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        초기화
+                    </button>
+                </div>
 
-                <div class="w-full px-6 py-10 flex-grow overflow-y-auto">
+                <div class="w-full px-6 pb-10 flex-grow overflow-y-auto">
                     <div class="glass-panel rounded-xl p-8 shadow-sm">
                         <h3 class="text-xl font-bold text-white mb-6">📹 새로운 영상 업로드</h3>
 
@@ -1297,7 +1313,6 @@
                                     <label class="block text-xs font-medium text-gray-400 mb-1">로고 선택</label>
                                     <select x-model="genVideoCategory" @change="genVideoLogoTimestamp = Date.now()"
                                         class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                        <option value="">로고 없음</option>
                                         <template x-for="cat in categories" :key="cat">
                                             <option :value="cat" x-text="cat"></option>
                                         </template>
@@ -1528,6 +1543,36 @@
     <script>
         function app() {
             return {
+                // Sidebar Resize
+                sidebarWidth: 346, // 80% of 432px
+                isResizing: false,
+
+                startSidebarResize(e) {
+                    this.isResizing = true;
+                    const startX = e.clientX;
+                    const startWidth = this.sidebarWidth;
+
+                    const onMouseMove = (e) => {
+                        if (!this.isResizing) return;
+                        const delta = e.clientX - startX;
+                        const newWidth = Math.max(200, Math.min(600, startWidth + delta));
+                        this.sidebarWidth = newWidth;
+                    };
+
+                    const onMouseUp = () => {
+                        this.isResizing = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                    };
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    document.body.style.cursor = 'col-resize';
+                    document.body.style.userSelect = 'none';
+                },
+
                 // Multilingual Support
                 currentLang: localStorage.getItem('app_lang') || 'ko',
 
@@ -1570,8 +1615,8 @@
                 ytDragOver: false,
                 pdfFile: null,
                 pdfDragOver: false,
-                ytCategory: '',
-                ytLang: 'ko',
+                ytCategory: 'tech',
+                ytLang: 'en',
                 genSubtitles: false,
                 useThumbnail: true,
                 ytLoading: false,
@@ -2009,6 +2054,42 @@
                     const files = e.target.files;
                     if (files.length > 0) {
                         this.file = files[0];
+                    }
+                },
+
+                resetYoutube() {
+                    // 영상 관련 초기화
+                    this.ytFile = null;
+                    this.ytDragOver = false;
+                    this.ytVideoSource = 'upload';
+                    this.selectedGenVideo = '';
+
+                    // PDF 관련 초기화
+                    this.pdfFile = null;
+                    this.pdfDragOver = false;
+                    this.ytPdfSource = 'upload';
+                    this.selectedGenPdf = '';
+
+                    // 설정 초기화
+                    this.ytCategory = 'tech';
+                    this.ytLang = 'en';
+                    this.genSubtitles = false;
+                    this.useThumbnail = true;
+
+                    // 결과 및 상태 초기화
+                    this.ytLoading = false;
+                    this.ytMetadata = null;
+                    this.ytMetadataEditing = false;
+                    this.ytMetadataEdited = null;
+                    this.ytValidation = null;
+                    this.ytResult = null;
+
+                    // 파일 입력 필드 초기화
+                    if (this.$refs.ytFileInput) {
+                        this.$refs.ytFileInput.value = '';
+                    }
+                    if (this.$refs.pdfFileInput) {
+                        this.$refs.pdfFileInput.value = '';
                     }
                 },
 
