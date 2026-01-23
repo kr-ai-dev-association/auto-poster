@@ -1635,10 +1635,10 @@
             <div x-show="mainTab === 'timing-editor'" class="flex flex-col h-full animate-fade-in">
                 <div class="w-full h-full flex flex-col">
                     <!-- Top: PDF Viewer & OCR Section -->
-                    <div class="flex-shrink-0 h-1/3 border-b border-gray-700 flex">
+                    <div class="flex-shrink-0 border-b border-gray-700 flex" :style="'height: ' + timingEditorTopHeight + '%'">
                         <!-- PDF Slide Viewer -->
-                        <div class="w-1/2 p-4 border-r border-gray-700">
-                            <div class="flex items-center justify-between mb-3">
+                        <div class="w-1/2 p-4 border-r border-gray-700 flex flex-col">
+                            <div class="flex-shrink-0 flex items-center justify-between mb-3">
                                 <h3 class="text-sm font-bold text-white">PDF 슬라이드</h3>
                                 <div class="flex items-center gap-2">
                                     <button @click="timingEditorPrevSlide()" :disabled="timingEditorCurrentSlide <= 0"
@@ -1656,7 +1656,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="bg-gray-800 rounded-lg h-full flex items-center justify-center overflow-hidden">
+                            <div class="flex-grow bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden min-h-0">
                                 <!-- 슬라이드 이미지 로드됨 -->
                                 <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.loaded && timingEditorSlides[timingEditorCurrentSlide]?.imageUrl">
                                     <img :src="timingEditorSlides[timingEditorCurrentSlide]?.imageUrl"
@@ -1686,9 +1686,9 @@
                         </div>
 
                         <!-- OCR Subtitle Section -->
-                        <div class="w-1/2 p-4">
-                            <h3 class="text-sm font-bold text-white mb-3">OCR 자막</h3>
-                            <div class="bg-gray-800 rounded-lg p-4 h-full overflow-y-auto">
+                        <div class="w-1/2 p-4 flex flex-col">
+                            <h3 class="flex-shrink-0 text-sm font-bold text-white mb-3">OCR 자막</h3>
+                            <div class="flex-grow bg-gray-800 rounded-lg p-4 overflow-y-auto min-h-0">
                                 <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.ocrText">
                                     <p class="text-gray-300 text-sm whitespace-pre-wrap"
                                        x-text="timingEditorSlides[timingEditorCurrentSlide]?.ocrText"></p>
@@ -1698,6 +1698,13 @@
                                 </template>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Resizer Handle (드래그하여 상단 영역 높이 조절) -->
+                    <div class="flex-shrink-0 h-2 bg-gray-700 hover:bg-purple-600 cursor-ns-resize transition-colors flex items-center justify-center group"
+                         @mousedown="startPanelResize($event)"
+                         @touchstart.prevent="startPanelResize($event)">
+                        <div class="w-16 h-1 bg-gray-500 group-hover:bg-white rounded-full transition-colors"></div>
                     </div>
 
                     <!-- Middle: Video Sequence Timeline -->
@@ -2221,6 +2228,8 @@
                 timingEditorSaving: false,
                 timingEditorReencoding: false,
                 timingEditorSaved: false,  // 타이밍 저장 완료 상태
+                timingEditorTopHeight: 33,  // 상단 영역 높이 (%)
+                timingEditorResizingPanel: false,  // 패널 리사이즈 중
 
                 async init() {
                     const token = localStorage.getItem('access_token');
@@ -2712,6 +2721,43 @@
                 // ======================================
                 // Timing Editor Functions
                 // ======================================
+
+                // Panel Resize Functions (상단 영역 높이 조절)
+                startPanelResize(e) {
+                    e.preventDefault();
+                    this.timingEditorResizingPanel = true;
+                    const container = e.target.closest('.w-full.h-full.flex.flex-col');
+                    if (!container) return;
+                    const containerRect = container.getBoundingClientRect();
+
+                    // 드래그 중 텍스트 선택 방지
+                    document.body.style.userSelect = 'none';
+                    document.body.style.cursor = 'ns-resize';
+
+                    const onMove = (moveEvent) => {
+                        moveEvent.preventDefault();
+                        const clientY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
+                        const offsetY = clientY - containerRect.top;
+                        const percent = (offsetY / containerRect.height) * 100;
+                        // 최소 15%, 최대 70%
+                        this.timingEditorTopHeight = Math.max(15, Math.min(70, percent));
+                    };
+
+                    const onEnd = () => {
+                        this.timingEditorResizingPanel = false;
+                        document.body.style.userSelect = '';
+                        document.body.style.cursor = '';
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onEnd);
+                        document.removeEventListener('touchmove', onMove);
+                        document.removeEventListener('touchend', onEnd);
+                    };
+
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onEnd);
+                    document.addEventListener('touchmove', onMove);
+                    document.addEventListener('touchend', onEnd);
+                },
 
                 formatTimecode(seconds) {
                     if (!seconds || isNaN(seconds)) return '0:00';
