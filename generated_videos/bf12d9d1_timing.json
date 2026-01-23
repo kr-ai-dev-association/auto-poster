@@ -1,0 +1,71 @@
+{
+  "timings": [
+    {
+      "start": 0,
+      "duration": 56.84
+    },
+    {
+      "start": 56.84,
+      "duration": 98.16
+    },
+    {
+      "start": 155,
+      "duration": 140.33460829493083
+    },
+    {
+      "start": 295.33460829493083,
+      "duration": 76.45350230414755
+    },
+    {
+      "start": 371.7881105990784,
+      "duration": 59.786975299839355
+    },
+    {
+      "start": 431.57508589891773,
+      "duration": 113.61670912202243
+    },
+    {
+      "start": 545.1917950209402,
+      "duration": 59.570688692414706
+    },
+    {
+      "start": 604.7624837133549,
+      "duration": 52.95394136807852
+    },
+    {
+      "start": 657.7164250814334,
+      "duration": 48.787850162866334
+    },
+    {
+      "start": 706.5042752442997,
+      "duration": 43.43755700325721
+    },
+    {
+      "start": 749.9418322475569,
+      "duration": 47.39756514657972
+    },
+    {
+      "start": 797.3393973941367,
+      "duration": 33.09815146579808
+    },
+    {
+      "start": 830.4375488599347,
+      "duration": 113.29415214006531
+    }
+  ],
+  "page_texts": [
+    "p1 81 05 p2 91 05 p3 191 05 p6 i81 06 p7 101 05 p9 1e1 05 vision vit 이미지는 단어의 가치를 가진다 transformer 16x16 이미지 인식을 위능 cnn을 10 트랜스포머의 original paper an image 1s worth 16x16 words iclr 2021 authors dosovitskiy alexey lucas beyer al google research brain team presentation context technical deep dive legacy analysis 2821 2825 6 notebooklm",
+    "컴퓨터 비전의 패러다임 전환 트랜스포머로 cnn에서 the core question nlp의 혁명 nlp revolution 이후 트랜스포머 transformer의 등장 cnn의 구조적 bert와 gpt 같은 10궁 i6유弓y 표준de facto standard으로 bias 1o평 편향inductive 자리 잡았습니다 이들은 거대한 텍스트 표준 랜스포머를 트 이미지에 코퍼스를 통해 사전 학습pre training하고 미세 조정fine tuning하는 직접 적용할 수 없을까 vision의 정체 vision status quo 이미지를 텍스트 시권스처럼 비전 분야는 여전히 resnet과 같은 처리한다면 결과가 나올까 cnn 아키텍처가 지배적이었습니다 attention 메커니즘은 cnn과 결합되거나 보조적인 io루늉 머물렀습니다 6 notebooklim",
+    "이미지를 텍스트처럼 읽는 법 methodology key concept split flatten patch 이미지씨를 고정된 크기의 패치x p 로 깅거루곰 16 16 본 논문에서는 16x16 크기의 패치를 사용합니다 이는 nlp에서의 단어token 와 flattened 동일하게 patch image 취급됩니다 technical detail linear 투영 패치를 linear projection 우 각 projection d 1차원 라뉴 평탄화flatten한 뒤 학습 가능한 선형 를이이고 통과시켜 차원d의 embedding patch 트랜스포머는 순서 position embeddings position embedding 정보가 없으므로 패치의 위치 정보를 긍물 position patch embedding 임베딩을 더해줍니다 a notebooklim",
+    "순수 트랜스포머 아키텍처 pure transformer architecture classification bert에서 사용된 것과 standard encoder mlp heac 동일한 표준 트랜스포머 인코더msa mlp를 사용합니다 구조적 변경을 최소화하여 확장성scalability을 확보했습니다 mlp 0풍 learnable class token 시권스의 layer norm 학습 가능한 릉글굴 추가합니다 하콩 class multi head transformer attention msa 출력에서 encoder 이 토큰의 상태가 이미지 layer norm 전체의 표현representation으로 사용되어 multi head msa attention 분류classification를 수행합니다 layer norm hybrid option 패치 대신 cnn의 feature map을 사용하는 하이브리드 내룬채 가능합니다 class token a notebooklim",
+    "귀납적 bias 대 편향inductive 대규모 학습large training scale cnn resnet transformer vit 강한 적은 우쿄 bias 편향 high 귀납적 low bias inductive inductive 픽셀은 주변 픽셀과 o오군 초기화 시점에서는 패치 간의 2차원 위치 관계나 locality 化iy 극푹 가정 지역적 특징을 전혀 모름 translation 우유 이동 등가성 모든 공간적 equivariance 관계spatial relations를 사물의 위치가 인식하는 성질 데이터를 너우릉울 h우울 처음부터 애우무우 함 弓 적은 데이터로도 효율적인 학습이 가능하지만 룸휘y 수 있음 the 중소 규모 데이터omagenet에서는 여우丘 부족한 vit가 불리하지만 insight 대규모 데이터14m 30om 대규모 학습이 귀납적 편향을 압도한다 images에서는 a notebooklm",
+    "데이터 규모에 따른 성능 performance scaling vit huge vit resnet bt resnet vit resnet imagenet vit resnet 오버피팅 imagenet 13m imagenet 21k 14m jft 300m 300m jetbrains mono key takeaway 데이터셋의 크기가 성능은 계속 향상되는 반면 커질수록 vit의 o윽요 resnet은 포화saturate되는 경향을 학습 jft 3oom 사전 시 vit는 sota를 6 notebooklim",
+    "효율성과 유를 sota state of the art efficiency training vit h 14 jft 3oom pre results comparison cost trained resnet bit l imagenet 8855 top 1 accuracy noisy student 884 vs vit l 16 9455 higher performance cifar 1o0 accuracy vit는 릉울 릉윽우 내기 위해 2 4배 더적은 컴퓨팅 자원tpuv3 core days을 사용합니다 conclusion vit는 성능과 학습 효율성performance compute trade off 두 마리 토끼를 모두 잡았습니다 6 notebooklm",
+    "내부 분석 1 학습한 것 linear filters embeddings projection position 초기 패치 극료 cnn의 초기 하이이고 워y용 패치 간의 위치 유사도를 시각화한 결과 긍룹채 기저 함수basis 학습하여 선 질감등 정보 피o평 행row과 functions를 열column 구조 및거리 저수준 구조를 개념을 스스로 학습하여 복원해냈습니다 a notebooklim",
+    "technical editorial swiss modernism 내부 무울 분석 2 전역적 attention global mean attention distance vs network depth mean attention distance pixels global context available immediately cnn은 층이 려야놔o픈 insight 시야receptive field가 넓어지지만 가장 낮은 i하이이l고 vit는 헤드에 서도 이미 이미지 전체를 참조합니다 이는 전역적 릉놈곰 처음부터 10 12 6 14 16 18 20 22 24 고려한다는 것을 의미합니다 network depth layer a notebooklm",
+    "technical editorial swiss modernism 무엇을 보는가 visualizing attention original input attention rollout token에서 input 릉百o 시각화attention rollout했습니다 모델은 이미지 해7 output space로의 의미 영역semantically 있는 강아지의 regions 형태 에 정확히 집중하고 있습니다 relevant 이는 사전 vit가 객체를 효과적으로 더우루곡 더위뇨콩 있음을 보여줍니다 6 notebooklm",
+    "자기 지도 학습의 가능성 self supervision result method nlp의 bert처럼 이미지 패치의 를ㄹ릉 처음부터 학습scratch하는 것보다 긍푹 마스킹masking하고 성능imagenet 이를 보였습니다 극위콩눔 799 을 prediction을 지도 학습supervised보다는 0 낮지만 masked f patch 실험했습니다 라벨 없는 데이터를 루융루 수 있는 잠재력을 확인했습니다 6 notebooklm",
+    "vit의 유산과 진화 legacy to 2025 evolution 2021 cthis paper 2025 new perspective vision vit video llms cneurips 2025 transformer 이미지를 정립 understanding 패치 시권스로 처리하는 개념 enhancing temporal video llms in transforme stacked por attentio current 최신 video llm 극y10건 vit 0껌7 시간적 application 어텐션stacked attention을 통합하여 시간적 흐름을 이해합니다 temporal vit는 단순한 비디오의 이미지 분류기를 0묵 핵심 자리 및 비디오 이해video understanding를 위능 비전 인코더로 잡았습니다 6 notebooklim",
+    "결론 확장성을 단순함이 루금 때 is key direct efficiency application scale 이미지 특화 구조 o평 표준 귀납적 편향의 부재는 cnn보다 더 적은 비용으로 트랜스포머를 데이터와 컴퓨팅 극복 더높은 그대로 성능을 달성했습니다 적용했습니다 가능하며 오히려 높은 성능 상한선을 제공합니다 vit는 컴퓨터 비전의 새로운 표준standard이 품입내 정지 영상을 비디오와 등윽y운콩 기반이 되고 있습니다 6 notebooklm"
+  ]
+}
