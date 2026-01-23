@@ -1778,19 +1778,29 @@ class PDF2MP4Service:
     def delete_video(self, video_id: str) -> bool:
         path = self.get_video_path(video_id)
         if path and os.path.exists(path):
+            print(f"[{video_id}] 영상 삭제: {path}")
             os.remove(path)
+
             # 연관된 PDF도 삭제
             pdf_path = self.get_pdf_path(video_id)
             if pdf_path and os.path.exists(pdf_path):
+                print(f"[{video_id}] PDF 삭제: {pdf_path}")
                 os.remove(pdf_path)
+            else:
+                print(f"[{video_id}] PDF 파일 없음 (video_id로 검색)")
+
             # 타이밍 JSON 파일 삭제
             timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
             if os.path.exists(timing_file):
+                print(f"[{video_id}] 타이밍 파일 삭제: {timing_file}")
                 os.remove(timing_file)
+
             # 메타데이터 JSON 파일 삭제
             meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
             if os.path.exists(meta_file):
+                print(f"[{video_id}] 메타데이터 파일 삭제: {meta_file}")
                 os.remove(meta_file)
+
             return True
         return False
 
