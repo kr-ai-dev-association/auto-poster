@@ -53,6 +53,14 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     print("Warning: sentence-transformers not installed. Semantic similarity will not be available.")
 
+# Deep Translator for English to Korean translation (optional)
+try:
+    from deep_translator import GoogleTranslator
+    TRANSLATOR_AVAILABLE = True
+except ImportError:
+    TRANSLATOR_AVAILABLE = False
+    print("Warning: deep-translator not installed. English to Korean translation will not be available.")
+
 
 @dataclass
 class ConversionConfig:
@@ -89,14 +97,24 @@ class PDF2MP4Service:
         self._whisper_model = None
         self._paddleocr = None
         self._sentence_model = None
+        self._translator = None
+
+    def get_paddleocr(self, lang: str = 'korean'):
+        """PaddleOCR 모델 (지연 로딩) - 언어별 캐시"""
+        if not PADDLEOCR_AVAILABLE:
+            return None
+
+        # 언어별 캐시 키
+        cache_key = f'_paddleocr_{lang}'
+        if not hasattr(self, cache_key) or getattr(self, cache_key) is None:
+            print(f"Loading PaddleOCR model (lang={lang})...")
+            setattr(self, cache_key, PaddleOCR(use_angle_cls=True, lang=lang, show_log=False))
+        return getattr(self, cache_key)
 
     @property
     def paddleocr(self):
-        """PaddleOCR 모델 (지연 로딩)"""
-        if self._paddleocr is None and PADDLEOCR_AVAILABLE:
-            print("Loading PaddleOCR model...")
-            self._paddleocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
-        return self._paddleocr
+        """PaddleOCR 모델 (기본 한국어) - 하위 호환성"""
+        return self.get_paddleocr('korean')
 
     @classmethod
     def get_progress(cls, video_id: str) -> Optional[Dict[str, Any]]:
@@ -205,6 +223,14 @@ class PDF2MP4Service:
             self._sentence_model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
         return self._sentence_model
 
+    @property
+    def translator(self):
+        """Google Translator (지연 로딩)"""
+        if self._translator is None and TRANSLATOR_AVAILABLE:
+            print("Loading Google Translator (deep-translator)...")
+            self._translator = GoogleTranslator(source='en', target='ko')
+        return self._translator
+
     def _resize_image(self, img: Image.Image, width: int, height: int, logo_img: Image.Image = None) -> np.ndarray:
         """이미지를 지정된 크기로 리사이즈 (종횡비 유지, 검은 배경, 로고 합성)"""
         orig_width, orig_height = img.size
@@ -266,14 +292,15 @@ class PDF2MP4Service:
 
         return page_texts
 
-    def _extract_text_with_ocr(self, images: List[Image.Image], video_id: str = "") -> List[str]:
+    def _extract_text_with_ocr(self, images: List[Image.Image], video_id: str = "", ocr_lang: str = "korean") -> List[str]:
         """PaddleOCR을 사용하여 이미지에서 텍스트 추출"""
-        if not PADDLEOCR_AVAILABLE or self.paddleocr is None:
+        ocr_model = self.get_paddleocr(ocr_lang)
+        if not PADDLEOCR_AVAILABLE or ocr_model is None:
             print(f"[{video_id}] PaddleOCR 사용 불가")
             return []
 
         page_texts = []
-        print(f"[{video_id}] 🔍 PaddleOCR로 {len(images)}개 페이지 텍스트 추출 시작")
+        print(f"[{video_id}] 🔍 PaddleOCR로 {len(images)}개 페이지 텍스트 추출 시작 (lang={ocr_lang})")
 
         for i, img in enumerate(images):
             try:
@@ -281,7 +308,7 @@ class PDF2MP4Service:
                 img_array = np.array(img.convert('RGB'))
 
                 # OCR 수행 (PaddleOCR 2.x)
-                result = self.paddleocr.ocr(img_array, cls=True)
+                result = ocr_model.ocr(img_array, cls=True)
 
                 # 텍스트 추출
                 texts = []
@@ -305,6 +332,105 @@ class PDF2MP4Service:
                 page_texts.append("")
 
         return page_texts
+
+    def _is_mostly_english(self, text: str) -> bool:
+        """텍스트가 주로 영문인지 확인 (60% 이상 영문이면 True)"""
+        if not text or len(text.strip()) < 10:
+            return False
+
+        # 영문 알파벳 문자 수 세기
+        english_chars = sum(1 for c in text if c.isalpha() and ord(c) < 128)
+        # 전체 알파벳 문자 수 (한글 포함)
+        total_alpha = sum(1 for c in text if c.isalpha())
+
+        if total_alpha == 0:
+            return False
+
+        english_ratio = english_chars / total_alpha
+        return english_ratio > 0.6
+
+    def _extract_english_words(self, text: str, min_length: int = 3) -> List[str]:
+        """텍스트에서 영문 단어만 추출 (기술 용어 등)"""
+        # 영문 단어 패턴 (연속된 영문자)
+        words = re.findall(r'[a-zA-Z]{3,}', text)
+        # 소문자로 변환하고 중복 제거
+        unique_words = list(set(w.lower() for w in words if len(w) >= min_length))
+        return unique_words
+
+    def _translate_english_keywords_to_korean(self, texts: List[str], video_id: str = "") -> List[str]:
+        """텍스트 내 영문 키워드를 한국어로 번역하여 텍스트에 추가 (매칭 정확도 향상용)
+
+        한글+영문 혼합 문서에서 영문 기술 용어를 한국어로 변환하여
+        한국어 오디오 트랜스크립트와의 매칭률을 높입니다.
+        """
+        if not TRANSLATOR_AVAILABLE or self.translator is None:
+            print(f"[{video_id}] Google Translator 사용 불가 - 번역 건너뜀")
+            return texts
+
+        enhanced_texts = []
+        translated_count = 0
+
+        # 기술 용어 사전 (번역 캐시)
+        translation_cache = {}
+
+        print(f"[{video_id}] 🌐 영문 키워드 한국어 번역 시작...")
+
+        for i, text in enumerate(texts):
+            if not text or not text.strip():
+                enhanced_texts.append(text)
+                continue
+
+            # 영문 단어 추출
+            english_words = self._extract_english_words(text, min_length=4)
+
+            if not english_words:
+                enhanced_texts.append(text)
+                continue
+
+            # 번역할 단어들 (캐시에 없는 것만)
+            words_to_translate = [w for w in english_words if w not in translation_cache]
+
+            if words_to_translate:
+                try:
+                    # 단어들을 한 번에 번역 (효율성)
+                    words_text = ' | '.join(words_to_translate[:30])  # 최대 30개
+                    translated = self.translator.translate(words_text)
+
+                    if translated:
+                        translated_words = translated.split(' | ')
+                        for orig, trans in zip(words_to_translate[:30], translated_words):
+                            trans = trans.strip()
+                            # 번역 결과가 원본과 다르고 의미있는 경우만 캐시
+                            if trans and trans.lower() != orig.lower() and len(trans) > 1:
+                                translation_cache[orig] = trans
+                        translated_count += 1
+
+                except Exception as e:
+                    print(f"[{video_id}] 번역 오류 (페이지 {i + 1}): {e}")
+
+            # 원본 텍스트에 번역된 키워드 추가
+            translated_keywords = []
+            for word in english_words:
+                if word in translation_cache:
+                    translated_keywords.append(translation_cache[word])
+
+            # 원본 + 번역된 키워드 결합
+            if translated_keywords:
+                enhanced_text = text + ' ' + ' '.join(translated_keywords)
+            else:
+                enhanced_text = text
+
+            enhanced_texts.append(enhanced_text)
+
+            if (i + 1) % 5 == 0:
+                print(f"[{video_id}]   번역 진행: {i + 1}/{len(texts)} 페이지")
+
+        print(f"[{video_id}] ✅ 키워드 번역 완료: {len(translation_cache)}개 용어 번역됨")
+        if translation_cache:
+            sample = list(translation_cache.items())[:5]
+            print(f"[{video_id}]   예시: {sample}")
+
+        return enhanced_texts
 
     def _extract_keywords_from_page(self, text: str, min_length: int = 4) -> List[str]:
         """페이지 텍스트에서 중요 키워드 추출"""
@@ -532,8 +658,8 @@ class PDF2MP4Service:
             # 2. 의미적 유사도 점수 (0~1)
             semantic_score = self._compute_semantic_similarity(page_text, window_text)
 
-            # 3. 결합 점수 계산 (키워드 50%, 의미적 유사도 50%)
-            combined_score = (keyword_score * 0.5) + (semantic_score * 0.5)
+            # 3. 결합 점수 계산 (키워드 80%, 의미적 유사도 20%)
+            combined_score = (keyword_score * 0.8) + (semantic_score * 0.2)
 
             if combined_score > best_score:
                 best_score = combined_score
@@ -541,6 +667,102 @@ class PDF2MP4Service:
                 best_keyword_count = keyword_matches
 
             current_window_start += window_seconds / 2  # 50% 오버랩으로 다음 윈도우
+
+        return best_time, best_score, best_keyword_count
+
+    def _find_best_segment_with_position(
+        self,
+        page_text: str,
+        keywords: List[str],
+        segments: List[Dict],
+        search_start: float,
+        search_end: float,
+        expected_start: float,
+        base_page_duration: float,
+        window_seconds: float = 15.0,
+        video_id: str = ""
+    ) -> tuple[Optional[float], float, int]:
+        """
+        키워드 매칭 + 의미적 유사도 + 위치 근접도를 결합하여 최적의 세그먼트 찾기
+
+        Args:
+            page_text: 페이지 전체 텍스트
+            keywords: 페이지에서 추출한 키워드 목록
+            segments: Whisper 세그먼트 목록
+            search_start: 검색 시작 시간
+            search_end: 검색 종료 시간
+            expected_start: 예상 시작 시간 (균등 분배 기준)
+            base_page_duration: 기본 페이지당 예상 길이
+            window_seconds: 윈도우 크기 (초)
+            video_id: 로깅용 비디오 ID
+
+        Returns:
+            (매칭 시간, 결합 점수, 키워드 매칭 수)
+        """
+        if not segments:
+            return None, 0.0, 0
+
+        best_time = None
+        best_score = 0.0
+        best_keyword_count = 0
+
+        # 검색 범위 내 세그먼트들을 윈도우로 그룹화
+        current_window_start = search_start
+        while current_window_start < search_end:
+            window_end_time = min(current_window_start + window_seconds, search_end)
+
+            # 윈도우 내 세그먼트 텍스트 수집
+            window_segments = []
+            window_text_parts = []
+            for seg in segments:
+                seg_start = seg['start']
+                if seg_start >= current_window_start and seg_start < window_end_time:
+                    window_segments.append(seg)
+                    window_text_parts.append(seg.get('text', ''))
+
+            if not window_segments:
+                current_window_start += window_seconds / 2
+                continue
+
+            window_text = ' '.join(window_text_parts).lower()
+            window_text_normalized = re.sub(r'[^\w\s]', ' ', window_text)
+
+            # 1. 키워드 매칭 점수 (0~1)
+            keyword_matches = 0
+            for kw in keywords:
+                kw_lower = kw.lower()
+                if kw_lower in window_text_normalized:
+                    keyword_matches += 1
+                else:
+                    # Fuzzy 매칭
+                    for word in window_text_normalized.split():
+                        if len(word) >= 4:
+                            ratio = SequenceMatcher(None, kw_lower, word).ratio()
+                            if ratio > 0.8:
+                                keyword_matches += 1
+                                break
+
+            keyword_score = min(keyword_matches / max(len(keywords), 1), 1.0)
+
+            # 2. 의미적 유사도 점수 (0~1)
+            semantic_score = self._compute_semantic_similarity(page_text, window_text)
+
+            # 3. 위치 근접도 점수 (0~1) - 예상 시작 시간과 가까울수록 높은 점수
+            window_time = window_segments[0]['start']
+            time_diff = abs(window_time - expected_start)
+            # 예상 시간에서 ±1 페이지 길이 내에 있으면 높은 점수
+            position_score = max(0, 1.0 - (time_diff / (base_page_duration * 2)))
+
+            # 4. 결합 점수 계산 (키워드 60%, 의미 15%, 위치 25%)
+            # 위치 가중치를 높여서 예상 시간 근처 우선
+            combined_score = (keyword_score * 0.60) + (semantic_score * 0.15) + (position_score * 0.25)
+
+            if combined_score > best_score:
+                best_score = combined_score
+                best_time = window_time
+                best_keyword_count = keyword_matches
+
+            current_window_start += window_seconds / 2  # 50% 오버랩
 
         return best_time, best_score, best_keyword_count
 
@@ -673,7 +895,8 @@ class PDF2MP4Service:
         fps: int = 30,
         dpi: int = 200,
         auto_duration: bool = False,
-        logo_path: Optional[str] = None
+        logo_path: Optional[str] = None,
+        ocr_lang: str = 'korean'
     ) -> Dict[str, Any]:
         """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환"""
         video_id = str(uuid.uuid4())[:8]
@@ -709,6 +932,17 @@ class PDF2MP4Service:
                 resized_images.append(resized)
                 self.update_progress(video_id, 'processing', int(10 + (i / len(images)) * 30),
                                    f'📄 이미지 처리 중... ({i+1}/{len(images)})', None)
+
+            check_cancelled()
+
+            # 2.5. PDF 텍스트 추출 (타이밍 편집기용)
+            self.update_progress(video_id, 'text_extract', 35, '📝 텍스트 추출 중...', None)
+            page_texts = self._extract_pdf_page_texts(pdf_content)
+            total_text_len = sum(len(t) for t in page_texts)
+            if total_text_len < 50 and PADDLEOCR_AVAILABLE:
+                print(f"[{video_id}] PyPDF2 텍스트 부족 ({total_text_len} 문자), OCR 사용 (lang={ocr_lang})")
+                page_texts = self._extract_text_with_ocr(images, video_id, ocr_lang)
+            print(f"[{video_id}] 텍스트 추출 완료: {len(page_texts)} 페이지")
 
             check_cancelled()
 
@@ -792,6 +1026,17 @@ class PDF2MP4Service:
                 'file_size': os.path.getsize(output_path)
             }
 
+            # 타이밍 정보를 JSON 파일로 저장 (타이밍 편집기용) - OCR 텍스트 포함
+            import json
+            timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
+            timing_data = {
+                'timings': timings,
+                'page_texts': page_texts if page_texts else []
+            }
+            with open(timing_file, 'w', encoding='utf-8') as f:
+                json.dump(timing_data, f, ensure_ascii=False, indent=2)
+            print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 포함)")
+
             print(f"[{video_id}] Conversion completed successfully")
             return {'status': 'success', 'video': video_info}
 
@@ -821,7 +1066,8 @@ class PDF2MP4Service:
         height: int = 1080,
         fps: int = 30,
         dpi: int = 200,
-        logo_path: Optional[str] = None
+        logo_path: Optional[str] = None,
+        ocr_lang: str = 'korean'
     ) -> Dict[str, Any]:
         """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정"""
         if not WHISPER_AVAILABLE:
@@ -881,11 +1127,21 @@ class PDF2MP4Service:
             # PyPDF2가 실패했거나 텍스트가 부족하면 OCR 사용
             total_text_len = sum(len(t) for t in page_texts)
             if total_text_len < 50 and PADDLEOCR_AVAILABLE:
-                print(f"[{video_id}] PyPDF2 텍스트 부족 ({total_text_len} 문자), OCR 사용")
+                print(f"[{video_id}] PyPDF2 텍스트 부족 ({total_text_len} 문자), OCR 사용 (lang={ocr_lang})")
                 self.update_progress(video_id, 'ocr', 43, '🔍 OCR로 텍스트 추출 중...', None)
-                page_texts = self._extract_text_with_ocr(images, video_id)
+                page_texts = self._extract_text_with_ocr(images, video_id, ocr_lang)
 
             print(f"[{video_id}] Extracted text from {len(page_texts)} pages (총 {sum(len(t) for t in page_texts)} 문자)")
+
+            check_cancelled()
+
+            # 3.5. 영문 키워드를 한국어로 번역 (매칭 정확도 향상)
+            # 한글+영문 혼합 문서에서 영문 기술 용어를 번역하여 매칭률 향상
+            page_texts_for_matching = page_texts  # 원본 보존 (타이밍 편집기용)
+            if page_texts and TRANSLATOR_AVAILABLE:
+                self.update_progress(video_id, 'translate', 44, '🌐 영문 키워드 한국어 번역 중...', None)
+                page_texts_for_matching = self._translate_english_keywords_to_korean(page_texts, video_id)
+                print(f"[{video_id}] 번역된 키워드가 추가된 텍스트를 매칭에 사용")
 
             check_cancelled()
 
@@ -912,10 +1168,10 @@ class PDF2MP4Service:
             )
             total_duration = float(result_probe.stdout.strip()) if result_probe.stdout.strip() else 0
 
-            # 6. 페이지 타이밍 계산 (키워드 기반)
+            # 6. 페이지 타이밍 계산 (키워드 기반) - 번역된 텍스트 사용
             self.update_progress(video_id, 'timing', 45, '🔍 키워드 기반 타이밍 계산 중...', None)
             page_timings = self._calculate_smart_timings(
-                segments, num_pages, total_duration, page_texts, video_id
+                segments, num_pages, total_duration, page_texts_for_matching, video_id
             )
             print(f"[{video_id}] Page timings: {page_timings}")
             self.update_progress(video_id, 'timing_done', 50, '⏱️ 페이지 타이밍 계산 완료', None)
@@ -978,6 +1234,17 @@ class PDF2MP4Service:
                 'file_size': os.path.getsize(output_path)
             }
 
+            # 타이밍 정보를 JSON 파일로 저장 (타이밍 편집기용) - OCR 텍스트 포함
+            import json
+            timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
+            timing_data = {
+                'timings': page_timings,
+                'page_texts': page_texts if page_texts else []
+            }
+            with open(timing_file, 'w', encoding='utf-8') as f:
+                json.dump(timing_data, f, ensure_ascii=False, indent=2)
+            print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 포함)")
+
             print(f"[{video_id}] Smart conversion completed successfully")
             return {'status': 'success', 'video': video_info}
 
@@ -1005,10 +1272,11 @@ class PDF2MP4Service:
     ) -> List[Dict[str, float]]:
         """PDF 페이지 키워드와 Whisper 트랜스크립트를 매칭하여 페이지 타이밍 계산
 
-        개선된 알고리즘:
-        1. 각 페이지에 예상 시간 범위를 할당 (균등 분배 기반)
-        2. 해당 범위 내에서 키워드 + 의미적 유사도를 결합하여 최적의 전환 시점 찾기
-        3. 순차적 제약 조건 유지 (페이지 순서 보장)
+        개선된 알고리즘 v2:
+        1. 전체 남은 시간 범위에서 검색 (제한된 마진 대신)
+        2. 키워드 + 의미적 유사도 + 위치 근접도를 결합
+        3. 최소 페이지 표시 시간 보장하되 짧은 슬라이드도 허용
+        4. 순차적 제약 조건 유지 (페이지 순서 보장)
         """
 
         # 기본 폴백: 균등 분배
@@ -1024,7 +1292,7 @@ class PDF2MP4Service:
             print(f"[{video_id}] 텍스트 없음 - 균등 분배 사용")
             return self._calculate_equal_timings(segments, num_pages, total_duration)
 
-        print(f"[{video_id}] 🔍 키워드 + 의미적 유사도 기반 페이지 매칭 시작")
+        print(f"[{video_id}] 🔍 키워드 + 의미적 유사도 기반 페이지 매칭 시작 (v2)")
 
         # 디버그: Whisper 세그먼트 샘플
         print(f"[{video_id}] 📝 Whisper 세그먼트 샘플:")
@@ -1040,18 +1308,18 @@ class PDF2MP4Service:
             if i < 3:
                 print(f"[{video_id}]   페이지 {i+1}: {kws[:10]}")
 
-        # 기본 예상 시간 범위 계산 (균등 분배 기반, 탐색 범위용)
+        # 기본 설정
         base_page_duration = total_duration / num_pages
-        min_page_duration = 5.0  # 최소 페이지 표시 시간
-        search_margin = base_page_duration * 1.0  # 탐색 여유 범위 (앞뒤 100% - 완화됨)
+        min_page_duration = 3.0  # 최소 페이지 표시 시간 (짧은 슬라이드 허용을 위해 5초→3초)
 
-        # 첫 페이지는 항상 0초
+        # 첫 페이지는 항상 0초, 신뢰도 1.0
         page_start_times = [0.0]
+        page_confidences = [1.0]
 
         # Semantic similarity 사용 가능 여부 확인
         use_semantic = SENTENCE_TRANSFORMERS_AVAILABLE and self.sentence_model is not None
         if use_semantic:
-            print(f"[{video_id}] ✅ Semantic similarity 활성화")
+            print(f"[{video_id}] ✅ Semantic similarity 활성화 (키워드 80% + 의미 20%)")
         else:
             print(f"[{video_id}] ⚠️ Semantic similarity 비활성화 (키워드만 사용)")
 
@@ -1062,10 +1330,9 @@ class PDF2MP4Service:
             # 예상 시작 시간 (균등 분배 기준)
             expected_start = page_idx * base_page_duration
 
-            # 이전 페이지의 실제 시작 시간 (None이면 예상값 사용)
+            # 이전 페이지의 실제 시작 시간
             last_valid_time = page_start_times[-1]
             if last_valid_time is None:
-                # None인 경우 이전 페이지들 중 마지막 유효한 값 찾기
                 for t in reversed(page_start_times):
                     if t is not None:
                         last_valid_time = t
@@ -1073,13 +1340,19 @@ class PDF2MP4Service:
                 if last_valid_time is None:
                     last_valid_time = (page_idx - 1) * base_page_duration
 
-            # 검색 범위: 이전 페이지 시작 + 최소 간격 ~ 예상 시작 + 마진
-            search_start = max(last_valid_time + min_page_duration, expected_start - search_margin)
-            search_end = min(expected_start + search_margin, total_duration - (num_pages - page_idx - 1) * min_page_duration)
+            # 남은 페이지 수를 고려한 최대 검색 범위 계산
+            remaining_pages = num_pages - page_idx
+            remaining_time = total_duration - last_valid_time
+            max_time_per_page = remaining_time / remaining_pages if remaining_pages > 0 else remaining_time
+
+            # 검색 범위: 이전 페이지 이후부터 ~ 남은 시간의 60%까지 (다음 페이지들 여유 확보)
+            search_start = last_valid_time + min_page_duration
+            search_end = min(last_valid_time + max_time_per_page * 2, total_duration - (remaining_pages - 1) * min_page_duration)
 
             # 검색 범위가 유효하지 않으면 보간으로 처리
             if search_start >= search_end:
                 page_start_times.append(None)
+                page_confidences.append(0.0)
                 print(f"[{video_id}]   페이지 {page_idx + 1}: (검색 범위 없음, 보간 예정)")
                 continue
 
@@ -1088,21 +1361,23 @@ class PDF2MP4Service:
             match_info = ""
 
             if use_semantic and page_text.strip():
-                # 의미적 유사도 + 키워드 결합 방식
-                match_time, score, kw_count = self._find_best_segment_with_semantic(
+                # 의미적 유사도 + 키워드 + 위치 근접도 결합 방식
+                match_time, score, kw_count = self._find_best_segment_with_position(
                     page_text,
                     keywords[:20],
                     segments,
                     search_start,
                     search_end,
-                    window_seconds=20.0,
+                    expected_start,
+                    base_page_duration,
+                    window_seconds=15.0,
                     video_id=video_id
                 )
 
-                if match_time is not None and score > 0.15:  # 최소 점수 임계값
+                if match_time is not None and score > 0.10:  # 최소 점수 임계값 낮춤 (0.15→0.10)
                     best_time = match_time
                     best_score = score
-                    match_info = f"semantic+kw (score={score:.2f}, kw={kw_count})"
+                    match_info = f"semantic+kw+pos (score={score:.2f}, kw={kw_count})"
 
             # Semantic 매칭 실패 시 키워드만 사용
             if best_time is None and keywords:
@@ -1115,15 +1390,18 @@ class PDF2MP4Service:
 
                 # 매칭 시간이 검색 범위 내에 있는지 확인
                 if multi_match_time is not None and search_start <= multi_match_time <= search_end:
-                    if match_count >= 2:
+                    if match_count >= 1:  # 최소 매칭 수 낮춤 (2→1)
                         best_time = multi_match_time
+                        best_score = match_count / len(keywords) if keywords else 0.0
                         match_info = f"keyword ({match_count}개: {matched_kws[:3]})"
 
             if best_time is not None:
                 page_start_times.append(best_time)
+                page_confidences.append(best_score)
                 print(f"[{video_id}]   페이지 {page_idx + 1}: {match_info} @ {best_time:.1f}초 (범위: {search_start:.1f}~{search_end:.1f}초)")
             else:
                 page_start_times.append(None)
+                page_confidences.append(0.0)
                 print(f"[{video_id}]   페이지 {page_idx + 1}: (매칭 실패, 보간 예정) (범위: {search_start:.1f}~{search_end:.1f}초)")
 
         # 매칭되지 않은 페이지들 보간 처리
@@ -1341,3 +1619,133 @@ class PDF2MP4Service:
 
     def is_smart_mode_available(self) -> bool:
         return WHISPER_AVAILABLE
+
+    async def reencode_with_timings(
+        self,
+        video_id: str,
+        pdf_path: str,
+        video_path: str,
+        timings: List[Dict[str, float]],
+        width: int = 1920,
+        height: int = 1080,
+        fps: int = 30,
+        dpi: int = 200
+    ) -> Dict[str, Any]:
+        """편집된 타이밍으로 영상을 재변환합니다."""
+        new_video_id = str(uuid.uuid4())[:8]
+        temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_reencode_{new_video_id}_')
+        self.register_temp_dir(new_video_id, temp_dir)
+
+        try:
+            print(f"[{new_video_id}] 🔄 Re-encoding with custom timings")
+            print(f"[{new_video_id}] PDF: {pdf_path}")
+            print(f"[{new_video_id}] Original Video: {video_path}")
+            print(f"[{new_video_id}] Timings: {len(timings)} slides")
+
+            # 1. PDF를 이미지로 변환
+            with open(pdf_path, 'rb') as f:
+                pdf_content = f.read()
+            images = convert_from_bytes(pdf_content, dpi=dpi)
+            print(f"[{new_video_id}] Extracted {len(images)} pages")
+
+            # 이미지 수와 타이밍 수 확인
+            if len(images) != len(timings):
+                print(f"[{new_video_id}] Warning: Image count ({len(images)}) != Timing count ({len(timings)})")
+                # 타이밍 수에 맞춰 조정
+                if len(timings) < len(images):
+                    images = images[:len(timings)]
+                else:
+                    timings = timings[:len(images)]
+
+            # 2. 이미지 리사이즈
+            resized_images = []
+            for i, img in enumerate(images):
+                resized = self._resize_image(img, width, height)
+                resized_images.append(resized)
+
+            # 3. 기존 영상에서 오디오 추출
+            audio_path = os.path.join(temp_dir, 'audio.aac')
+            try:
+                subprocess.run([
+                    'ffmpeg', '-y', '-i', video_path,
+                    '-vn', '-acodec', 'copy', audio_path
+                ], capture_output=True, check=True)
+                print(f"[{new_video_id}] Audio extracted")
+            except subprocess.CalledProcessError as e:
+                # AAC 추출 실패 시 MP3로 시도
+                audio_path = os.path.join(temp_dir, 'audio.mp3')
+                try:
+                    subprocess.run([
+                        'ffmpeg', '-y', '-i', video_path,
+                        '-vn', '-acodec', 'libmp3lame', '-q:a', '2', audio_path
+                    ], capture_output=True, check=True)
+                    print(f"[{new_video_id}] Audio extracted as MP3")
+                except:
+                    audio_path = None
+                    print(f"[{new_video_id}] No audio extracted")
+
+            # 4. 영상 출력
+            original_filename = os.path.basename(video_path)
+            base_name = original_filename.rsplit('_', 1)[0]  # video_id 제거
+            output_filename = f"{base_name}_edited_{new_video_id}.mp4"
+            output_path = os.path.join(self.output_dir, output_filename)
+
+            video_duration = timings[-1]['start'] + timings[-1]['duration']
+            print(f"[{new_video_id}] 🎬 NVENC GPU 가속 인코딩 시작")
+            print(f"[{new_video_id}] 📊 영상 길이: {video_duration:.1f}초")
+
+            success = self._encode_video_nvenc(
+                resized_images, timings, audio_path, output_path, fps, width, height, new_video_id
+            )
+
+            if not success:
+                raise Exception("Video encoding failed")
+
+            # 5. PDF 복사 (새 video_id로)
+            new_pdf_path = os.path.join(self.pdf_dir, f"{os.path.basename(pdf_path).rsplit('_', 1)[0]}_{new_video_id}.pdf")
+            import shutil
+            shutil.copy(pdf_path, new_pdf_path)
+            print(f"[{new_video_id}] PDF copied: {new_pdf_path}")
+
+            # 6. 타이밍 정보 저장
+            import json
+            timing_file = os.path.join(self.output_dir, f"{new_video_id}_timing.json")
+
+            # 기존 타이밍 파일에서 page_texts 가져오기
+            page_texts = []
+            old_timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
+            if os.path.exists(old_timing_file):
+                try:
+                    with open(old_timing_file, 'r', encoding='utf-8') as f:
+                        old_data = json.load(f)
+                        page_texts = old_data.get('page_texts', [])
+                except:
+                    pass
+
+            timing_data = {
+                'timings': timings,
+                'page_texts': page_texts
+            }
+            with open(timing_file, 'w', encoding='utf-8') as f:
+                json.dump(timing_data, f, ensure_ascii=False, indent=2)
+
+            video_info = {
+                'id': new_video_id,
+                'filename': output_filename,
+                'original_video_id': video_id,
+                'page_count': len(images),
+                'duration': video_duration,
+                'resolution': f'{width}x{height}',
+                'created_at': datetime.utcnow().isoformat(),
+                'file_path': output_path,
+                'file_size': os.path.getsize(output_path)
+            }
+
+            print(f"[{new_video_id}] ✅ Re-encoding completed successfully")
+            return {'status': 'success', 'video': video_info}
+
+        except Exception as e:
+            print(f"[{new_video_id}] ❌ Re-encoding failed: {e}")
+            return {'status': 'error', 'message': str(e)}
+        finally:
+            self.cleanup_temp_dir(new_video_id)

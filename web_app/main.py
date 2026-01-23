@@ -581,6 +581,7 @@ async def convert_pdf_to_video(
     fps: int = Form(30),
     auto_duration: bool = Form(False),
     category: str = Form(None),
+    ocr_lang: str = Form("korean"),
     user: models.User = Depends(get_current_user)
 ):
     """PDF를 MP4 영상으로 변환합니다."""
@@ -619,7 +620,8 @@ async def convert_pdf_to_video(
                 width=width,
                 height=height,
                 fps=fps,
-                logo_path=logo_path
+                logo_path=logo_path,
+                ocr_lang=ocr_lang
             )
         else:
             result = await pdf2mp4.convert_basic(
@@ -634,7 +636,8 @@ async def convert_pdf_to_video(
                 height=height,
                 fps=fps,
                 auto_duration=auto_duration,
-                logo_path=logo_path
+                logo_path=logo_path,
+                ocr_lang=ocr_lang
             )
 
         return JSONResponse(content=result)
@@ -841,6 +844,278 @@ async def delete_generated_pdf(pdf_id: str, user: models.User = Depends(get_curr
 
     # 파일이 없어도 성공으로 처리 (이미 삭제된 것으로 간주)
     return JSONResponse(content={"status": "success", "message": "PDF deleted"})
+
+@app.get("/api/genvideo/timing/{video_id}")
+async def get_video_timing(
+    video_id: str,
+    db: Session = Depends(database.get_db),
+    user: models.User = Depends(get_current_user)
+):
+    """영상의 타이밍 정보를 반환합니다 (가벼운 데이터만)."""
+    import json
+    from pdf2image import convert_from_bytes
+
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    # 영상 정보 가져오기
+    video_info = pdf2mp4.get_video_info(video_id)
+    if not video_info:
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "message": "Video not found"}
+        )
+
+    # 타이밍 파일 경로
+    video_dir = pdf2mp4.output_dir
+    timing_file = os.path.join(video_dir, f"{video_id}_timing.json")
+
+    timings = []
+    page_texts = []
+    duration = 0
+    num_slides = 0
+
+    # 타이밍 파일 로드
+    if os.path.exists(timing_file):
+        try:
+            with open(timing_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                timings = data.get('timings', [])
+                page_texts = data.get('page_texts', [])
+                num_slides = len(timings)
+                # 타이밍에서 duration 계산
+                if timings:
+                    last_timing = timings[-1]
+                    duration = last_timing.get('start', 0) + last_timing.get('duration', 0)
+        except Exception as e:
+            print(f"Error loading timing file: {e}")
+
+    # 타이밍이 없으면 PDF에서 페이지 수만 확인
+    if not timings:
+        pdf_path = pdf2mp4.get_pdf_path(video_id)
+        if pdf_path and os.path.exists(pdf_path):
+            try:
+                with open(pdf_path, 'rb') as f:
+                    pdf_content = f.read()
+                images = convert_from_bytes(pdf_content, dpi=36)  # 매우 저해상도로 페이지 수만 확인
+                num_slides = len(images)
+                # 기본 균등 분배
+                if duration > 0 and num_slides > 0:
+                    page_duration = duration / num_slides
+                    timings = [
+                        {'start': i * page_duration, 'duration': page_duration}
+                        for i in range(num_slides)
+                    ]
+            except Exception as e:
+                print(f"Error counting PDF pages: {e}")
+
+    return JSONResponse(content={
+        "status": "success",
+        "timings": timings,
+        "pageTexts": page_texts,
+        "numSlides": num_slides,
+        "duration": duration
+    })
+
+
+@app.get("/api/genvideo/timing/{video_id}/slide/{slide_index}")
+async def get_slide_image(
+    video_id: str,
+    slide_index: int,
+    db: Session = Depends(database.get_db),
+    user: models.User = Depends(get_current_user)
+):
+    """특정 슬라이드의 이미지와 OCR 텍스트를 반환합니다."""
+    import json
+    from pdf2image import convert_from_bytes
+    import base64
+    from io import BytesIO
+
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    pdf_path = pdf2mp4.get_pdf_path(video_id)
+    if not pdf_path or not os.path.exists(pdf_path):
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "message": "PDF not found"}
+        )
+
+    try:
+        with open(pdf_path, 'rb') as f:
+            pdf_content = f.read()
+
+        # 특정 페이지만 변환 (first_page와 last_page는 1-based index)
+        images = convert_from_bytes(
+            pdf_content,
+            dpi=100,
+            first_page=slide_index + 1,
+            last_page=slide_index + 1
+        )
+
+        if not images:
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "message": "Slide not found"}
+            )
+
+        img = images[0]
+
+        # 이미지를 base64로 인코딩
+        buffered = BytesIO()
+        img.thumbnail((800, 600))  # 적절한 크기로 리사이즈
+        img.save(buffered, format="PNG", optimize=True)
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+
+        # OCR 텍스트 (캐시된 타이밍 파일에서 가져오거나 간단한 텍스트 추출)
+        ocr_text = ""
+        timing_file = os.path.join(pdf2mp4.output_dir, f"{video_id}_timing.json")
+        if os.path.exists(timing_file):
+            try:
+                with open(timing_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    texts = data.get('page_texts', [])
+                    if slide_index < len(texts):
+                        ocr_text = texts[slide_index]
+            except:
+                pass
+
+        # 캐시된 텍스트가 없으면 PyPDF2로 간단히 추출
+        if not ocr_text:
+            page_texts = pdf2mp4._extract_pdf_page_texts(pdf_content)
+            if slide_index < len(page_texts):
+                ocr_text = page_texts[slide_index]
+
+        return JSONResponse(content={
+            "status": "success",
+            "index": slide_index,
+            "imageUrl": f'data:image/png;base64,{img_str}',
+            "ocrText": ocr_text
+        })
+
+    except Exception as e:
+        print(f"Error extracting slide {slide_index}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+@app.post("/api/genvideo/timing/{video_id}")
+async def save_video_timing(
+    video_id: str,
+    request: Request,
+    user: models.User = Depends(get_current_user)
+):
+    """영상의 타이밍 정보를 저장합니다."""
+    import json
+
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    try:
+        data = await request.json()
+        timings = data.get('timings', [])
+
+        # 기존 타이밍 파일에서 page_texts 가져오기
+        video_dir = pdf2mp4.output_dir
+        timing_file = os.path.join(video_dir, f"{video_id}_timing.json")
+
+        page_texts = []
+        if os.path.exists(timing_file):
+            try:
+                with open(timing_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+                    page_texts = existing_data.get('page_texts', [])
+            except:
+                pass
+
+        # 타이밍 파일 저장 (page_texts 유지)
+        timing_data = {
+            'timings': timings,
+            'page_texts': page_texts
+        }
+        with open(timing_file, 'w', encoding='utf-8') as f:
+            json.dump(timing_data, f, ensure_ascii=False, indent=2)
+
+        return JSONResponse(content={"status": "success", "message": "Timing saved"})
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.post("/api/genvideo/reencode/{video_id}")
+async def reencode_video(
+    video_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: models.User = Depends(get_current_user)
+):
+    """편집된 타이밍으로 영상을 재변환합니다."""
+    import json
+    from pdf2image import convert_from_bytes
+
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    try:
+        data = await request.json()
+        timings = data.get('timings', [])
+
+        if not timings:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "No timings provided"}
+            )
+
+        # 기존 영상 정보 가져오기
+        video_info = pdf2mp4.get_video_info(video_id)
+        if not video_info:
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "message": "Video not found"}
+            )
+
+        # PDF 파일 경로
+        pdf_path = pdf2mp4.get_pdf_path(video_id)
+        if not pdf_path or not os.path.exists(pdf_path):
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "message": "PDF not found for this video"}
+            )
+
+        # 오디오 파일 경로 (영상에서 추출하거나 기존 오디오 사용)
+        video_path = video_info.get('file_path')
+
+        # 동기적으로 재변환 수행
+        result = await pdf2mp4.reencode_with_timings(
+            video_id=video_id,
+            pdf_path=pdf_path,
+            video_path=video_path,
+            timings=timings
+        )
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        print(f"Error re-encoding video: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
 
 @app.post("/api/youtube/upload-from-genvideo")
 async def youtube_upload_from_genvideo(

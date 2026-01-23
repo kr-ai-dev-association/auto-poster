@@ -19,79 +19,123 @@
 
     <div x-data="app()" class="min-h-screen flex bg-gray-900">
 
-        <!-- Left Sidebar (Resizable) -->
-        <div class="glass-sidebar text-white flex flex-col shadow-xl flex-shrink-0"
-            :style="'width: ' + sidebarWidth + 'px'">
-            <div class="p-6">
-                <div class="flex items-center mb-3">
+        <!-- Left Sidebar (Collapsible & Resizable) -->
+        <div class="glass-sidebar text-white flex flex-col shadow-xl flex-shrink-0 transition-all duration-300"
+            :style="'width: ' + (sidebarCollapsed ? '64' : sidebarWidth) + 'px'">
+
+            <!-- Header -->
+            <div class="p-4" :class="sidebarCollapsed ? 'px-2' : 'p-6'">
+                <div class="flex items-center" :class="sidebarCollapsed ? 'justify-center' : 'mb-3'">
                     <img src="/static/imgs/ai_profile.jpeg" alt="Logo"
-                        class="w-10 h-10 rounded-full object-cover mr-3 border-2 border-gray-700">
-                    <h1 class="text-2xl font-bold tracking-tight">Auto Poster</h1>
+                        class="w-10 h-10 rounded-full object-cover border-2 border-gray-700"
+                        :class="sidebarCollapsed ? '' : 'mr-3'">
+                    <h1 x-show="!sidebarCollapsed" class="text-2xl font-bold tracking-tight">Auto Poster</h1>
                 </div>
-                <p class="text-gray-400 text-xs mt-1">Multi-Platform Auto Posting</p>
+                <p x-show="!sidebarCollapsed" class="text-gray-400 text-xs mt-1">Multi-Platform Auto Posting</p>
             </div>
 
-            <nav class="flex-grow mt-6 px-4 space-y-2">
+            <nav class="flex-grow mt-2 space-y-2" :class="sidebarCollapsed ? 'px-2' : 'px-4 mt-6'">
+                <!-- Wiki -->
                 <button @click="mainTab = 'wiki'"
                     :class="mainTab === 'wiki' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
-                    class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-full flex items-center text-sm font-medium rounded-lg transition-all group"
+                    :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'"
+                    :title="sidebarCollapsed ? t('sidebar.wiki') : ''">
+                    <svg class="w-5 h-5" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2zM12 14v4M12 14a2 2 0 110-4 2 2 0 010 4z" />
                     </svg>
-                    <span x-text="t('sidebar.wiki')"></span>
+                    <span x-show="!sidebarCollapsed" x-text="t('sidebar.wiki')"></span>
                 </button>
+
+                <!-- YouTube -->
                 <button @click="mainTab = 'youtube'"
                     :class="mainTab === 'youtube' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
-                    class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-full flex items-center text-sm font-medium rounded-lg transition-all group"
+                    :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'"
+                    :title="sidebarCollapsed ? t('sidebar.youtube') : ''">
+                    <svg class="w-5 h-5" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    <span x-text="t('sidebar.youtube')"></span>
+                    <span x-show="!sidebarCollapsed" x-text="t('sidebar.youtube')"></span>
                 </button>
+
+                <!-- GenVideo -->
                 <button @click="mainTab = 'genvideo'"
                     :class="mainTab === 'genvideo' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
-                    class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-full flex items-center text-sm font-medium rounded-lg transition-all group"
+                    :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'"
+                    :title="sidebarCollapsed ? t('sidebar.genvideo') : ''">
+                    <svg class="w-5 h-5" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
                     </svg>
-                    <span x-text="t('sidebar.genvideo')"></span>
+                    <span x-show="!sidebarCollapsed" x-text="t('sidebar.genvideo')"></span>
+                </button>
+
+                <!-- Timing Editor -->
+                <button @click="mainTab = 'timing-editor'"
+                    :class="mainTab === 'timing-editor' ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
+                    class="w-full flex items-center text-sm font-medium rounded-lg transition-all group"
+                    :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'"
+                    :title="sidebarCollapsed ? '타이밍 편집' : ''">
+                    <svg class="w-5 h-5" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed">타이밍 편집</span>
                 </button>
 
                 <!-- Admin Menu (Conditional) -->
                 <template x-if="user?.is_super_admin">
                     <div class="mt-4 space-y-2">
                         <a href="/admin/users" @click.prevent="window.location.href = '/admin/users'"
-                            class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group text-indigo-300 hover:bg-indigo-900 hover:text-white border border-indigo-900 cursor-pointer">
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="w-full flex items-center text-sm font-medium rounded-lg transition-all group text-indigo-300 hover:bg-indigo-900 hover:text-white border border-indigo-900 cursor-pointer"
+                            :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'"
+                            :title="sidebarCollapsed ? '회원 관리' : ''">
+                            <svg class="w-5 h-5" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
-                            회원 관리
+                            <span x-show="!sidebarCollapsed">회원 관리</span>
                         </a>
                         <a href="/admin/secure-files" @click.prevent="window.location.href = '/admin/secure-files'"
-                            class="w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all group text-yellow-300 hover:bg-yellow-900 hover:text-white border border-yellow-900 cursor-pointer">
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            class="w-full flex items-center text-sm font-medium rounded-lg transition-all group text-yellow-300 hover:bg-yellow-900 hover:text-white border border-yellow-900 cursor-pointer"
+                            :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'"
+                            :title="sidebarCollapsed ? '보안 파일 관리' : ''">
+                            <svg class="w-5 h-5" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
-                            보안 파일 관리
+                            <span x-show="!sidebarCollapsed">보안 파일 관리</span>
                         </a>
                     </div>
                 </template>
             </nav>
 
+            <!-- Collapse/Expand Button -->
+            <div class="p-2" :class="sidebarCollapsed ? 'px-2' : 'px-4'">
+                <button @click="sidebarCollapsed = !sidebarCollapsed"
+                    class="w-full flex items-center text-sm font-medium rounded-lg transition-all text-gray-400 hover:bg-gray-800 hover:text-white"
+                    :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-3'"
+                    :title="sidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'">
+                    <svg class="w-5 h-5 transition-transform duration-300" :class="sidebarCollapsed ? 'rotate-180' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed">접기</span>
+                </button>
+            </div>
 
-
-            <div class="p-4 border-t border-gray-800 text-xs text-gray-400 text-center">
-                &copy; 2026 Banya AI
+            <div class="p-4 border-t border-gray-800 text-xs text-gray-400 text-center" :class="sidebarCollapsed ? 'p-2' : ''">
+                <span x-show="!sidebarCollapsed">&copy; 2026 Banya AI</span>
+                <span x-show="sidebarCollapsed" class="text-[10px]">&copy;</span>
             </div>
         </div>
 
-        <!-- Sidebar Resize Handle -->
-        <div class="w-1 bg-gray-700 hover:bg-indigo-500 cursor-col-resize flex-shrink-0 transition-colors"
+        <!-- Sidebar Resize Handle (hidden when collapsed) -->
+        <div x-show="!sidebarCollapsed"
+            class="w-1 bg-gray-700 hover:bg-indigo-500 cursor-col-resize flex-shrink-0 transition-colors"
             @mousedown="startSidebarResize($event)"></div>
 
         <!-- Main Content Area -->
@@ -106,6 +150,7 @@
                         <span x-show="mainTab === 'wiki'" x-text="t('wiki.title')"></span>
                         <span x-show="mainTab === 'youtube'" x-text="t('yt.title')"></span>
                         <span x-show="mainTab === 'genvideo'" x-text="t('genvideo.title')"></span>
+                        <span x-show="mainTab === 'timing-editor'">슬라이드 타이밍 편집기</span>
                     </h2>
                     <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'wiki'" x-text="t('wiki.subtitle')">
                     </p>
@@ -113,6 +158,8 @@
                     </p>
                     <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'genvideo'"
                         x-text="t('genvideo.subtitle')"></p>
+                    <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'timing-editor'">
+                        비디오 시퀀스를 확인하고 슬라이드 타이밍을 수동으로 조절하세요</p>
                 </div>
 
 
@@ -1144,8 +1191,19 @@
             <!-- Gen Video Section -->
             <div x-show="mainTab === 'genvideo'" class="flex flex-col h-full animate-fade-in">
 
+                <!-- Reset Button (Top Right) -->
+                <div class="w-full px-6 pt-4 pb-4 flex justify-end">
+                    <button @click="resetGenvideo()"
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        초기화
+                    </button>
+                </div>
 
-                <div class="w-full px-6 py-10 flex-grow overflow-y-auto">
+                <div class="w-full px-6 pb-10 flex-grow overflow-y-auto">
                     <div class="glass-panel rounded-xl p-8 shadow-sm">
                         <h3 class="text-xl font-bold text-white mb-6">📄 PDF to Video 변환</h3>
 
@@ -1164,6 +1222,19 @@
                                         class="mt-2 text-xs text-yellow-400">
                                         ⚠️ Smart 모드는 Whisper 설치가 필요합니다.
                                     </p>
+                                </div>
+
+                                <!-- OCR Language Selection -->
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">PDF 언어 (OCR)</label>
+                                    <select x-model="genVideoOcrLang"
+                                        class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                        <option value="korean">한국어 + 영어</option>
+                                        <option value="en">영어 전용</option>
+                                        <option value="ch">중국어 + 영어</option>
+                                        <option value="japan">일본어</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500">PDF에 포함된 텍스트의 주요 언어를 선택하세요.</p>
                                 </div>
 
                                 <!-- PDF File Upload -->
@@ -1537,6 +1608,275 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Timing Editor Tab -->
+            <div x-show="mainTab === 'timing-editor'" class="flex flex-col h-full animate-fade-in">
+                <div class="w-full h-full flex flex-col">
+                    <!-- Top: PDF Viewer & OCR Section -->
+                    <div class="flex-shrink-0 h-1/3 border-b border-gray-700 flex">
+                        <!-- PDF Slide Viewer -->
+                        <div class="w-1/2 p-4 border-r border-gray-700">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-sm font-bold text-white">PDF 슬라이드</h3>
+                                <div class="flex items-center gap-2">
+                                    <button @click="timingEditorPrevSlide()" :disabled="timingEditorCurrentSlide <= 0"
+                                        class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                        </svg>
+                                    </button>
+                                    <span class="text-sm text-gray-300" x-text="(timingEditorCurrentSlide + 1) + ' / ' + timingEditorSlides.length"></span>
+                                    <button @click="timingEditorNextSlide()" :disabled="timingEditorCurrentSlide >= timingEditorSlides.length - 1"
+                                        class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-gray-800 rounded-lg h-full flex items-center justify-center overflow-hidden">
+                                <!-- 슬라이드 이미지 로드됨 -->
+                                <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.loaded && timingEditorSlides[timingEditorCurrentSlide]?.imageUrl">
+                                    <img :src="timingEditorSlides[timingEditorCurrentSlide]?.imageUrl"
+                                         class="max-h-full max-w-full object-contain" alt="Slide">
+                                </template>
+                                <!-- 슬라이드 로딩 중 -->
+                                <template x-if="timingEditorSlides.length > 0 && !timingEditorSlides[timingEditorCurrentSlide]?.loaded">
+                                    <div class="text-gray-500 text-center">
+                                        <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <p class="text-sm">슬라이드 로딩 중...</p>
+                                    </div>
+                                </template>
+                                <!-- 영상 미선택 -->
+                                <template x-if="timingEditorSlides.length === 0">
+                                    <div class="text-gray-500 text-center">
+                                        <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        <p class="text-sm">영상을 선택하면 슬라이드가 표시됩니다</p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- OCR Subtitle Section -->
+                        <div class="w-1/2 p-4">
+                            <h3 class="text-sm font-bold text-white mb-3">OCR 자막</h3>
+                            <div class="bg-gray-800 rounded-lg p-4 h-full overflow-y-auto">
+                                <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.ocrText">
+                                    <p class="text-gray-300 text-sm whitespace-pre-wrap"
+                                       x-text="timingEditorSlides[timingEditorCurrentSlide]?.ocrText"></p>
+                                </template>
+                                <template x-if="timingEditorSlides.length === 0 || !timingEditorSlides[timingEditorCurrentSlide]?.ocrText">
+                                    <p class="text-gray-500 text-sm">OCR 텍스트가 없습니다</p>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Middle: Video Sequence Timeline -->
+                    <div class="flex-grow p-4 flex flex-col">
+                        <!-- Video Selection & Controls -->
+                        <div class="flex items-center gap-4 mb-4">
+                            <select x-model="timingEditorSelectedVideo" @change="loadTimingEditorVideo()"
+                                class="px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                                <option value="">영상 선택...</option>
+                                <template x-for="video in generatedVideos" :key="video.id">
+                                    <option :value="video.id" x-text="video.filename"></option>
+                                </template>
+                            </select>
+                            <button @click="playPauseTimingEditor()" :disabled="!timingEditorVideoLoaded"
+                                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-show="!timingEditorPlaying">▶ 재생</span>
+                                <span x-show="timingEditorPlaying">⏸ 일시정지</span>
+                            </button>
+                            <span class="text-sm text-gray-400" x-text="formatTimecode(timingEditorCurrentTime) + ' / ' + formatTimecode(timingEditorDuration)"></span>
+
+                            <!-- Save & Reencode Button (상태에 따라 변경) -->
+                            <div class="ml-auto flex gap-2">
+                                <!-- 저장되지 않은 상태: 저장 버튼 -->
+                                <button x-show="!timingEditorSaved"
+                                    @click="saveTimingsAndPrepareReencode()"
+                                    :disabled="timingEditorTimings.length === 0 || timingEditorSaving"
+                                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all">
+                                    <template x-if="timingEditorSaving">
+                                        <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </template>
+                                    <svg x-show="!timingEditorSaving" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                    </svg>
+                                    <span x-text="timingEditorSaving ? '저장 중...' : '타이밍 저장'"></span>
+                                </button>
+
+                                <!-- 저장된 상태: 영상 재변환 버튼 -->
+                                <button x-show="timingEditorSaved"
+                                    @click="reencodeVideo()"
+                                    :disabled="timingEditorTimings.length === 0 || timingEditorReencoding"
+                                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all animate-pulse">
+                                    <template x-if="timingEditorReencoding">
+                                        <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </template>
+                                    <svg x-show="!timingEditorReencoding" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    <span x-text="timingEditorReencoding ? '변환 중...' : '🎬 영상 재변환'"></span>
+                                </button>
+
+                                <!-- 저장 상태 되돌리기 버튼 (저장 후 다시 수정하고 싶을 때) -->
+                                <button x-show="timingEditorSaved && !timingEditorReencoding"
+                                    @click="timingEditorSaved = false"
+                                    class="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-lg flex items-center gap-1"
+                                    title="타이밍 다시 수정">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+                                    </svg>
+                                </button>
+                                <button @click="exportTimingsSRT()" :disabled="timingEditorTimings.length === 0"
+                                    class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                                    SRT 내보내기
+                                </button>
+                                <button @click="exportTimingsCSV()" :disabled="timingEditorTimings.length === 0"
+                                    class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                                    CSV 내보내기
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Video Player (Hidden, for audio) -->
+                        <video x-ref="timingEditorVideo" class="hidden"
+                               @loadedmetadata="timingEditorVideoLoaded = true; timingEditorDuration = $refs.timingEditorVideo.duration"
+                               @timeupdate="updateTimingEditorTime()"
+                               @ended="timingEditorPlaying = false"></video>
+
+                        <!-- Video Sequence / Frame Strip -->
+                        <div class="bg-gray-800 rounded-lg p-3 mb-4 overflow-x-auto">
+                            <div class="flex gap-1 min-w-max" :style="'width: ' + Math.max(100, timingEditorDuration * 10) + 'px'">
+                                <!-- Frame thumbnails will be generated here -->
+                                <template x-for="(frame, idx) in timingEditorFrames" :key="idx">
+                                    <div class="flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
+                                         :class="{'ring-2 ring-yellow-500': isFrameInCurrentSlide(idx)}"
+                                         @click="seekToFrame(idx)"
+                                         :style="'width: ' + (timingEditorFrameWidth) + 'px'">
+                                        <img :src="frame.thumbnail" class="h-16 w-full object-cover rounded" alt="">
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Timeline with Markers -->
+                        <div class="relative bg-gray-800 rounded-lg p-2 h-20">
+                            <!-- Time ruler (클릭하여 seek) -->
+                            <div class="absolute top-0 left-0 right-0 h-8 border-b border-gray-700 cursor-pointer hover:bg-gray-700/30 transition-colors"
+                                 x-ref="timeRuler"
+                                 @click="seekToPosition($event)">
+                                <template x-for="t in Math.ceil(timingEditorDuration / 10)" :key="t">
+                                    <div class="absolute text-xs text-gray-500 bottom-1" :style="'left: ' + ((t * 10) / timingEditorDuration * 100) + '%'">
+                                        <span x-text="formatTimecode(t * 10)"></span>
+                                    </div>
+                                </template>
+                                <!-- Current time indicator on ruler -->
+                                <div class="absolute top-0 bottom-0 w-0.5 bg-red-500 pointer-events-none"
+                                     :style="'left: ' + (timingEditorCurrentTime / timingEditorDuration * 100) + '%'">
+                                    <div class="absolute -top-1 left-1/2 transform -translate-x-1/2 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded whitespace-nowrap shadow-lg"
+                                         x-text="formatTimecode(timingEditorCurrentTime)"></div>
+                                </div>
+                            </div>
+
+                            <!-- Slide timing blocks (리사이즈 핸들 영역) -->
+                            <div class="absolute top-10 left-0 right-0 bottom-0 overflow-hidden" x-ref="timelineContainer">
+                                <template x-for="(timing, idx) in timingEditorTimings" :key="idx">
+                                    <div class="absolute h-10 rounded flex items-center justify-center text-xs font-bold text-white shadow-lg transition-colors"
+                                         :class="idx === timingEditorCurrentSlide ? 'bg-purple-600 ring-2 ring-yellow-400' : 'bg-purple-500/70 hover:bg-purple-600'"
+                                         :style="'left: ' + (timing.start / timingEditorDuration * 100) + '%; width: ' + (timing.duration / timingEditorDuration * 100) + '%'">
+                                        <!-- 중앙 드래그 영역 -->
+                                        <div class="absolute inset-0 left-4 right-4 cursor-move"
+                                             @mousedown="startDragTiming($event, idx)"
+                                             @click="jumpToSlide(idx)">
+                                            <span class="absolute inset-0 flex items-center justify-center" x-text="'슬라이드 ' + (idx + 1)"></span>
+                                        </div>
+
+                                        <!-- Left resize handle -->
+                                        <div class="absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize bg-purple-900/80 hover:bg-yellow-500 rounded-l transition-colors flex items-center justify-center z-10"
+                                             @mousedown.stop="startResizeTiming($event, idx, 'left')">
+                                            <div class="w-0.5 h-6 bg-white/50 rounded"></div>
+                                        </div>
+
+                                        <!-- Right resize handle -->
+                                        <div class="absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize bg-purple-900/80 hover:bg-yellow-500 rounded-r transition-colors flex items-center justify-center z-10"
+                                             @mousedown.stop="startResizeTiming($event, idx, 'right')">
+                                            <div class="w-0.5 h-6 bg-white/50 rounded"></div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- Current time indicator on blocks -->
+                                <div class="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
+                                     :style="'left: ' + (timingEditorCurrentTime / timingEditorDuration * 100) + '%'">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timing Details Table -->
+                        <div class="mt-4 bg-gray-800 rounded-lg overflow-hidden">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-gray-300">슬라이드</th>
+                                        <th class="px-4 py-2 text-left text-gray-300">시작 시간</th>
+                                        <th class="px-4 py-2 text-left text-gray-300">종료 시간</th>
+                                        <th class="px-4 py-2 text-left text-gray-300">길이</th>
+                                        <th class="px-4 py-2 text-center text-gray-300">이동</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(timing, idx) in timingEditorTimings" :key="idx">
+                                        <tr class="border-t border-gray-700 hover:bg-gray-700/50"
+                                            :class="idx === timingEditorCurrentSlide ? 'bg-purple-900/30' : ''">
+                                            <td class="px-4 py-2 text-white cursor-pointer" @click="jumpToSlide(idx)" x-text="'슬라이드 ' + (idx + 1)"></td>
+                                            <td class="px-2 py-1">
+                                                <input type="text"
+                                                    :value="formatTimecodeEditable(timing.start)"
+                                                    @blur="updateTimingStart(idx, $event.target.value)"
+                                                    @keydown.enter="$event.target.blur()"
+                                                    class="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-gray-200 text-center text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                                                    placeholder="0:00.0">
+                                            </td>
+                                            <td class="px-2 py-1">
+                                                <input type="text"
+                                                    :value="formatTimecodeEditable(timing.start + timing.duration)"
+                                                    @blur="updateTimingEnd(idx, $event.target.value)"
+                                                    @keydown.enter="$event.target.blur()"
+                                                    class="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-gray-200 text-center text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                                                    placeholder="0:00.0">
+                                            </td>
+                                            <td class="px-4 py-2 text-gray-400 text-center" x-text="timing.duration.toFixed(1) + '초'"></td>
+                                            <td class="px-2 py-1 text-center">
+                                                <button @click="jumpToSlide(idx)"
+                                                    class="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded">
+                                                    ▶
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            <div class="px-4 py-2 bg-gray-700/50 text-xs text-gray-400">
+                                💡 시간 형식: 분:초.밀리초 (예: 2:35.5) 또는 초 (예: 155.5)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1545,6 +1885,7 @@
             return {
                 // Sidebar Resize
                 sidebarWidth: 346, // 80% of 432px
+                sidebarCollapsed: false,
                 isResizing: false,
 
                 startSidebarResize(e) {
@@ -1637,6 +1978,7 @@
 
                 // Gen Video State
                 genVideoMode: 'smart', // 'basic' or 'smart'
+                genVideoOcrLang: 'korean', // OCR 언어 설정
                 genVideoPdf: null,
                 genVideoPdfDragOver: false,
                 genVideoAudio: null,
@@ -1658,6 +2000,24 @@
                 generatedVideos: [],
                 smartModeAvailable: true,
                 categories: [], // 카테고리 목록
+
+                // Timing Editor State
+                timingEditorSelectedVideo: '',
+                timingEditorVideoLoaded: false,
+                timingEditorPlaying: false,
+                timingEditorCurrentTime: 0,
+                timingEditorDuration: 0,
+                timingEditorTimings: [],
+                timingEditorSlides: [],
+                timingEditorCurrentSlide: 0,
+                timingEditorNumSlides: 0,
+                timingEditorFrames: [],
+                timingEditorFrameWidth: 30,
+                timingEditorDragging: null,
+                timingEditorResizing: null,
+                timingEditorSaving: false,
+                timingEditorReencoding: false,
+                timingEditorSaved: false,  // 타이밍 저장 완료 상태
 
                 async init() {
                     const token = localStorage.getItem('access_token');
@@ -2092,6 +2452,622 @@
                         this.$refs.pdfFileInput.value = '';
                     }
                 },
+
+                resetGenvideo() {
+                    // 파일 초기화
+                    this.genVideoPdf = null;
+                    this.genVideoPdfDragOver = false;
+                    this.genVideoAudio = null;
+                    this.genVideoAudioDragOver = false;
+
+                    // 모드 및 설정 초기화
+                    this.genVideoMode = 'smart';
+                    this.genVideoOcrLang = 'korean';
+                    this.genVideoPageDuration = 5;
+                    this.genVideoTransition = 'fade';
+                    this.genVideoTransitionDuration = 0.5;
+                    this.genVideoResolution = '1920x1080';
+                    this.genVideoAutoDuration = false;
+                    this.genVideoCategory = 'tech';
+                    this.genVideoLogoTimestamp = Date.now();
+                    this.genVideoLogoError = '';
+
+                    // 상태 및 결과 초기화
+                    this.genVideoLoading = false;
+                    this.genVideoResult = null;
+                    this.genVideoProgress = null;
+                    this.genVideoCancelling = false;
+                    this.genVideoCurrentId = null;
+
+                    // 진행 타이머 정리
+                    if (this.genVideoProgressInterval) {
+                        clearTimeout(this.genVideoProgressInterval);
+                        this.genVideoProgressInterval = null;
+                    }
+
+                    // 파일 입력 필드 초기화
+                    if (this.$refs.genVideoPdfInput) {
+                        this.$refs.genVideoPdfInput.value = '';
+                    }
+                    if (this.$refs.genVideoAudioInput) {
+                        this.$refs.genVideoAudioInput.value = '';
+                    }
+                    if (this.$refs.genVideoLogoInput) {
+                        this.$refs.genVideoLogoInput.value = '';
+                    }
+                },
+
+                // ======================================
+                // Timing Editor Functions
+                // ======================================
+
+                formatTimecode(seconds) {
+                    if (!seconds || isNaN(seconds)) return '0:00';
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                },
+
+                formatTimecodeEditable(seconds) {
+                    if (!seconds || isNaN(seconds)) return '0:00.0';
+                    const mins = Math.floor(seconds / 60);
+                    const secs = (seconds % 60).toFixed(1);
+                    return `${mins}:${secs.padStart(4, '0')}`;
+                },
+
+                parseTimecode(timeStr) {
+                    // 다양한 형식 지원: "2:35.5", "2:35", "155.5", "155"
+                    if (!timeStr || typeof timeStr !== 'string') return null;
+
+                    timeStr = timeStr.trim();
+
+                    // 분:초 형식 (예: 2:35.5 또는 2:35)
+                    if (timeStr.includes(':')) {
+                        const parts = timeStr.split(':');
+                        if (parts.length === 2) {
+                            const mins = parseFloat(parts[0]) || 0;
+                            const secs = parseFloat(parts[1]) || 0;
+                            return mins * 60 + secs;
+                        }
+                    }
+
+                    // 초 단위 형식 (예: 155.5)
+                    const seconds = parseFloat(timeStr);
+                    if (!isNaN(seconds)) {
+                        return seconds;
+                    }
+
+                    return null;
+                },
+
+                updateTimingStart(idx, newStartStr) {
+                    const newStart = this.parseTimecode(newStartStr);
+                    if (newStart === null || newStart < 0) {
+                        console.log('Invalid start time:', newStartStr);
+                        return;
+                    }
+
+                    const timing = this.timingEditorTimings[idx];
+                    if (!timing) return;
+
+                    const oldStart = timing.start;
+                    const oldEnd = timing.start + timing.duration;
+
+                    // 제약 조건 검사
+                    // 1. 이전 슬라이드의 끝보다 뒤여야 함
+                    const minStart = idx > 0 ? this.timingEditorTimings[idx - 1].start + this.timingEditorTimings[idx - 1].duration : 0;
+                    // 2. 현재 슬라이드의 끝보다 앞이어야 함
+                    const maxStart = oldEnd - 0.1; // 최소 0.1초 길이 유지
+
+                    const clampedStart = Math.max(minStart, Math.min(newStart, maxStart));
+
+                    // 현재 슬라이드 업데이트: 시작 변경, 끝은 유지 -> duration 변경
+                    timing.start = clampedStart;
+                    timing.duration = oldEnd - clampedStart;
+
+                    // 이전 슬라이드의 끝 시간 조정 (간격이 생기면)
+                    if (idx > 0) {
+                        const prevTiming = this.timingEditorTimings[idx - 1];
+                        const prevEnd = prevTiming.start + prevTiming.duration;
+                        if (clampedStart > prevEnd) {
+                            // 이전 슬라이드 duration 늘리기
+                            prevTiming.duration = clampedStart - prevTiming.start;
+                        } else if (clampedStart < prevEnd) {
+                            // 이전 슬라이드 duration 줄이기
+                            prevTiming.duration = clampedStart - prevTiming.start;
+                        }
+                    }
+
+                    console.log(`Slide ${idx + 1} start updated: ${oldStart.toFixed(1)}s -> ${clampedStart.toFixed(1)}s`);
+                },
+
+                updateTimingEnd(idx, newEndStr) {
+                    const newEnd = this.parseTimecode(newEndStr);
+                    if (newEnd === null || newEnd < 0) {
+                        console.log('Invalid end time:', newEndStr);
+                        return;
+                    }
+
+                    const timing = this.timingEditorTimings[idx];
+                    if (!timing) return;
+
+                    const oldEnd = timing.start + timing.duration;
+
+                    // 제약 조건 검사
+                    // 1. 현재 슬라이드의 시작보다 뒤여야 함
+                    const minEnd = timing.start + 0.1; // 최소 0.1초 길이 유지
+                    // 2. 다음 슬라이드의 끝보다 앞이어야 함 (또는 전체 duration 이하)
+                    let maxEnd;
+                    if (idx < this.timingEditorTimings.length - 1) {
+                        const nextTiming = this.timingEditorTimings[idx + 1];
+                        maxEnd = nextTiming.start + nextTiming.duration;
+                    } else {
+                        maxEnd = this.timingEditorDuration;
+                    }
+
+                    const clampedEnd = Math.max(minEnd, Math.min(newEnd, maxEnd));
+
+                    // 현재 슬라이드 업데이트: 끝 변경 -> duration 변경
+                    timing.duration = clampedEnd - timing.start;
+
+                    // 다음 슬라이드의 시작 시간 조정
+                    if (idx < this.timingEditorTimings.length - 1) {
+                        const nextTiming = this.timingEditorTimings[idx + 1];
+                        const nextEnd = nextTiming.start + nextTiming.duration;
+
+                        if (clampedEnd !== nextTiming.start) {
+                            // 다음 슬라이드 시작 조정
+                            nextTiming.start = clampedEnd;
+                            nextTiming.duration = nextEnd - clampedEnd;
+
+                            // duration이 음수가 되지 않도록
+                            if (nextTiming.duration < 0.1) {
+                                nextTiming.duration = 0.1;
+                            }
+                        }
+                    }
+
+                    console.log(`Slide ${idx + 1} end updated: ${oldEnd.toFixed(1)}s -> ${clampedEnd.toFixed(1)}s`);
+                },
+
+                async loadTimingEditorVideo() {
+                    if (!this.timingEditorSelectedVideo) {
+                        this.resetTimingEditor();
+                        return;
+                    }
+
+                    // 새 영상 로드 시 저장 상태 리셋
+                    this.timingEditorSaved = false;
+
+                    const token = localStorage.getItem('access_token');
+                    console.log('Loading timing editor for video:', this.timingEditorSelectedVideo);
+
+                    try {
+                        // Load timing data from API (타이밍 + OCR 텍스트)
+                        const response = await fetch(`/api/genvideo/timing/${this.timingEditorSelectedVideo}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            console.log('Timing data loaded:', data);
+                            this.timingEditorTimings = data.timings || [];
+                            this.timingEditorDuration = data.duration || 0;
+                            this.timingEditorNumSlides = data.numSlides || this.timingEditorTimings.length;
+
+                            // OCR 텍스트가 있으면 미리 저장
+                            const pageTexts = data.pageTexts || [];
+
+                            // 슬라이드 플레이스홀더 생성 (이미지는 나중에 개별 로드, OCR 텍스트는 미리 저장)
+                            this.timingEditorSlides = Array.from({length: this.timingEditorNumSlides}, (_, i) => ({
+                                index: i,
+                                imageUrl: '',
+                                ocrText: pageTexts[i] || '',  // 미리 추출된 OCR 텍스트 사용
+                                loaded: false
+                            }));
+
+                            // 첫 번째 슬라이드 이미지 로드
+                            if (this.timingEditorNumSlides > 0) {
+                                await this.loadSlideImage(0);
+                            }
+
+                            // Load video into player
+                            const videoUrl = `/api/genvideo/download/${this.timingEditorSelectedVideo}?token=${token}`;
+                            this.$refs.timingEditorVideo.src = videoUrl;
+                        } else {
+                            console.error('Failed to load timing data');
+                            this.timingEditorTimings = [];
+                            this.timingEditorSlides = [];
+                        }
+                    } catch (error) {
+                        console.error('Error loading timing editor video:', error);
+                    }
+                },
+
+                async loadSlideImage(slideIndex) {
+                    if (slideIndex < 0 || slideIndex >= this.timingEditorSlides.length) return;
+                    if (this.timingEditorSlides[slideIndex].loaded) return; // 이미 로드됨
+
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch(`/api/genvideo/timing/${this.timingEditorSelectedVideo}/slide/${slideIndex}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            // 기존 OCR 텍스트가 있으면 유지 (미리 로드된 텍스트 우선)
+                            const existingOcrText = this.timingEditorSlides[slideIndex]?.ocrText;
+                            this.timingEditorSlides[slideIndex] = {
+                                index: slideIndex,
+                                imageUrl: data.imageUrl,
+                                ocrText: existingOcrText || data.ocrText || '',
+                                loaded: true
+                            };
+                        }
+                    } catch (error) {
+                        console.error(`Error loading slide ${slideIndex}:`, error);
+                    }
+                },
+
+                resetTimingEditor() {
+                    this.timingEditorVideoLoaded = false;
+                    this.timingEditorPlaying = false;
+                    this.timingEditorCurrentTime = 0;
+                    this.timingEditorDuration = 0;
+                    this.timingEditorTimings = [];
+                    this.timingEditorSlides = [];
+                    this.timingEditorCurrentSlide = 0;
+                    this.timingEditorNumSlides = 0;
+                    this.timingEditorFrames = [];
+                    if (this.$refs.timingEditorVideo) {
+                        this.$refs.timingEditorVideo.src = '';
+                    }
+                },
+
+                playPauseTimingEditor() {
+                    if (!this.$refs.timingEditorVideo) return;
+                    if (this.timingEditorPlaying) {
+                        this.$refs.timingEditorVideo.pause();
+                        this.timingEditorPlaying = false;
+                    } else {
+                        this.$refs.timingEditorVideo.play();
+                        this.timingEditorPlaying = true;
+                    }
+                },
+
+                updateTimingEditorTime() {
+                    if (!this.$refs.timingEditorVideo) return;
+                    this.timingEditorCurrentTime = this.$refs.timingEditorVideo.currentTime;
+
+                    // Update current slide based on time
+                    let newSlideIdx = this.timingEditorCurrentSlide;
+                    for (let i = this.timingEditorTimings.length - 1; i >= 0; i--) {
+                        const timing = this.timingEditorTimings[i];
+                        if (this.timingEditorCurrentTime >= timing.start) {
+                            newSlideIdx = i;
+                            break;
+                        }
+                    }
+
+                    // 슬라이드가 변경되면 이미지 로드
+                    if (newSlideIdx !== this.timingEditorCurrentSlide) {
+                        this.timingEditorCurrentSlide = newSlideIdx;
+                        this.loadSlideImage(newSlideIdx);
+                    }
+                },
+
+                seekToPosition(event) {
+                    if (!this.$refs.timingEditorVideo || !this.timingEditorDuration) return;
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    const clickX = event.clientX - rect.left;
+                    const percent = clickX / rect.width;
+                    const newTime = percent * this.timingEditorDuration;
+                    this.$refs.timingEditorVideo.currentTime = newTime;
+                    this.timingEditorCurrentTime = newTime;
+
+                    // 새 위치에 해당하는 슬라이드 찾아서 로드
+                    for (let i = this.timingEditorTimings.length - 1; i >= 0; i--) {
+                        const timing = this.timingEditorTimings[i];
+                        if (newTime >= timing.start) {
+                            if (i !== this.timingEditorCurrentSlide) {
+                                this.timingEditorCurrentSlide = i;
+                                this.loadSlideImage(i);
+                            }
+                            break;
+                        }
+                    }
+                },
+
+                seekToFrame(idx) {
+                    if (!this.$refs.timingEditorVideo || !this.timingEditorFrames[idx]) return;
+                    const frameTime = this.timingEditorFrames[idx].time;
+                    this.$refs.timingEditorVideo.currentTime = frameTime;
+                    this.timingEditorCurrentTime = frameTime;
+
+                    // 해당 시간의 슬라이드 찾아서 로드
+                    for (let i = this.timingEditorTimings.length - 1; i >= 0; i--) {
+                        const timing = this.timingEditorTimings[i];
+                        if (frameTime >= timing.start) {
+                            if (i !== this.timingEditorCurrentSlide) {
+                                this.timingEditorCurrentSlide = i;
+                                this.loadSlideImage(i);
+                            }
+                            break;
+                        }
+                    }
+                },
+
+                isFrameInCurrentSlide(idx) {
+                    if (!this.timingEditorFrames[idx] || !this.timingEditorTimings.length) return false;
+                    const frameTime = this.timingEditorFrames[idx].time;
+                    const currentTiming = this.timingEditorTimings[this.timingEditorCurrentSlide];
+                    if (!currentTiming) return false;
+                    return frameTime >= currentTiming.start && frameTime < currentTiming.start + currentTiming.duration;
+                },
+
+                async jumpToSlide(idx) {
+                    if (!this.timingEditorTimings[idx]) return;
+                    this.timingEditorCurrentSlide = idx;
+                    const startTime = this.timingEditorTimings[idx].start;
+                    if (this.$refs.timingEditorVideo) {
+                        this.$refs.timingEditorVideo.currentTime = startTime;
+                    }
+                    this.timingEditorCurrentTime = startTime;
+                    // 슬라이드 이미지 로드
+                    await this.loadSlideImage(idx);
+                },
+
+                async timingEditorPrevSlide() {
+                    if (this.timingEditorCurrentSlide > 0) {
+                        await this.jumpToSlide(this.timingEditorCurrentSlide - 1);
+                    }
+                },
+
+                async timingEditorNextSlide() {
+                    if (this.timingEditorCurrentSlide < this.timingEditorSlides.length - 1) {
+                        await this.jumpToSlide(this.timingEditorCurrentSlide + 1);
+                    }
+                },
+
+                startDragTiming(event, idx) {
+                    if (event.target.classList.contains('cursor-ew-resize')) return;
+
+                    const containerRect = this.$refs.timelineContainer.getBoundingClientRect();
+                    const startX = event.clientX;
+                    const originalTiming = { ...this.timingEditorTimings[idx] };
+
+                    const onMouseMove = (e) => {
+                        const deltaX = e.clientX - startX;
+                        const deltaTime = (deltaX / containerRect.width) * this.timingEditorDuration;
+
+                        // Calculate new start time
+                        let newStart = originalTiming.start + deltaTime;
+
+                        // Constraints
+                        const prevEnd = idx > 0 ? this.timingEditorTimings[idx - 1].start + this.timingEditorTimings[idx - 1].duration : 0;
+                        const nextStart = idx < this.timingEditorTimings.length - 1 ? this.timingEditorTimings[idx + 1].start : this.timingEditorDuration;
+
+                        newStart = Math.max(prevEnd, Math.min(newStart, nextStart - originalTiming.duration));
+
+                        this.timingEditorTimings[idx].start = newStart;
+                    };
+
+                    const onMouseUp = () => {
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                        // 타이밍이 변경되면 저장 상태 리셋
+                        this.timingEditorSaved = false;
+                    };
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    document.body.style.cursor = 'move';
+                    document.body.style.userSelect = 'none';
+                },
+
+                startResizeTiming(event, idx, side) {
+                    const containerRect = this.$refs.timelineContainer.getBoundingClientRect();
+                    const startX = event.clientX;
+                    const originalTiming = { ...this.timingEditorTimings[idx] };
+                    const originalPrevTiming = idx > 0 ? { ...this.timingEditorTimings[idx - 1] } : null;
+                    const originalNextTiming = idx < this.timingEditorTimings.length - 1 ? { ...this.timingEditorTimings[idx + 1] } : null;
+
+                    const onMouseMove = (e) => {
+                        const deltaX = e.clientX - startX;
+                        const deltaTime = (deltaX / containerRect.width) * this.timingEditorDuration;
+                        const minDuration = 1.0; // 최소 슬라이드 길이 1초
+
+                        if (side === 'left') {
+                            // 왼쪽 핸들: 시작 시간 조정 + 이전 슬라이드 종료 시간 연동
+                            let newStart = originalTiming.start + deltaTime;
+
+                            // 제한: 이전 슬라이드 시작 + 최소 길이 이상, 현재 슬라이드 종료 - 최소 길이 이하
+                            const minStart = idx > 0 ? originalPrevTiming.start + minDuration : 0;
+                            const maxStart = originalTiming.start + originalTiming.duration - minDuration;
+                            newStart = Math.max(minStart, Math.min(newStart, maxStart));
+
+                            // 현재 슬라이드: 시작 시간 변경, 종료 시간 유지
+                            const endTime = originalTiming.start + originalTiming.duration;
+                            this.timingEditorTimings[idx].start = newStart;
+                            this.timingEditorTimings[idx].duration = endTime - newStart;
+
+                            // 이전 슬라이드: 종료 시간(duration) 연동 조정
+                            if (idx > 0) {
+                                this.timingEditorTimings[idx - 1].duration = newStart - this.timingEditorTimings[idx - 1].start;
+                            }
+                        } else {
+                            // 오른쪽 핸들: 종료 시간 조정 + 다음 슬라이드 시작 시간 연동
+                            let newEnd = originalTiming.start + originalTiming.duration + deltaTime;
+
+                            // 제한: 현재 슬라이드 시작 + 최소 길이 이상, 다음 슬라이드 종료 - 최소 길이 이하
+                            const minEnd = originalTiming.start + minDuration;
+                            const maxEnd = idx < this.timingEditorTimings.length - 1
+                                ? originalNextTiming.start + originalNextTiming.duration - minDuration
+                                : this.timingEditorDuration;
+                            newEnd = Math.max(minEnd, Math.min(newEnd, maxEnd));
+
+                            // 현재 슬라이드: duration 변경
+                            this.timingEditorTimings[idx].duration = newEnd - originalTiming.start;
+
+                            // 다음 슬라이드: 시작 시간 연동 조정
+                            if (idx < this.timingEditorTimings.length - 1) {
+                                const nextEndTime = originalNextTiming.start + originalNextTiming.duration;
+                                this.timingEditorTimings[idx + 1].start = newEnd;
+                                this.timingEditorTimings[idx + 1].duration = nextEndTime - newEnd;
+                            }
+                        }
+                    };
+
+                    const onMouseUp = () => {
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                        // 타이밍이 변경되면 저장 상태 리셋
+                        this.timingEditorSaved = false;
+                    };
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    document.body.style.cursor = 'ew-resize';
+                    document.body.style.userSelect = 'none';
+                },
+
+                async saveTimings() {
+                    if (!this.timingEditorSelectedVideo || !this.timingEditorTimings.length) return false;
+
+                    this.timingEditorSaving = true;
+                    const token = localStorage.getItem('access_token');
+
+                    try {
+                        const response = await fetch(`/api/genvideo/timing/${this.timingEditorSelectedVideo}`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                timings: this.timingEditorTimings
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            return true;
+                        } else {
+                            alert('저장 실패: ' + (data.message || '알 수 없는 오류'));
+                            return false;
+                        }
+                    } catch (error) {
+                        console.error('Error saving timings:', error);
+                        alert('저장 중 오류가 발생했습니다.');
+                        return false;
+                    } finally {
+                        this.timingEditorSaving = false;
+                    }
+                },
+
+                async saveTimingsAndPrepareReencode() {
+                    const success = await this.saveTimings();
+                    if (success) {
+                        this.timingEditorSaved = true;
+                    }
+                },
+
+                async reencodeVideo() {
+                    if (!this.timingEditorSelectedVideo || !this.timingEditorTimings.length) return;
+
+                    if (!confirm('현재 타이밍으로 영상을 재변환하시겠습니까?\n기존 영상은 유지되고 새로운 영상이 생성됩니다.')) {
+                        return;
+                    }
+
+                    this.timingEditorReencoding = true;
+                    const token = localStorage.getItem('access_token');
+
+                    try {
+                        // 먼저 타이밍 저장
+                        await this.saveTimings();
+
+                        // 재변환 요청
+                        const response = await fetch(`/api/genvideo/reencode/${this.timingEditorSelectedVideo}`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                timings: this.timingEditorTimings
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            alert(`영상 재변환이 완료되었습니다!\n새 영상: ${data.video?.filename || '새 영상'}`);
+                            // 영상 목록 새로고침
+                            await this.refreshGenVideoList();
+                        } else {
+                            alert('재변환 실패: ' + (data.message || '알 수 없는 오류'));
+                        }
+                    } catch (error) {
+                        console.error('Error re-encoding video:', error);
+                        alert('재변환 중 오류가 발생했습니다.');
+                    } finally {
+                        this.timingEditorReencoding = false;
+                    }
+                },
+
+                exportTimingsSRT() {
+                    if (!this.timingEditorTimings.length) return;
+
+                    let srt = '';
+                    this.timingEditorTimings.forEach((timing, idx) => {
+                        const startTime = this.formatSRTTime(timing.start);
+                        const endTime = this.formatSRTTime(timing.start + timing.duration);
+                        srt += `${idx + 1}\n`;
+                        srt += `${startTime} --> ${endTime}\n`;
+                        srt += `슬라이드 ${idx + 1}\n\n`;
+                    });
+
+                    this.downloadFile(srt, 'timings.srt', 'text/plain');
+                },
+
+                exportTimingsCSV() {
+                    if (!this.timingEditorTimings.length) return;
+
+                    let csv = '슬라이드,시작(분:초),끝(분:초),길이(초)\n';
+                    this.timingEditorTimings.forEach((timing, idx) => {
+                        const startTime = this.formatTimecode(timing.start);
+                        const endTime = this.formatTimecode(timing.start + timing.duration);
+                        csv += `${idx + 1},${startTime},${endTime},${timing.duration.toFixed(1)}\n`;
+                    });
+
+                    this.downloadFile(csv, 'timings.csv', 'text/csv');
+                },
+
+                formatSRTTime(seconds) {
+                    const hours = Math.floor(seconds / 3600);
+                    const mins = Math.floor((seconds % 3600) / 60);
+                    const secs = Math.floor(seconds % 60);
+                    const ms = Math.floor((seconds % 1) * 1000);
+                    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+                },
+
+                downloadFile(content, filename, mimeType) {
+                    const blob = new Blob([content], { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                // ======================================
+                // End of Timing Editor Functions
+                // ======================================
 
                 handleYtDrop(e) {
                     this.ytDragOver = false;
@@ -2622,6 +3598,7 @@
                     formData.append('pdf', this.genVideoPdf);
                     formData.append('mode', this.genVideoMode);
                     formData.append('resolution', this.genVideoResolution);
+                    formData.append('ocr_lang', this.genVideoOcrLang);
 
                     // 로고 선택 (카테고리)
                     if (this.genVideoCategory) {
