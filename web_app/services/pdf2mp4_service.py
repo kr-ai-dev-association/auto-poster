@@ -82,6 +82,7 @@ class PDF2MP4Service:
     _progress_store: Dict[str, Dict[str, Any]] = {}
     _cancel_store: Dict[str, bool] = {}  # 취소 요청 저장소
     _temp_dirs: Dict[str, str] = {}  # video_id -> temp_dir 매핑
+    _process_pids: Dict[str, int] = {}  # video_id -> process PID 매핑
 
     def __init__(self):
         self.output_dir = os.path.join(
@@ -171,10 +172,56 @@ class PDF2MP4Service:
                 print(f"[{video_id}] 🗑️ 임시 디렉토리 삭제: {temp_dir}")
             del cls._temp_dirs[video_id]
 
+    @classmethod
+    def register_process_pid(cls, video_id: str, pid: int):
+        """변환 프로세스 PID 등록"""
+        cls._process_pids[video_id] = pid
+        print(f"[{video_id}] 📝 프로세스 PID 등록: {pid}")
+
+    @classmethod
+    def clear_process_pid(cls, video_id: str):
+        """프로세스 PID 정리"""
+        if video_id in cls._process_pids:
+            del cls._process_pids[video_id]
+
+    @classmethod
+    def kill_process(cls, video_id: str) -> bool:
+        """변환 프로세스 강제 종료"""
+        import signal
+        if video_id not in cls._process_pids:
+            return False
+
+        pid = cls._process_pids[video_id]
+        try:
+            # 프로세스 그룹 전체 종료 (자식 프로세스 포함)
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+            print(f"[{video_id}] 🛑 프로세스 그룹 종료 시도: {pid}")
+        except ProcessLookupError:
+            print(f"[{video_id}] ⚠️ 프로세스가 이미 종료됨: {pid}")
+        except PermissionError:
+            # 프로세스 그룹 종료 실패시 단일 프로세스 종료 시도
+            try:
+                os.kill(pid, signal.SIGTERM)
+                print(f"[{video_id}] 🛑 단일 프로세스 종료: {pid}")
+            except:
+                pass
+        except Exception as e:
+            print(f"[{video_id}] ⚠️ 프로세스 종료 실패: {e}")
+            return False
+
+        cls.clear_process_pid(video_id)
+        return True
+
     def cancel_conversion(self, video_id: str) -> Dict[str, Any]:
         """변환 취소 및 정리"""
-        if not self.request_cancel(video_id):
+        if video_id not in self._progress_store:
             return {'status': 'error', 'message': '진행 중인 변환을 찾을 수 없습니다.'}
+
+        # 취소 플래그 설정
+        self.request_cancel(video_id)
+
+        # 프로세스 강제 종료
+        self.kill_process(video_id)
 
         # 임시 파일 정리
         self.cleanup_temp_dir(video_id)
@@ -809,13 +856,17 @@ class PDF2MP4Service:
 
         ffmpeg_cmd.append(output_path)
 
-        # ffmpeg 프로세스 시작
+        # ffmpeg 프로세스 시작 (새 프로세스 그룹으로)
         process = subprocess.Popen(
             ffmpeg_cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            start_new_session=True  # 취소 시 프로세스 그룹 전체 종료 가능
         )
+
+        # 프로세스 PID 등록 (취소 시 종료를 위해)
+        self.register_process_pid(video_id, process.pid)
 
         # 총 프레임 수 계산
         total_duration = timings[-1]['start'] + timings[-1]['duration'] if timings else 0
@@ -835,6 +886,7 @@ class PDF2MP4Service:
                     process.stdin.close()
                     process.terminate()
                     process.wait()
+                    self.clear_process_pid(video_id)
                     # 출력 파일 삭제
                     if os.path.exists(output_path):
                         os.remove(output_path)
@@ -871,6 +923,9 @@ class PDF2MP4Service:
 
         process.stdin.close()
         process.wait()
+
+        # 프로세스 PID 정리
+        self.clear_process_pid(video_id)
 
         stderr_output = process.stderr.read().decode() if process.stderr else ""
 
@@ -1186,6 +1241,7 @@ class PDF2MP4Service:
             shutil.rmtree(temp_dir, ignore_errors=True)
             self.cleanup_temp_dir(video_id)
             self.clear_cancel(video_id)
+            self.clear_process_pid(video_id)
 
     async def convert_smart(
         self,
@@ -1445,6 +1501,7 @@ class PDF2MP4Service:
             shutil.rmtree(temp_dir, ignore_errors=True)
             self.cleanup_temp_dir(video_id)
             self.clear_cancel(video_id)
+            self.clear_process_pid(video_id)
 
     def _calculate_smart_timings(
         self,
@@ -2003,3 +2060,4 @@ class PDF2MP4Service:
             return {'status': 'error', 'message': str(e)}
         finally:
             self.cleanup_temp_dir(new_video_id)
+            self.clear_process_pid(new_video_id)
