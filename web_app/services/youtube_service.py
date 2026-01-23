@@ -549,7 +549,7 @@ class YouTubeService:
             traceback.print_exc()
             return None
 
-    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', gen_sub=False, use_thumbnail=True, skip_logo=False):
+    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, skip_logo=False):
         """영상을 처리하고 유튜브에 업로드합니다.
 
         Args:
@@ -619,36 +619,22 @@ class YouTubeService:
             else:
                 print(f"✅ 메타데이터 최종 검증 통과")
 
-            # 3. 자막 생성 (옵션)
-            srt_path = None
-            if gen_sub:
-                print(f"📝 자막 생성 시작...")
-                try:
-                    srt_path = self.poster.generate_subtitles(video_path, lang=lang)
-                    print(f"✅ 자막 생성 완료: {srt_path}")
-                except Exception as e:
-                    print(f"❌ 자막 생성 실패: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    raise
-
-            # 4. 로고 및 자막 합성 (skip_logo가 False인 경우에만)
+            # 3. 로고 합성 (skip_logo가 False인 경우에만)
             if skip_logo:
                 print(f"⏭️ 로고 합성 건너뜀 (이미 합성된 영상)")
                 final_video_path = video_path
             else:
-                print(f"🎨 로고 및 자막 합성 시작...")
+                print(f"🎨 로고 합성 시작...")
                 logo_path = self.get_logo_path(category)
                 if not logo_path:
                     raise Exception("Logo not found for category " + category)
                 print(f"   로고 경로: {logo_path}")
                 print(f"   비디오 경로: {video_path}")
                 print(f"   최종 비디오 경로: {os.path.join(v_dir, f'final_{filename}')}")
-                print(f"   자막 경로: {srt_path if srt_path else '없음'}")
 
                 final_video_path = os.path.join(v_dir, f"final_{filename}")
                 try:
-                    success = self.poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, final_video_path)
+                    success = self.poster.add_logo_and_subs_to_video(video_path, logo_path, None, final_video_path)
                     print(f"✅ 비디오 편집 완료: {success}")
                     if not success:
                         error_msg = "비디오 편집이 실패했습니다. FFmpeg 에러 로그를 확인하세요."
@@ -660,7 +646,7 @@ class YouTubeService:
                     traceback.print_exc()
                     raise
 
-            # 5. 유튜브 업로드
+            # 4. 유튜브 업로드
             print(f"📤 YouTube 업로드 시작...")
             if thumbnail_path:
                 print(f"   썸네일 경로: {thumbnail_path}")
@@ -676,8 +662,8 @@ class YouTubeService:
             if not video_id:
                 raise Exception("YouTube upload failed")
 
-            # 6. 정리
-            for f in [video_path, pdf_path, srt_path, final_video_path, thumbnail_path]:
+            # 5. 정리
+            for f in [video_path, pdf_path, final_video_path, thumbnail_path]:
                 if f and os.path.exists(f):
                     os.remove(f)
 

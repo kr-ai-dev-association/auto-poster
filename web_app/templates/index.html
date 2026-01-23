@@ -1964,7 +1964,6 @@
                 pdfDragOver: false,
                 ytCategory: 'tech',
                 ytLang: 'en',
-                genSubtitles: false,
                 useThumbnail: true,
                 ytLoading: false,
                 ytMetadata: null,
@@ -2442,7 +2441,6 @@
                     // 설정 초기화
                     this.ytCategory = 'tech';
                     this.ytLang = 'en';
-                    this.genSubtitles = false;
                     this.useThumbnail = true;
 
                     // 결과 및 상태 초기화
@@ -3474,7 +3472,6 @@
                             }
                             formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
-                            formData.append('gen_sub', false); // 자막은 Gen Video에서 생성
                             formData.append('use_thumbnail', this.useThumbnail);
 
                             response = await fetch('/api/youtube/upload-from-genvideo', {
@@ -3495,7 +3492,6 @@
                             }
                             formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
-                            formData.append('gen_sub', false); // 자막 기능은 Gen Video로 이동됨
                             formData.append('use_thumbnail', this.useThumbnail);
 
                             response = await fetch('/api/youtube/upload', {

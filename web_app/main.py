@@ -447,7 +447,6 @@ async def youtube_upload(
     pdf_id: str = Form(None),
     category: str = Form(...),
     lang: str = Form("ko"),
-    gen_sub: bool = Form(False),
     use_thumbnail: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
@@ -475,7 +474,7 @@ async def youtube_upload(
             return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
 
         result = await youtube.process_and_upload(
-            video_content, video.filename, pdf_content, category, lang, gen_sub, use_thumbnail
+            video_content, video.filename, pdf_content, category, lang, use_thumbnail
         )
         return JSONResponse(content=result)
     except Exception as e:
@@ -1141,7 +1140,6 @@ async def youtube_upload_from_genvideo(
     pdf_id: str = Form(None),
     category: str = Form(...),
     lang: str = Form("ko"),
-    gen_sub: bool = Form(False),
     use_thumbnail: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
@@ -1187,7 +1185,6 @@ async def youtube_upload_from_genvideo(
             pdf_content,
             category,
             lang,
-            gen_sub,
             use_thumbnail,
             skip_logo=True  # Gen Video에서 이미 로고가 합성됨
         )
