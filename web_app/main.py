@@ -582,9 +582,18 @@ async def convert_pdf_to_video(
     auto_duration: bool = Form(False),
     category: str = Form(None),
     ocr_lang: str = Form("korean"),
+    gen_subtitles: bool = Form(False),
+    subtitle_lang: str = Form("ko"),
+    subtitle_level: int = Form(1),
     user: models.User = Depends(get_current_user)
 ):
-    """PDF를 MP4 영상으로 변환합니다."""
+    """PDF를 MP4 영상으로 변환합니다.
+
+    subtitle_level:
+        1 - 키워드 중심 (간결)
+        2 - 요약 중심 (균형)
+        3 - 전체 자막 (상세)
+    """
     if not pdf2mp4:
         return JSONResponse(
             status_code=503,
@@ -621,7 +630,11 @@ async def convert_pdf_to_video(
                 height=height,
                 fps=fps,
                 logo_path=logo_path,
-                ocr_lang=ocr_lang
+                ocr_lang=ocr_lang,
+                gen_subtitles=gen_subtitles,
+                subtitle_lang=subtitle_lang,
+                subtitle_level=subtitle_level,
+                youtube_service=youtube
             )
         else:
             result = await pdf2mp4.convert_basic(
@@ -637,7 +650,11 @@ async def convert_pdf_to_video(
                 fps=fps,
                 auto_duration=auto_duration,
                 logo_path=logo_path,
-                ocr_lang=ocr_lang
+                ocr_lang=ocr_lang,
+                gen_subtitles=gen_subtitles,
+                subtitle_lang=subtitle_lang,
+                subtitle_level=subtitle_level,
+                youtube_service=youtube
             )
 
         return JSONResponse(content=result)

@@ -332,6 +332,166 @@ class YouTubeAutoPoster:
             print(f"❌ Error generating subtitles: {e}")
             return None
 
+    def generate_subtitles_with_level(self, video_path, lang='ko', level=1):
+        """레벨별 자막 생성
+
+        Args:
+            video_path: 비디오 파일 경로
+            lang: 자막 언어 ('ko' 또는 'en')
+            level: 자막 상세도
+                   1 - 키워드 중심 (간결)
+                   2 - 요약 중심 (균형)
+                   3 - 전체 자막 (상세)
+
+        Returns:
+            생성된 SRT 파일 경로 또는 None
+        """
+        print(f"🎙️ Generating subtitles with level {level} (Language: {lang})...")
+        try:
+            with open(video_path, 'rb') as f:
+                video_data = f.read()
+
+            lang_str = "Korean" if lang == 'ko' else "English"
+
+            # 레벨별 프롬프트 설정
+            if level == 1:
+                # 키워드 중심 (간결)
+                examples = (
+                    '"AGI 시대의 패러다임", "혁신적 AI 아키텍처", "소브린 AI의 가치"'
+                    if lang == 'ko' else
+                    '"AGI Era Paradigm", "Innovative AI Architecture", "Value of Sovereign AI"'
+                )
+                prompt = f"""
+                Analyze the video and generate keyword-focused SRT subtitles in {lang_str}.
+
+                [Rules for Level 1 - Keyword Focus]
+                - Extract ONLY the key terms and concepts (3-5 words per entry)
+                - Generate 10-15 subtitle entries for key moments
+                - Focus on technical terms, proper nouns, and core concepts
+                - Each entry should be ultra-concise, like a tag or keyword
+                - Timing MUST follow standard SRT: HH:MM:SS,mmm --> HH:MM:SS,mmm
+                - Ensure 3-4 seconds per subtitle
+
+                Examples: {examples}
+
+                Return ONLY the raw SRT content.
+                """
+            elif level == 2:
+                # 요약 중심 (균형)
+                examples = (
+                    '"AGI 시대의 새로운 패러다임 분석", "혁신적인 AI 아키텍처의 도약", "한국형 소브린 AI의 전략적 가치"'
+                    if lang == 'ko' else
+                    '"Analyzing the New Paradigm of AGI", "The Leap of Innovative AI Architecture", "Strategic Value of Sovereign AI"'
+                )
+                prompt = f"""
+                Analyze the video and generate summary-focused SRT subtitles in {lang_str}.
+
+                [Rules for Level 2 - Summary Focus]
+                - Summarize key points into concise phrases (6-10 words per entry)
+                - Generate 15-25 subtitle entries covering main topics
+                - Balance between brevity and clarity
+                - Each entry should convey a complete idea
+                - Timing MUST follow standard SRT: HH:MM:SS,mmm --> HH:MM:SS,mmm
+                - Ensure 2.5-3.5 seconds per subtitle
+
+                Examples: {examples}
+
+                Return ONLY the raw SRT content.
+                """
+            else:
+                # 전체 자막 (상세)
+                prompt = f"""
+                Analyze the video and generate complete verbatim SRT subtitles in {lang_str}.
+
+                [Rules for Level 3 - Full Transcription]
+                - Transcribe ALL spoken content accurately
+                - Generate as many subtitle entries as needed to cover everything
+                - Include all details and explanations
+                - Keep each entry under 2 lines maximum
+                - Timing MUST follow standard SRT: HH:MM:SS,mmm --> HH:MM:SS,mmm
+                - Ensure 2-3 seconds per subtitle for readability
+
+                Return ONLY the raw SRT content with complete transcription.
+                """
+
+            response = self.summarizer.client.models.generate_content(
+                model=self.summarizer.model_id,
+                contents=[prompt, types.Part.from_bytes(data=video_data, mime_type='video/mp4')]
+            )
+            srt_content = response.text.strip()
+
+            # Remove markdown code blocks
+            srt_content = re.sub(r'^.*?```(?:srt)?\s*\n?', '', srt_content, flags=re.DOTALL)
+            srt_content = re.sub(r'\n?\s*```.*?$', '', srt_content, flags=re.DOTALL)
+
+            # Remove text before first subtitle number
+            lines = srt_content.split('\n')
+            start_idx = 0
+            for i, line in enumerate(lines):
+                if line.strip().isdigit():
+                    start_idx = i
+                    break
+            srt_content = '\n'.join(lines[start_idx:]).strip()
+
+            v_dir = os.path.dirname(video_path)
+            srt_path = os.path.join(v_dir, f"subtitles_{lang}_lvl{level}.srt")
+
+            # Standardize format
+            srt_content = srt_content.replace('\r\n', '\n').replace('\r', '\n')
+
+            # Parse SRT blocks
+            blocks = re.findall(r'(\d+)\n(\d{1,2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{1,2}:\d{2}:\d{2},\d{3})\n(.*?)(?=\n\d+\n|$)', srt_content, re.DOTALL)
+
+            if not blocks:
+                blocks = re.findall(r'(\d+)\s+(\d{1,2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{1,2}:\d{2}:\d{2},\d{3})\s+(.*?)(?=\s+\d+\s+|$)', srt_content, re.DOTALL)
+
+            final_srt = ""
+            for i, (idx, timing, content) in enumerate(blocks):
+                clean_content = re.sub(r'\d{1,2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{1,2}:\d{2}:\d{2},\d{3}', '', content)
+                clean_content = " ".join(clean_content.split()).strip()
+
+                # Ensure minimum duration
+                try:
+                    parts = timing.split('-->')
+                    def to_ms(s_str):
+                        h, m, s_ms = s_str.strip().split(':')
+                        sec, ms = s_ms.split(',')
+                        return (int(h)*3600 + int(m)*60 + int(sec))*1000 + int(ms)
+
+                    def from_ms(ms_val):
+                        h = ms_val // 3600000
+                        ms_val %= 3600000
+                        m = ms_val // 60000
+                        ms_val %= 60000
+                        s = ms_val // 1000
+                        ms_val %= 1000
+                        return f"{h:02d}:{m:02d}:{s:02d},{ms_val:03d}"
+
+                    start_ms = to_ms(parts[0])
+                    end_ms = to_ms(parts[1])
+                    min_duration = 2500 if level < 3 else 2000
+                    if (end_ms - start_ms) < min_duration:
+                        end_ms = start_ms + min_duration
+                    timing = f"{from_ms(start_ms)} --> {from_ms(end_ms)}"
+                except:
+                    pass
+
+                final_srt += f"{i+1}\n{timing}\n{clean_content}\n\n"
+
+            srt_content = final_srt.strip()
+            with open(srt_path, 'w', encoding='utf-8') as f:
+                f.write(srt_content)
+                f.flush()
+                os.fsync(f.fileno())
+
+            print(f"✅ Subtitle file generated (level {level}): {srt_path} ({os.path.getsize(srt_path)} bytes)")
+            return srt_path
+        except Exception as e:
+            print(f"❌ Error generating subtitles with level: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     def ffmpeg_filter_escape(self, path):
         """Robustly escapes a file path for use in FFmpeg filters on macOS."""
         # On macOS, colons in absolute paths (/Volumes/...) must be escaped as \\:

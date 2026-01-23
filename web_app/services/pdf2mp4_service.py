@@ -881,6 +881,87 @@ class PDF2MP4Service:
         print(f"[{video_id}] ✅ NVENC 인코딩 완료: {frame_count} 프레임")
         return True
 
+    async def _generate_and_burn_subtitles(
+        self,
+        video_path: str,
+        video_id: str,
+        temp_dir: str,
+        youtube_service,
+        subtitle_lang: str = 'ko',
+        subtitle_level: int = 1
+    ) -> Optional[str]:
+        """AI로 자막을 생성하고 영상에 합성합니다.
+
+        Args:
+            video_path: 원본 영상 경로
+            video_id: 비디오 ID (로깅용)
+            temp_dir: 임시 디렉토리
+            youtube_service: YouTubeService 인스턴스
+            subtitle_lang: 자막 언어 ('ko' 또는 'en')
+            subtitle_level: 자막 상세도 (1: 키워드, 2: 요약, 3: 전체)
+
+        Returns:
+            자막이 합성된 새 영상 경로, 실패 시 None
+        """
+        try:
+            print(f"[{video_id}] 🎤 AI 자막 생성 시작 (언어: {subtitle_lang}, 레벨: {subtitle_level})")
+
+            # 1. 자막 생성 (YouTubeService의 generate_subtitles 사용)
+            srt_path = youtube_service.poster.generate_subtitles_with_level(
+                video_path,
+                lang=subtitle_lang,
+                level=subtitle_level
+            )
+
+            if not srt_path or not os.path.exists(srt_path):
+                print(f"[{video_id}] ⚠️ 자막 파일 생성 실패")
+                return None
+
+            print(f"[{video_id}] 📝 자막 파일 생성 완료: {srt_path}")
+
+            # 2. FFmpeg로 자막 합성 (burn-in)
+            output_path = os.path.join(temp_dir, f"subtitled_{video_id}.mp4")
+
+            # SRT 파일 경로를 FFmpeg에서 사용할 수 있도록 이스케이프
+            srt_escaped = srt_path.replace('\\', '/').replace(':', '\\:')
+
+            cmd = [
+                'ffmpeg', '-y',
+                '-i', video_path,
+                '-vf', f"subtitles='{srt_escaped}':force_style='FontSize=24,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,Outline=2,MarginV=50'",
+                '-c:v', 'h264_nvenc',
+                '-preset', 'p4',
+                '-b:v', '8M',
+                '-c:a', 'copy',
+                output_path
+            ]
+
+            print(f"[{video_id}] 🎬 자막 합성 중...")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode != 0:
+                print(f"[{video_id}] ⚠️ 자막 합성 실패: {result.stderr}")
+                # 폴백: CPU 인코딩 시도
+                cmd[cmd.index('-c:v') + 1] = 'libx264'
+                cmd = [c for c in cmd if c not in ['-preset', 'p4']]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    print(f"[{video_id}] ❌ CPU 인코딩도 실패: {result.stderr}")
+                    return None
+
+            # 임시 SRT 파일 삭제
+            if os.path.exists(srt_path):
+                os.remove(srt_path)
+
+            print(f"[{video_id}] ✅ 자막 합성 완료")
+            return output_path
+
+        except Exception as e:
+            print(f"[{video_id}] ❌ 자막 생성/합성 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     async def convert_basic(
         self,
         pdf_content: bytes,
@@ -896,9 +977,19 @@ class PDF2MP4Service:
         dpi: int = 200,
         auto_duration: bool = False,
         logo_path: Optional[str] = None,
-        ocr_lang: str = 'korean'
+        ocr_lang: str = 'korean',
+        gen_subtitles: bool = False,
+        subtitle_lang: str = 'ko',
+        subtitle_level: int = 1,
+        youtube_service = None
     ) -> Dict[str, Any]:
-        """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환"""
+        """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환
+
+        gen_subtitles: True이면 AI 자막 생성
+        subtitle_lang: 자막 언어 (ko, en)
+        subtitle_level: 자막 상세도 (1: 키워드, 2: 요약, 3: 전체)
+        youtube_service: 자막 생성을 위한 YouTubeService 인스턴스
+        """
         video_id = str(uuid.uuid4())[:8]
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_{video_id}_')
         self.register_temp_dir(video_id, temp_dir)
@@ -1037,6 +1128,28 @@ class PDF2MP4Service:
                 json.dump(timing_data, f, ensure_ascii=False, indent=2)
             print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 포함)")
 
+            # 7. AI 자막 생성 (옵션)
+            if gen_subtitles and youtube_service:
+                self.update_progress(video_id, 'subtitles', 90, '🎤 AI 자막 생성 중...', None)
+                try:
+                    final_output = await self._generate_and_burn_subtitles(
+                        video_path=output_path,
+                        video_id=video_id,
+                        temp_dir=temp_dir,
+                        youtube_service=youtube_service,
+                        subtitle_lang=subtitle_lang,
+                        subtitle_level=subtitle_level
+                    )
+                    if final_output and final_output != output_path:
+                        # 자막이 합성된 새 파일로 교체
+                        os.remove(output_path)
+                        os.rename(final_output, output_path)
+                        print(f"[{video_id}] ✅ 자막 합성 완료")
+                        video_info['has_subtitles'] = True
+                except Exception as sub_err:
+                    print(f"[{video_id}] ⚠️ 자막 생성 실패 (영상은 정상): {sub_err}")
+                    video_info['subtitle_error'] = str(sub_err)
+
             print(f"[{video_id}] Conversion completed successfully")
             return {'status': 'success', 'video': video_info}
 
@@ -1067,9 +1180,19 @@ class PDF2MP4Service:
         fps: int = 30,
         dpi: int = 200,
         logo_path: Optional[str] = None,
-        ocr_lang: str = 'korean'
+        ocr_lang: str = 'korean',
+        gen_subtitles: bool = False,
+        subtitle_lang: str = 'ko',
+        subtitle_level: int = 1,
+        youtube_service = None
     ) -> Dict[str, Any]:
-        """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정"""
+        """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정
+
+        gen_subtitles: True이면 AI 자막 생성
+        subtitle_lang: 자막 언어 (ko, en)
+        subtitle_level: 자막 상세도 (1: 키워드, 2: 요약, 3: 전체)
+        youtube_service: 자막 생성을 위한 YouTubeService 인스턴스
+        """
         if not WHISPER_AVAILABLE:
             return {
                 'status': 'error',
@@ -1244,6 +1367,28 @@ class PDF2MP4Service:
             with open(timing_file, 'w', encoding='utf-8') as f:
                 json.dump(timing_data, f, ensure_ascii=False, indent=2)
             print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 포함)")
+
+            # 7. AI 자막 생성 (옵션)
+            if gen_subtitles and youtube_service:
+                self.update_progress(video_id, 'subtitles', 95, '🎤 AI 자막 생성 중...', None)
+                try:
+                    final_output = await self._generate_and_burn_subtitles(
+                        video_path=output_path,
+                        video_id=video_id,
+                        temp_dir=temp_dir,
+                        youtube_service=youtube_service,
+                        subtitle_lang=subtitle_lang,
+                        subtitle_level=subtitle_level
+                    )
+                    if final_output and final_output != output_path:
+                        # 자막이 합성된 새 파일로 교체
+                        os.remove(output_path)
+                        os.rename(final_output, output_path)
+                        print(f"[{video_id}] ✅ 자막 합성 완료")
+                        video_info['has_subtitles'] = True
+                except Exception as sub_err:
+                    print(f"[{video_id}] ⚠️ 자막 생성 실패 (영상은 정상): {sub_err}")
+                    video_info['subtitle_error'] = str(sub_err)
 
             print(f"[{video_id}] Smart conversion completed successfully")
             return {'status': 'success', 'video': video_info}

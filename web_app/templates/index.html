@@ -884,11 +884,6 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center">
-                                    <input type="checkbox" id="gen_sub" x-model="genSubtitles"
-                                        class="h-4 w-4 text-red-600 focus:ring-red-500 bg-gray-700 border-gray-600 rounded">
-                                    <label for="gen_sub" class="ml-2 block text-sm text-gray-300">AI 자막 자동 생성</label>
-                                </div>
-                                <div class="flex items-center">
                                     <input type="checkbox" id="use_thumbnail" x-model="useThumbnail" checked
                                         class="h-4 w-4 text-red-600 focus:ring-red-500 bg-gray-700 border-gray-600 rounded">
                                     <label for="use_thumbnail" class="ml-2 block text-sm text-gray-300">PDF 첫 페이지를 썸네일로
@@ -902,7 +897,7 @@
                                 <ul class="text-sm text-gray-300 space-y-3 list-disc ml-4">
                                     <li><strong>콘텐츠 분석:</strong> 업로드된 PDF 자료를 Gemini AI가 분석하여 최적의 메타데이터를 추출합니다.</li>
                                     <li><strong>프리뷰 확인:</strong> 배포 전 AI가 생성한 제목, 상세 설명, 태그를 미리 확인하고 수정할 수 있습니다.</li>
-                                    <li><strong>자동 편집:</strong> 영상에 아웃트로를 합성하고 선택 시 자막을 생성합니다.</li>
+                                    <li><strong>영상 편집:</strong> 직접 업로드한 영상에 로고를 합성합니다. (Gen Video 영상은 이미 편집 완료)</li>
                                     <li><strong>원클릭 업로드:</strong> 모든 준비가 완료되면 YouTube API를 통해 채널에 즉시 게시됩니다.</li>
                                     <li><strong>소셜 홍보:</strong> 업로드 완료 후, AI 요약 기술을 활용해 LinkedIn에 즉시 홍보 게시물을 작성할 수 있습니다.
                                     </li>
@@ -1331,138 +1326,138 @@
                                     </p>
                                 </div>
 
-                                <!-- Settings -->
-                                <div class="space-y-4 pt-4 border-t border-gray-700">
-                                    <h4 class="text-sm font-bold text-gray-300">변환 설정</h4>
+                            </div>
 
-                                    <!-- Timing Settings (Basic Mode Only) -->
-                                    <div x-show="genVideoMode === 'basic'" class="space-y-4">
-                                        <!-- Page Duration -->
-                                        <div>
-                                            <label class="block text-xs font-medium text-gray-400 mb-1">페이지당 표시
-                                                시간</label>
-                                            <div class="flex items-center gap-3">
-                                                <input type="range" x-model="genVideoPageDuration" min="1" max="30"
-                                                    step="0.5"
-                                                    class="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
-                                                <span class="text-sm text-white w-12 text-right"
-                                                    x-text="genVideoPageDuration + '초'"></span>
+                            <!-- Right: Settings, Guide & Actions -->
+                            <div class="space-y-6">
+                                <!-- Settings Section -->
+                                <div class="bg-gray-700 p-6 rounded-lg border border-gray-600">
+                                    <h4 class="font-bold text-white mb-4">⚙️ 변환 설정</h4>
+
+                                    <div class="space-y-4">
+                                        <!-- Timing Settings (Basic Mode Only) -->
+                                        <div x-show="genVideoMode === 'basic'" class="space-y-4">
+                                            <!-- Page Duration -->
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-400 mb-1">페이지당 표시 시간</label>
+                                                <div class="flex items-center gap-3">
+                                                    <input type="range" x-model="genVideoPageDuration" min="1" max="30" step="0.5"
+                                                        class="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                                                    <span class="text-sm text-white w-12 text-right" x-text="genVideoPageDuration + '초'"></span>
+                                                </div>
+                                            </div>
+                                            <!-- Auto Duration Checkbox -->
+                                            <div x-show="genVideoAudio" class="flex items-center gap-2">
+                                                <input type="checkbox" x-model="genVideoAutoDuration" id="autoDuration"
+                                                    class="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500">
+                                                <label for="autoDuration" class="text-sm text-gray-300">오디오 길이에 맞춰 자동 조절</label>
                                             </div>
                                         </div>
 
-                                        <!-- Auto Duration Checkbox -->
-                                        <div x-show="genVideoAudio" class="flex items-center gap-2">
-                                            <input type="checkbox" x-model="genVideoAutoDuration" id="autoDuration"
-                                                class="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500">
-                                            <label for="autoDuration" class="text-sm text-gray-300">오디오 길이에 맞춰 자동
-                                                조절</label>
+                                        <!-- Transition Settings -->
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-400 mb-1">전환 효과</label>
+                                                <select x-model="genVideoTransition"
+                                                    class="w-full px-3 py-2 bg-gray-600 border border-gray-500 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                    <option value="fade">Fade</option>
+                                                    <option value="slide_left">Slide Left</option>
+                                                    <option value="slide_right">Slide Right</option>
+                                                    <option value="slide_up">Slide Up</option>
+                                                    <option value="slide_down">Slide Down</option>
+                                                    <option value="zoom">Zoom</option>
+                                                    <option value="none">None</option>
+                                                </select>
+                                            </div>
+                                            <div x-show="genVideoTransition !== 'none'">
+                                                <label class="block text-xs font-medium text-gray-400 mb-1">전환 시간</label>
+                                                <div class="flex items-center gap-2">
+                                                    <input type="range" x-model="genVideoTransitionDuration" min="0.1" max="2" step="0.1"
+                                                        class="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                                                    <span class="text-xs text-white w-8" x-text="genVideoTransitionDuration + 's'"></span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <!-- Transition Settings (Shared) -->
-                                    <div class="space-y-4">
-                                        <!-- Transition Effect -->
+                                        <!-- Resolution -->
                                         <div>
-                                            <label class="block text-xs font-medium text-gray-400 mb-1">전환 효과</label>
-                                            <select x-model="genVideoTransition"
-                                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                                <option value="fade">Fade</option>
-                                                <option value="slide_left">Slide Left</option>
-                                                <option value="slide_right">Slide Right</option>
-                                                <option value="slide_up">Slide Up</option>
-                                                <option value="slide_down">Slide Down</option>
-                                                <option value="zoom">Zoom</option>
-                                                <option value="none">None</option>
+                                            <label class="block text-xs font-medium text-gray-400 mb-1">출력 해상도</label>
+                                            <select x-model="genVideoResolution"
+                                                class="w-full px-3 py-2 bg-gray-600 border border-gray-500 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                <option value="1920x1080">1920x1080 (Full HD)</option>
+                                                <option value="1280x720">1280x720 (HD)</option>
+                                                <option value="3840x2160">3840x2160 (4K)</option>
                                             </select>
                                         </div>
 
-                                        <!-- Transition Duration -->
-                                        <div x-show="genVideoTransition !== 'none'">
-                                            <label class="block text-xs font-medium text-gray-400 mb-1">전환 시간</label>
+                                        <!-- Logo Selection -->
+                                        <div class="pt-3 border-t border-gray-600">
+                                            <label class="block text-xs font-medium text-gray-400 mb-2">로고 선택</label>
                                             <div class="flex items-center gap-3">
-                                                <input type="range" x-model="genVideoTransitionDuration" min="0.1"
-                                                    max="2" step="0.1"
-                                                    class="flex-1 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
-                                                <span class="text-sm text-white w-12 text-right"
-                                                    x-text="genVideoTransitionDuration + '초'"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Logo Selection (Category) -->
-                                <div class="space-y-3">
-                                    <label class="block text-xs font-medium text-gray-400 mb-1">로고 선택</label>
-                                    <select x-model="genVideoCategory" @change="genVideoLogoTimestamp = Date.now()"
-                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                        <template x-for="cat in categories" :key="cat">
-                                            <option :value="cat" x-text="cat"></option>
-                                        </template>
-                                    </select>
-
-                                    <!-- Logo Preview & Upload -->
-                                    <div x-show="genVideoCategory"
-                                        class="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-                                        <div class="flex items-center gap-4">
-                                            <!-- Current Logo Preview -->
-                                            <div class="flex-1">
-                                                <p class="text-xs text-gray-400 mb-2">현재 로고</p>
-                                                <div
-                                                    class="bg-gray-800 rounded p-3 flex justify-center items-center min-h-[60px]">
+                                                <select x-model="genVideoCategory" @change="genVideoLogoTimestamp = Date.now()"
+                                                    class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                    <template x-for="cat in categories" :key="cat">
+                                                        <option :value="cat" x-text="cat"></option>
+                                                    </template>
+                                                </select>
+                                                <div class="bg-gray-800 rounded p-2 flex justify-center items-center w-16 h-10">
                                                     <template x-if="genVideoCategory">
                                                         <img :src="'/api/genvideo/logo/' + genVideoCategory + '?token=' + localStorage.getItem('access_token') + '&t=' + genVideoLogoTimestamp"
-                                                            class="max-h-12 object-contain" alt="Logo"
+                                                            class="max-h-8 object-contain" alt="Logo"
                                                             @error="$event.target.style.display='none'"
                                                             @load="$event.target.style.display='block'">
                                                     </template>
-                                                    <span x-show="!genVideoCategory" class="text-xs text-gray-500">카테고리를
-                                                        선택하세요</span>
                                                 </div>
-                                            </div>
-                                            <!-- Logo Upload -->
-                                            <div class="flex-1">
-                                                <p class="text-xs text-gray-400 mb-2">로고 변경</p>
                                                 <div @click="$refs.genVideoLogoInput.click()"
-                                                    class="border-2 border-dashed border-gray-600 rounded p-3 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[60px] flex flex-col justify-center items-center">
+                                                    class="px-3 py-2 border border-dashed border-gray-500 rounded-lg text-center hover:bg-gray-600 transition-colors cursor-pointer">
                                                     <input type="file" x-ref="genVideoLogoInput" class="hidden"
                                                         @change="uploadGenVideoLogo($event)" accept="image/png">
-                                                    <svg class="h-5 w-5 text-gray-400 mb-1" fill="none"
-                                                        stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                    </svg>
-                                                    <p class="text-xs text-gray-400">PNG 업로드</p>
+                                                    <p class="text-xs text-gray-400">변경</p>
                                                 </div>
                                             </div>
+                                            <p x-show="genVideoLogoError" x-text="genVideoLogoError" class="mt-1 text-xs text-red-400"></p>
                                         </div>
-                                        <p x-show="genVideoLogoError" x-text="genVideoLogoError"
-                                            class="mt-2 text-xs text-red-400"></p>
+
+                                        <!-- AI Subtitles -->
+                                        <div class="pt-3 border-t border-gray-600">
+                                            <div class="flex items-center mb-2">
+                                                <input type="checkbox" id="gen_video_subtitles" x-model="genVideoSubtitles"
+                                                    class="h-4 w-4 text-purple-600 focus:ring-purple-500 bg-gray-600 border-gray-500 rounded">
+                                                <label for="gen_video_subtitles" class="ml-2 block text-sm text-gray-300">AI 자막 자동 생성</label>
+                                            </div>
+                                            <div x-show="genVideoSubtitles" x-cloak class="ml-6 space-y-2">
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label class="block text-xs font-medium text-gray-400 mb-1">자막 언어</label>
+                                                        <select x-model="genVideoSubtitleLang"
+                                                            class="w-full px-3 py-2 bg-gray-600 border border-gray-500 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                            <option value="ko">한국어</option>
+                                                            <option value="en">English</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-xs font-medium text-gray-400 mb-1">자막 상세도</label>
+                                                        <select x-model="genVideoSubtitleLevel"
+                                                            class="w-full px-3 py-2 bg-gray-600 border border-gray-500 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                                            <option value="1">키워드</option>
+                                                            <option value="2">요약</option>
+                                                            <option value="3">전체</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <p class="text-xs text-gray-500">Gemini AI가 영상 분석 후 자막 생성</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p class="text-xs text-gray-500">선택한 카테고리의 로고가 영상 우측 하단에 합성됩니다.</p>
                                 </div>
 
-                                <!-- Resolution -->
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-400 mb-1">출력 해상도</label>
-                                    <select x-model="genVideoResolution"
-                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                        <option value="1920x1080">1920x1080 (Full HD)</option>
-                                        <option value="1280x720">1280x720 (HD)</option>
-                                        <option value="3840x2160">3840x2160 (4K)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Right: Guide & Actions -->
-                            <div class="space-y-6">
-                                <div class="bg-gray-700 p-6 rounded-lg border border-gray-600">
-                                    <h4 class="font-bold text-white mb-4">📜 사용 가이드</h4>
-                                    <ul class="text-sm text-gray-300 space-y-3 list-disc ml-4">
-                                        <li><strong>Basic 모드:</strong> 각 PDF 페이지를 지정된 시간 동안 표시합니다.</li>
-                                        <li><strong>Smart 모드:</strong> 오디오를 Whisper로 분석하여 자동으로 페이지 전환 타이밍을 결정합니다.</li>
-                                        <li><strong>오디오:</strong> MP3, WAV, M4A, AAC, OGG 형식을 지원합니다.</li>
-                                        <li><strong>전환 효과:</strong> 페이지 간 자연스러운 전환을 위한 다양한 효과를 제공합니다.</li>
+                                <!-- Guide Section -->
+                                <div class="bg-gray-700 p-5 rounded-lg border border-gray-600">
+                                    <h4 class="font-bold text-white mb-3">📜 사용 가이드</h4>
+                                    <ul class="text-sm text-gray-300 space-y-2 list-disc ml-4">
+                                        <li><strong>Basic:</strong> 고정 시간 슬라이드</li>
+                                        <li><strong>Smart:</strong> AI 자동 타이밍 (오디오 필수)</li>
+                                        <li><strong>오디오:</strong> MP3, WAV, M4A, AAC, OGG</li>
                                     </ul>
                                 </div>
 
@@ -2000,6 +1995,9 @@
                 genVideoResolution: '1920x1080',
                 genVideoAutoDuration: false,
                 genVideoCategory: 'tech', // 로고 선택용 카테고리
+                genVideoSubtitles: false, // AI 자막 자동 생성
+                genVideoSubtitleLang: 'ko', // 자막 언어
+                genVideoSubtitleLevel: '1', // 자막 상세도 (1: 키워드, 2: 요약, 3: 전체)
                 genVideoLogoTimestamp: Date.now(),
                 genVideoLogoError: '',
                 genVideoLoading: false,
@@ -2480,6 +2478,9 @@
                     this.genVideoResolution = '1920x1080';
                     this.genVideoAutoDuration = false;
                     this.genVideoCategory = 'tech';
+                    this.genVideoSubtitles = false;
+                    this.genVideoSubtitleLang = 'ko';
+                    this.genVideoSubtitleLevel = '1';
                     this.genVideoLogoTimestamp = Date.now();
                     this.genVideoLogoError = '';
 
@@ -3473,7 +3474,7 @@
                             }
                             formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
-                            formData.append('gen_sub', this.genSubtitles);
+                            formData.append('gen_sub', false); // 자막은 Gen Video에서 생성
                             formData.append('use_thumbnail', this.useThumbnail);
 
                             response = await fetch('/api/youtube/upload-from-genvideo', {
@@ -3494,7 +3495,7 @@
                             }
                             formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
-                            formData.append('gen_sub', this.genSubtitles);
+                            formData.append('gen_sub', false); // 자막 기능은 Gen Video로 이동됨
                             formData.append('use_thumbnail', this.useThumbnail);
 
                             response = await fetch('/api/youtube/upload', {
@@ -3654,6 +3655,13 @@
                         formData.append('transition', this.genVideoTransition);
                         formData.append('transition_duration', this.genVideoTransitionDuration);
                         formData.append('auto_duration', this.genVideoAutoDuration);
+                    }
+
+                    // 자막 생성 옵션
+                    formData.append('gen_subtitles', this.genVideoSubtitles);
+                    if (this.genVideoSubtitles) {
+                        formData.append('subtitle_lang', this.genVideoSubtitleLang);
+                        formData.append('subtitle_level', this.genVideoSubtitleLevel);
                     }
 
                     try {
