@@ -1641,26 +1641,56 @@
                             <div class="flex-shrink-0 flex items-center justify-between mb-3">
                                 <h3 class="text-sm font-bold text-white">PDF 슬라이드</h3>
                                 <div class="flex items-center gap-2">
+                                    <!-- 줌 컨트롤 -->
+                                    <button @click="timingEditorZoomOut()" :disabled="timingEditorZoom <= 50"
+                                        class="p-1 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" title="축소">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
+                                        </svg>
+                                    </button>
+                                    <span class="text-xs text-gray-400 w-10 text-center" x-text="timingEditorZoom + '%'"></span>
+                                    <button @click="timingEditorZoomIn()" :disabled="timingEditorZoom >= 300"
+                                        class="p-1 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" title="확대">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
+                                        </svg>
+                                    </button>
+                                    <button @click="timingEditorZoomReset()"
+                                        class="p-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs" title="원본 크기">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+                                        </svg>
+                                    </button>
+                                    <div class="w-px h-4 bg-gray-600 mx-1"></div>
+                                    <!-- 페이지 네비게이션 -->
                                     <button @click="timingEditorPrevSlide()" :disabled="timingEditorCurrentSlide <= 0"
-                                        class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed">
+                                        class="p-1 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                                         </svg>
                                     </button>
-                                    <span class="text-sm text-gray-300" x-text="(timingEditorCurrentSlide + 1) + ' / ' + timingEditorSlides.length"></span>
+                                    <span class="text-xs text-gray-300" x-text="(timingEditorCurrentSlide + 1) + ' / ' + timingEditorSlides.length"></span>
                                     <button @click="timingEditorNextSlide()" :disabled="timingEditorCurrentSlide >= timingEditorSlides.length - 1"
-                                        class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded disabled:opacity-50 disabled:cursor-not-allowed">
+                                        class="p-1 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                         </svg>
                                     </button>
                                 </div>
                             </div>
-                            <div class="flex-grow bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden min-h-0">
+                            <div class="flex-grow bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden min-h-0 relative"
+                                 @wheel.prevent="timingEditorHandleWheel($event)"
+                                 @mousedown="timingEditorStartPan($event)"
+                                 @mousemove="timingEditorDoPan($event)"
+                                 @mouseup="timingEditorEndPan()"
+                                 @mouseleave="timingEditorEndPan()"
+                                 :class="{'cursor-grab': timingEditorZoom > 100, 'cursor-grabbing': timingEditorIsPanning}">
                                 <!-- 슬라이드 이미지 로드됨 -->
                                 <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.loaded && timingEditorSlides[timingEditorCurrentSlide]?.imageUrl">
                                     <img :src="timingEditorSlides[timingEditorCurrentSlide]?.imageUrl"
-                                         class="max-h-full max-w-full object-contain" alt="Slide">
+                                         class="object-contain select-none transition-transform duration-100"
+                                         :style="'transform: scale(' + (timingEditorZoom / 100) + ') translate(' + (timingEditorPanX / (timingEditorZoom / 100)) + 'px, ' + (timingEditorPanY / (timingEditorZoom / 100)) + 'px); max-height: 100%; max-width: 100%;'"
+                                         draggable="false" alt="Slide">
                                 </template>
                                 <!-- 슬라이드 로딩 중 -->
                                 <template x-if="timingEditorSlides.length > 0 && !timingEditorSlides[timingEditorCurrentSlide]?.loaded">
@@ -2231,6 +2261,10 @@
                 timingEditorSaved: false,  // 타이밍 저장 완료 상태
                 timingEditorTopHeight: 33,  // 상단 영역 높이 (%)
                 timingEditorResizingPanel: false,  // 패널 리사이즈 중
+                timingEditorZoom: 100,  // 슬라이드 줌 레벨 (%)
+                timingEditorPanX: 0,  // 패닝 X
+                timingEditorPanY: 0,  // 패닝 Y
+                timingEditorIsPanning: false,  // 패닝 중
 
                 async init() {
                     const token = localStorage.getItem('access_token');
@@ -2760,6 +2794,60 @@
                     document.addEventListener('touchend', onEnd);
                 },
 
+                // Slide Zoom Functions
+                timingEditorZoomIn() {
+                    this.timingEditorZoom = Math.min(300, this.timingEditorZoom + 25);
+                },
+
+                timingEditorZoomOut() {
+                    this.timingEditorZoom = Math.max(50, this.timingEditorZoom - 25);
+                    // 축소 시 패닝 제한
+                    if (this.timingEditorZoom <= 100) {
+                        this.timingEditorPanX = 0;
+                        this.timingEditorPanY = 0;
+                    }
+                },
+
+                timingEditorZoomReset() {
+                    this.timingEditorZoom = 100;
+                    this.timingEditorPanX = 0;
+                    this.timingEditorPanY = 0;
+                },
+
+                timingEditorHandleWheel(e) {
+                    // Ctrl 키와 함께 휠 스크롤로 줌
+                    if (e.ctrlKey || e.metaKey) {
+                        if (e.deltaY < 0) {
+                            this.timingEditorZoomIn();
+                        } else {
+                            this.timingEditorZoomOut();
+                        }
+                    } else if (this.timingEditorZoom > 100) {
+                        // 줌 상태에서 일반 스크롤로 패닝
+                        this.timingEditorPanX -= e.deltaX * 0.5;
+                        this.timingEditorPanY -= e.deltaY * 0.5;
+                    }
+                },
+
+                timingEditorStartPan(e) {
+                    if (this.timingEditorZoom > 100 && e.button === 0) {
+                        this.timingEditorIsPanning = true;
+                        this._panStartX = e.clientX - this.timingEditorPanX;
+                        this._panStartY = e.clientY - this.timingEditorPanY;
+                    }
+                },
+
+                timingEditorDoPan(e) {
+                    if (this.timingEditorIsPanning) {
+                        this.timingEditorPanX = e.clientX - this._panStartX;
+                        this.timingEditorPanY = e.clientY - this._panStartY;
+                    }
+                },
+
+                timingEditorEndPan() {
+                    this.timingEditorIsPanning = false;
+                },
+
                 formatTimecode(seconds) {
                     if (!seconds || isNaN(seconds)) return '0:00';
                     const mins = Math.floor(seconds / 60);
@@ -3073,6 +3161,10 @@
                         this.$refs.timingEditorVideo.currentTime = startTime;
                     }
                     this.timingEditorCurrentTime = startTime;
+                    // 슬라이드 변경 시 줌/패닝 리셋
+                    this.timingEditorZoom = 100;
+                    this.timingEditorPanX = 0;
+                    this.timingEditorPanY = 0;
                     // 슬라이드 이미지 로드
                     await this.loadSlideImage(idx);
                 },
