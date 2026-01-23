@@ -617,8 +617,11 @@ async def convert_pdf_to_video(
             if categories:
                 logo_path = youtube.get_logo_path(categories[0])
 
+        import asyncio
+
         if mode == "smart":
-            result = await pdf2mp4.convert_smart(
+            result = await asyncio.to_thread(
+                pdf2mp4.convert_smart_sync,
                 pdf_content=pdf_content,
                 filename=pdf.filename,
                 audio_content=audio_content,
@@ -638,7 +641,8 @@ async def convert_pdf_to_video(
                 created_by=user.email if user else ''
             )
         else:
-            result = await pdf2mp4.convert_basic(
+            result = await asyncio.to_thread(
+                pdf2mp4.convert_basic_sync,
                 pdf_content=pdf_content,
                 filename=pdf.filename,
                 audio_content=audio_content,

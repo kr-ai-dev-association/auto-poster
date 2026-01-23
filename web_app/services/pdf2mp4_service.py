@@ -936,7 +936,7 @@ class PDF2MP4Service:
         print(f"[{video_id}] ✅ NVENC 인코딩 완료: {frame_count} 프레임")
         return True
 
-    async def _generate_and_burn_subtitles(
+    def _generate_and_burn_subtitles(
         self,
         video_path: str,
         video_id: str,
@@ -945,7 +945,7 @@ class PDF2MP4Service:
         subtitle_lang: str = 'ko',
         subtitle_level: int = 1
     ) -> Optional[str]:
-        """AI로 자막을 생성하고 영상에 합성합니다.
+        """AI로 자막을 생성하고 영상에 합성합니다. (동기 함수)
 
         Args:
             video_path: 원본 영상 경로
@@ -1017,7 +1017,7 @@ class PDF2MP4Service:
             traceback.print_exc()
             return None
 
-    async def convert_basic(
+    def convert_basic_sync(
         self,
         pdf_content: bytes,
         filename: str,
@@ -1040,7 +1040,7 @@ class PDF2MP4Service:
         category: str = '',
         created_by: str = ''
     ) -> Dict[str, Any]:
-        """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환
+        """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환 (동기 버전)
 
         gen_subtitles: True이면 AI 자막 생성
         subtitle_lang: 자막 언어 (ko, en)
@@ -1207,7 +1207,7 @@ class PDF2MP4Service:
             if gen_subtitles and youtube_service:
                 self.update_progress(video_id, 'subtitles', 90, '🎤 AI 자막 생성 중...', None)
                 try:
-                    final_output = await self._generate_and_burn_subtitles(
+                    final_output = self._generate_and_burn_subtitles(
                         video_path=output_path,
                         video_id=video_id,
                         temp_dir=temp_dir,
@@ -1243,7 +1243,7 @@ class PDF2MP4Service:
             self.clear_cancel(video_id)
             self.clear_process_pid(video_id)
 
-    async def convert_smart(
+    def convert_smart_sync(
         self,
         pdf_content: bytes,
         filename: str,
@@ -1467,7 +1467,7 @@ class PDF2MP4Service:
             if gen_subtitles and youtube_service:
                 self.update_progress(video_id, 'subtitles', 95, '🎤 AI 자막 생성 중...', None)
                 try:
-                    final_output = await self._generate_and_burn_subtitles(
+                    final_output = self._generate_and_burn_subtitles(
                         video_path=output_path,
                         video_id=video_id,
                         temp_dir=temp_dir,
@@ -1502,6 +1502,17 @@ class PDF2MP4Service:
             self.cleanup_temp_dir(video_id)
             self.clear_cancel(video_id)
             self.clear_process_pid(video_id)
+
+    # Async 래퍼 (하위 호환성)
+    async def convert_basic(self, **kwargs):
+        """Basic 모드 변환 (async 래퍼)"""
+        import asyncio
+        return await asyncio.to_thread(self.convert_basic_sync, **kwargs)
+
+    async def convert_smart(self, **kwargs):
+        """Smart 모드 변환 (async 래퍼)"""
+        import asyncio
+        return await asyncio.to_thread(self.convert_smart_sync, **kwargs)
 
     def _calculate_smart_timings(
         self,
