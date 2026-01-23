@@ -1196,6 +1196,120 @@ async def reencode_video(
             content={"status": "error", "message": str(e)}
         )
 
+
+@app.post("/api/genvideo/linkedin-post")
+async def linkedin_post_from_genvideo(
+    video_id: str = Form(...),
+    category: str = Form(...),
+    lang: str = Form("ko"),
+    user: models.User = Depends(get_current_user)
+):
+    """Gen Video에서 생성된 영상을 LinkedIn에 포스팅합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    try:
+        # 영상 정보 가져오기
+        video_info = pdf2mp4.get_video_info(video_id)
+        if not video_info:
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "message": "Video not found"}
+            )
+
+        # PDF 파일 경로
+        pdf_path = pdf2mp4.get_pdf_path(video_id)
+        if not pdf_path or not os.path.exists(pdf_path):
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "message": "PDF not found for this video"}
+            )
+
+        video_path = video_info.get('file_path')
+        if not video_path or not os.path.exists(video_path):
+            return JSONResponse(
+                status_code=404,
+                content={"status": "error", "message": "Video file not found"}
+            )
+
+        # PDF에서 메타데이터 생성
+        with open(pdf_path, 'rb') as f:
+            pdf_content = f.read()
+
+        metadata = youtube.poster.generate_metadata(pdf_content, category=category, lang=lang)
+        if not metadata:
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": "Failed to generate metadata from PDF"}
+            )
+
+        # LinkedIn 포스팅
+        from core.linkedin_poster import LinkedInPoster
+
+        title = metadata.get('title', 'Video')
+        description = metadata.get('description', '')
+
+        # PDF 첫 페이지에서 썸네일 생성
+        thumbnail_path = None
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(pdf_path)
+            page = doc.load_page(0)
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+            thumbnail_path = os.path.join(pdf2mp4.temp_dir, f"{video_id}_linkedin_thumb.png")
+            pix.save(thumbnail_path)
+            doc.close()
+        except Exception as thumb_err:
+            print(f"Failed to create thumbnail: {thumb_err}")
+
+        # LinkedIn 포스터 초기화
+        linkedin_poster = LinkedInPoster()
+
+        # 이미지 업로드 (썸네일이 있는 경우)
+        image_urn = None
+        if thumbnail_path and os.path.exists(thumbnail_path):
+            image_urn = linkedin_poster.upload_image(thumbnail_path)
+
+        # 포스트 텍스트 작성
+        post_text = f"{title}\n\n{description}"
+
+        # LinkedIn에 포스팅
+        result = linkedin_poster.post_text(
+            text=post_text,
+            title=title,
+            uploaded_image_urn=image_urn
+        )
+
+        # 썸네일 정리
+        if thumbnail_path and os.path.exists(thumbnail_path):
+            os.remove(thumbnail_path)
+
+        if result:
+            post_id = result.get('id', '')
+            return JSONResponse(content={
+                "status": "success",
+                "message": f"LinkedIn 포스팅 완료: {title}",
+                "linkedin_post_id": post_id
+            })
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": "LinkedIn posting failed"}
+            )
+
+    except Exception as e:
+        print(f"Error posting to LinkedIn: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
 @app.post("/api/youtube/upload-from-genvideo")
 async def youtube_upload_from_genvideo(
     video_id: str = Form(...),
