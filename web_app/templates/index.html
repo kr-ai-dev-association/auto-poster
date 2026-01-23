@@ -1401,12 +1401,10 @@
                                                     </template>
                                                 </select>
                                                 <div class="bg-gray-800 rounded p-2 flex justify-center items-center w-16 h-10">
-                                                    <template x-if="genVideoCategory">
-                                                        <img :src="'/api/genvideo/logo/' + genVideoCategory + '?token=' + localStorage.getItem('access_token') + '&t=' + genVideoLogoTimestamp"
-                                                            class="max-h-8 object-contain" alt="Logo"
-                                                            @error="$event.target.style.display='none'"
-                                                            @load="$event.target.style.display='block'">
-                                                    </template>
+                                                    <img x-show="genVideoCategory"
+                                                        :src="'/api/genvideo/logo/' + genVideoCategory + '?token=' + localStorage.getItem('access_token') + '&t=' + genVideoLogoTimestamp"
+                                                        :key="genVideoCategory + '-' + genVideoLogoTimestamp"
+                                                        class="max-h-8 object-contain" alt="Logo">
                                                 </div>
                                                 <div @click="$refs.genVideoLogoInput.click()"
                                                     class="px-3 py-2 border border-dashed border-gray-500 rounded-lg text-center hover:bg-gray-600 transition-colors cursor-pointer">
@@ -3892,9 +3890,11 @@
                                     this.ytCategory = this.categories[0];
                                 }
                                 // genVideoCategory: 'tech'가 있으면 'tech', 없거나 유효하지 않으면 첫 번째 카테고리
-                                if (!this.genVideoCategory || !this.categories.includes(this.genVideoCategory)) {
+                                if (!this.categories.includes(this.genVideoCategory)) {
                                     this.genVideoCategory = this.categories.includes('tech') ? 'tech' : this.categories[0];
                                 }
+                                // 로고 이미지 새로고침
+                                this.genVideoLogoTimestamp = Date.now();
                             }
                         }
                     } catch (error) {
