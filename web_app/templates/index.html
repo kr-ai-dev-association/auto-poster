@@ -3881,13 +3881,15 @@
                         const data = await response.json();
                         if (data.status === 'success') {
                             this.categories = data.categories;
-                            // 첫 번째 카테고리를 기본값으로 설정
+                            // 카테고리 기본값 설정
                             if (this.categories.length > 0) {
-                                if (!this.ytCategory) {
+                                // ytCategory: 값이 없거나 유효하지 않으면 첫 번째 카테고리
+                                if (!this.ytCategory || !this.categories.includes(this.ytCategory)) {
                                     this.ytCategory = this.categories[0];
                                 }
-                                if (!this.genVideoCategory) {
-                                    this.genVideoCategory = this.categories[0];
+                                // genVideoCategory: 'tech'가 있으면 'tech', 없거나 유효하지 않으면 첫 번째 카테고리
+                                if (!this.genVideoCategory || !this.categories.includes(this.genVideoCategory)) {
+                                    this.genVideoCategory = this.categories.includes('tech') ? 'tech' : this.categories[0];
                                 }
                             }
                         }
