@@ -981,7 +981,9 @@ class PDF2MP4Service:
         gen_subtitles: bool = False,
         subtitle_lang: str = 'ko',
         subtitle_level: int = 1,
-        youtube_service = None
+        youtube_service = None,
+        category: str = '',
+        created_by: str = ''
     ) -> Dict[str, Any]:
         """Basic 모드: 고정 시간 간격으로 PDF를 영상으로 변환
 
@@ -989,6 +991,8 @@ class PDF2MP4Service:
         subtitle_lang: 자막 언어 (ko, en)
         subtitle_level: 자막 상세도 (1: 키워드, 2: 요약, 3: 전체)
         youtube_service: 자막 생성을 위한 YouTubeService 인스턴스
+        category: 영상 카테고리
+        created_by: 생성자 이메일
         """
         video_id = str(uuid.uuid4())[:8]
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_{video_id}_')
@@ -1065,13 +1069,15 @@ class PDF2MP4Service:
                 start_time = i * page_duration
                 timings.append({'start': start_time, 'duration': page_duration})
 
-            # 오디오에 맞게 조정
+            # 오디오에 맞게 조정 - 오디오 끝부분이 잘리지 않도록 마진 추가
             if audio_duration > 0:
-                total_video_duration = len(images) * page_duration
-                if audio_duration > total_video_duration:
+                total_video_duration = timings[-1]['start'] + timings[-1]['duration']
+                # 오디오 길이 + 0.5초 마진으로 비디오 길이 설정 (오디오 끝 잘림 방지)
+                target_duration = audio_duration + 0.5
+                if target_duration > total_video_duration:
                     # 마지막 이미지 연장
-                    extra = audio_duration - total_video_duration + 2.0  # 2초 마진
-                    timings[-1]['duration'] += extra
+                    timings[-1]['duration'] = target_duration - timings[-1]['start']
+                    print(f"[{video_id}] 마지막 슬라이드 연장: {total_video_duration:.1f}초 → {target_duration:.1f}초")
 
             check_cancelled()
 
@@ -1127,6 +1133,20 @@ class PDF2MP4Service:
             with open(timing_file, 'w', encoding='utf-8') as f:
                 json.dump(timing_data, f, ensure_ascii=False, indent=2)
             print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 포함)")
+
+            # 메타데이터 파일 저장 (영상 관리용)
+            meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
+            meta_data = {
+                'category': category,
+                'ocr_lang': ocr_lang,
+                'created_by': created_by,
+                'duration': video_duration,
+                'mode': 'basic',
+                'created_at': datetime.utcnow().isoformat()
+            }
+            with open(meta_file, 'w', encoding='utf-8') as f:
+                json.dump(meta_data, f, ensure_ascii=False, indent=2)
+            print(f"[{video_id}] 메타데이터 저장: {meta_file}")
 
             # 7. AI 자막 생성 (옵션)
             if gen_subtitles and youtube_service:
@@ -1184,7 +1204,9 @@ class PDF2MP4Service:
         gen_subtitles: bool = False,
         subtitle_lang: str = 'ko',
         subtitle_level: int = 1,
-        youtube_service = None
+        youtube_service = None,
+        category: str = '',
+        created_by: str = ''
     ) -> Dict[str, Any]:
         """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정
 
@@ -1192,6 +1214,8 @@ class PDF2MP4Service:
         subtitle_lang: 자막 언어 (ko, en)
         subtitle_level: 자막 상세도 (1: 키워드, 2: 요약, 3: 전체)
         youtube_service: 자막 생성을 위한 YouTubeService 인스턴스
+        category: 영상 카테고리
+        created_by: 생성자 이메일
         """
         if not WHISPER_AVAILABLE:
             return {
@@ -1299,13 +1323,14 @@ class PDF2MP4Service:
             print(f"[{video_id}] Page timings: {page_timings}")
             self.update_progress(video_id, 'timing_done', 50, '⏱️ 페이지 타이밍 계산 완료', None)
 
-            # 6. 마지막 페이지 연장 (오디오 끝까지 + 마진)
-            audio_margin = 2.0
+            # 6. 마지막 페이지 연장 (오디오 끝까지 + 마진) - 오디오 끝부분 잘림 방지
+            audio_margin = 0.5  # 오디오 끝 잘림 방지 마진
             target_duration = total_duration + audio_margin
             if page_timings:
                 last_end = page_timings[-1]['start'] + page_timings[-1]['duration']
                 if last_end < target_duration:
                     page_timings[-1]['duration'] = target_duration - page_timings[-1]['start']
+                    print(f"[{video_id}] 마지막 슬라이드 연장: {last_end:.1f}초 → {target_duration:.1f}초")
 
             # 7. 영상 출력
             output_filename = f"{os.path.splitext(filename)[0]}_smart_{video_id}.mp4"
@@ -1367,6 +1392,20 @@ class PDF2MP4Service:
             with open(timing_file, 'w', encoding='utf-8') as f:
                 json.dump(timing_data, f, ensure_ascii=False, indent=2)
             print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 포함)")
+
+            # 메타데이터 파일 저장 (영상 관리용)
+            meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
+            meta_data = {
+                'category': category,
+                'ocr_lang': ocr_lang,
+                'created_by': created_by,
+                'duration': video_duration,
+                'mode': 'smart',
+                'created_at': datetime.utcnow().isoformat()
+            }
+            with open(meta_file, 'w', encoding='utf-8') as f:
+                json.dump(meta_data, f, ensure_ascii=False, indent=2)
+            print(f"[{video_id}] 메타데이터 저장: {meta_file}")
 
             # 7. AI 자막 생성 (옵션)
             if gen_subtitles and youtube_service:
@@ -1671,13 +1710,47 @@ class PDF2MP4Service:
                     parts = f.rsplit('_', 1)
                     video_id = parts[1].replace('.mp4', '') if len(parts) > 1 else f.replace('.mp4', '')
 
-                    videos.append({
+                    video_data = {
                         'id': video_id,
                         'filename': f,
                         'file_path': path,
                         'file_size': os.path.getsize(path),
                         'created_at': datetime.fromtimestamp(os.path.getctime(path)).isoformat()
-                    })
+                    }
+
+                    # 타이밍 JSON 파일에서 추가 정보 로드 (duration 계산)
+                    timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
+                    if os.path.exists(timing_file):
+                        try:
+                            import json
+                            with open(timing_file, 'r', encoding='utf-8') as tf:
+                                timing_data = json.load(tf)
+                                timings = timing_data.get('timings', [])
+                                if timings:
+                                    last_timing = timings[-1]
+                                    video_data['duration'] = last_timing.get('start', 0) + last_timing.get('duration', 0)
+                                # 메타데이터 로드
+                                video_data['category'] = timing_data.get('category', '')
+                                video_data['ocr_lang'] = timing_data.get('ocr_lang', '')
+                                video_data['created_by'] = timing_data.get('created_by', '')
+                        except Exception as e:
+                            print(f"Error loading timing file for {video_id}: {e}")
+
+                    # 메타데이터 JSON 파일에서 추가 정보 로드
+                    meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
+                    if os.path.exists(meta_file):
+                        try:
+                            import json
+                            with open(meta_file, 'r', encoding='utf-8') as mf:
+                                meta_data = json.load(mf)
+                                video_data['category'] = meta_data.get('category', video_data.get('category', ''))
+                                video_data['ocr_lang'] = meta_data.get('ocr_lang', video_data.get('ocr_lang', ''))
+                                video_data['created_by'] = meta_data.get('created_by', video_data.get('created_by', ''))
+                                video_data['duration'] = meta_data.get('duration', video_data.get('duration', 0))
+                        except Exception as e:
+                            print(f"Error loading meta file for {video_id}: {e}")
+
+                    videos.append(video_data)
 
         return sorted(videos, key=lambda x: x['created_at'], reverse=True)
 
@@ -1710,6 +1783,14 @@ class PDF2MP4Service:
             pdf_path = self.get_pdf_path(video_id)
             if pdf_path and os.path.exists(pdf_path):
                 os.remove(pdf_path)
+            # 타이밍 JSON 파일 삭제
+            timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
+            if os.path.exists(timing_file):
+                os.remove(timing_file)
+            # 메타데이터 JSON 파일 삭제
+            meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
+            if os.path.exists(meta_file):
+                os.remove(meta_file)
             return True
         return False
 
@@ -1810,6 +1891,7 @@ class PDF2MP4Service:
 
             # 3. 기존 영상에서 오디오 추출
             audio_path = os.path.join(temp_dir, 'audio.aac')
+            audio_duration = 0
             try:
                 subprocess.run([
                     'ffmpeg', '-y', '-i', video_path,
@@ -1828,6 +1910,23 @@ class PDF2MP4Service:
                 except:
                     audio_path = None
                     print(f"[{new_video_id}] No audio extracted")
+
+            # 오디오 길이 확인 및 마지막 타이밍 조정 (오디오 끝 잘림 방지)
+            if audio_path and os.path.exists(audio_path):
+                result = subprocess.run(
+                    ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                     '-of', 'default=noprint_wrappers=1:nokey=1', audio_path],
+                    capture_output=True, text=True
+                )
+                audio_duration = float(result.stdout.strip()) if result.stdout.strip() else 0
+                print(f"[{new_video_id}] Audio duration: {audio_duration:.2f}s")
+
+                # 비디오가 오디오보다 짧으면 마지막 슬라이드 연장
+                target_duration = audio_duration + 0.5  # 0.5초 마진
+                video_end = timings[-1]['start'] + timings[-1]['duration']
+                if video_end < target_duration:
+                    timings[-1]['duration'] = target_duration - timings[-1]['start']
+                    print(f"[{new_video_id}] 마지막 슬라이드 연장: {video_end:.1f}초 → {target_duration:.1f}초")
 
             # 4. 영상 출력
             original_filename = os.path.basename(video_path)

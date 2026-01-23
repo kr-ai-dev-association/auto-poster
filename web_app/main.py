@@ -633,7 +633,9 @@ async def convert_pdf_to_video(
                 gen_subtitles=gen_subtitles,
                 subtitle_lang=subtitle_lang,
                 subtitle_level=subtitle_level,
-                youtube_service=youtube
+                youtube_service=youtube,
+                category=category or '',
+                created_by=user.email if user else ''
             )
         else:
             result = await pdf2mp4.convert_basic(
@@ -653,7 +655,9 @@ async def convert_pdf_to_video(
                 gen_subtitles=gen_subtitles,
                 subtitle_lang=subtitle_lang,
                 subtitle_level=subtitle_level,
-                youtube_service=youtube
+                youtube_service=youtube,
+                category=category or '',
+                created_by=user.email if user else ''
             )
 
         return JSONResponse(content=result)
@@ -715,6 +719,65 @@ async def list_generated_videos(
 
     videos = pdf2mp4.get_video_list()
     return JSONResponse(content={"status": "success", "videos": videos})
+
+
+@app.get("/api/genvideo/manage/list")
+async def list_videos_for_management(
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """영상 관리 페이지용 상세 목록을 조회합니다."""
+    if not pdf2mp4:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Service not initialized"}
+        )
+
+    videos = pdf2mp4.get_video_list()
+
+    # 각 영상에 추가 정보 추가
+    enhanced_videos = []
+    for video in videos:
+        video_id = video.get('id', '')
+
+        # 기본 단계 판단
+        stage = 'generated'
+
+        # 타이밍 파일 존재 여부로 'timed' 단계 판단
+        timing_file = os.path.join(pdf2mp4.output_dir, f"{video_id}_timing.json")
+        if os.path.exists(timing_file):
+            try:
+                import json
+                with open(timing_file, 'r') as f:
+                    timing_data = json.load(f)
+                    # 타이밍이 수정되었는지 확인 (편집된 타이밍 파일은 edited 키가 있을 수 있음)
+                    if timing_data.get('edited') or '_edited_' in video.get('filename', ''):
+                        stage = 'timed'
+            except:
+                pass
+
+        # 파일명에 'edited'가 포함되어 있으면 timed 단계
+        if '_edited_' in video.get('filename', ''):
+            stage = 'timed'
+
+        # DB에서 YouTube 업로드 기록 확인하여 'posted' 단계 판단
+        # (YouTube 업로드 기록이 있으면 posted로 표시)
+        # TODO: 추후 업로드 기록 테이블 추가 시 구현
+
+        enhanced_video = {
+            **video,
+            'stage': stage,
+            'category': video.get('category', ''),
+            'ocr_lang': video.get('ocr_lang', ''),
+            'created_by': video.get('created_by', user.email if user else ''),
+        }
+        enhanced_videos.append(enhanced_video)
+
+    # 생성일 기준 내림차순 정렬
+    enhanced_videos.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+
+    return JSONResponse(content={"status": "success", "videos": enhanced_videos})
+
 
 @app.get("/api/genvideo/info")
 async def get_genvideo_info(

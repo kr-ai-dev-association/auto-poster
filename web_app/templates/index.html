@@ -97,6 +97,21 @@
                     <span x-show="!sidebarCollapsed" x-text="t('sidebar.wiki')" class="truncate"></span>
                 </button>
 
+                <!-- Video Management (영상 관리) -->
+                <button @click="mainTab = 'video-manage'"
+                    class="w-full flex items-center text-sm font-medium rounded-lg transition-all"
+                    :class="[
+                        mainTab === 'video-manage' ? 'bg-indigo-600/20 text-white border-l-2 border-indigo-500' : 'text-gray-400 hover:bg-gray-800/50 hover:text-white border-l-2 border-transparent',
+                        sidebarCollapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                    ]"
+                    :title="sidebarCollapsed ? '영상 관리' : ''">
+                    <svg class="w-5 h-5 flex-shrink-0" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed" class="truncate">영상 관리</span>
+                </button>
+
                 <!-- Admin Menu (Conditional) -->
                 <template x-if="user?.is_super_admin">
                     <div class="mt-4 pt-4 border-t border-gray-700/50 space-y-1">
@@ -162,6 +177,7 @@
                         <span x-show="mainTab === 'youtube'" x-text="t('yt.title')"></span>
                         <span x-show="mainTab === 'genvideo'" x-text="t('genvideo.title')"></span>
                         <span x-show="mainTab === 'timing-editor'">슬라이드 타이밍 편집기</span>
+                        <span x-show="mainTab === 'video-manage'">영상 관리</span>
                     </h2>
                     <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'wiki'" x-text="t('wiki.subtitle')">
                     </p>
@@ -171,6 +187,8 @@
                         x-text="t('genvideo.subtitle')"></p>
                     <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'timing-editor'">
                         비디오 시퀀스를 확인하고 슬라이드 타이밍을 수동으로 조절하세요</p>
+                    <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'video-manage'">
+                        생성된 영상 목록을 확인하고 관리하세요</p>
                 </div>
 
 
@@ -1881,6 +1899,163 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Video Management Tab -->
+            <div x-show="mainTab === 'video-manage'" class="flex flex-col h-full animate-fade-in">
+                <div class="w-full h-full flex flex-col p-6">
+                    <!-- Header with Refresh Button -->
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-white">영상 목록</h3>
+                        <div class="flex gap-2">
+                            <button @click="loadVideoManageList()"
+                                class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg flex items-center gap-2"
+                                :disabled="videoManageLoading">
+                                <svg class="w-4 h-4" :class="videoManageLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                새로고침
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Bar -->
+                    <div class="flex gap-4 mb-4 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-400">단계:</label>
+                            <select x-model="videoManageFilter.stage" @change="filterVideoManageList()"
+                                class="px-3 py-1.5 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg">
+                                <option value="">전체</option>
+                                <option value="generated">생성</option>
+                                <option value="timed">타이밍 적용</option>
+                                <option value="posted">포스팅 완료</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-400">카테고리:</label>
+                            <select x-model="videoManageFilter.category" @change="filterVideoManageList()"
+                                class="px-3 py-1.5 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg">
+                                <option value="">전체</option>
+                                <template x-for="cat in categories" :key="cat">
+                                    <option :value="cat" x-text="cat"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-400">검색:</label>
+                            <input type="text" x-model="videoManageFilter.search" @input="filterVideoManageList()"
+                                placeholder="파일명 검색..."
+                                class="px-3 py-1.5 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg w-48">
+                        </div>
+                    </div>
+
+                    <!-- Video List Table -->
+                    <div class="flex-grow overflow-auto bg-gray-800 rounded-lg">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-700 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-gray-300 font-medium">파일명</th>
+                                    <th class="px-4 py-3 text-center text-gray-300 font-medium w-24">단계</th>
+                                    <th class="px-4 py-3 text-center text-gray-300 font-medium w-20">영상길이</th>
+                                    <th class="px-4 py-3 text-center text-gray-300 font-medium w-24">카테고리</th>
+                                    <th class="px-4 py-3 text-center text-gray-300 font-medium w-20">PDF언어</th>
+                                    <th class="px-4 py-3 text-center text-gray-300 font-medium w-28">생성자</th>
+                                    <th class="px-4 py-3 text-center text-gray-300 font-medium w-36">생성시간</th>
+                                    <th class="px-4 py-3 text-center text-gray-300 font-medium w-32">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                <template x-if="videoManageLoading">
+                                    <tr>
+                                        <td colspan="8" class="px-4 py-8 text-center text-gray-400">
+                                            <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            로딩 중...
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-if="!videoManageLoading && videoManageListFiltered.length === 0">
+                                    <tr>
+                                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">
+                                            영상이 없습니다
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-for="video in videoManageListFiltered" :key="video.id">
+                                    <tr class="hover:bg-gray-700/50 transition-colors">
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2">
+                                                <svg class="w-5 h-5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                                <span class="text-white truncate max-w-xs" :title="video.filename" x-text="video.filename"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <span class="px-2 py-1 rounded text-xs font-medium"
+                                                :class="{
+                                                    'bg-blue-500/20 text-blue-400': video.stage === 'generated',
+                                                    'bg-yellow-500/20 text-yellow-400': video.stage === 'timed',
+                                                    'bg-green-500/20 text-green-400': video.stage === 'posted'
+                                                }"
+                                                x-text="video.stage === 'generated' ? '생성' : video.stage === 'timed' ? '타이밍' : '포스팅'">
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-center text-gray-300" x-text="formatDuration(video.duration)"></td>
+                                        <td class="px-4 py-3 text-center text-gray-300" x-text="video.category || '-'"></td>
+                                        <td class="px-4 py-3 text-center text-gray-300" x-text="video.ocr_lang === 'korean' ? '한국어' : video.ocr_lang === 'en' ? '영어' : video.ocr_lang || '-'"></td>
+                                        <td class="px-4 py-3 text-center text-gray-300" x-text="video.created_by || '-'"></td>
+                                        <td class="px-4 py-3 text-center text-gray-400 text-xs" x-text="formatDateTime(video.created_at)"></td>
+                                        <td class="px-4 py-3 text-center">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <a :href="'/api/genvideo/download/' + video.id + '?token=' + localStorage.getItem('access_token')"
+                                                    class="p-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded" title="다운로드">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                    </svg>
+                                                </a>
+                                                <button @click="goToYoutubeWithVideo(video)"
+                                                    class="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded" title="YouTube 포스팅"
+                                                    :disabled="video.stage === 'posted'">
+                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                                    </svg>
+                                                </button>
+                                                <button @click="deleteVideoManage(video.id, video.filename)"
+                                                    class="p-1.5 bg-gray-700 hover:bg-red-700 text-gray-300 hover:text-white rounded" title="삭제">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Summary Footer -->
+                    <div class="mt-4 flex justify-between items-center text-sm text-gray-400">
+                        <span x-text="'총 ' + videoManageListFiltered.length + '개 영상'"></span>
+                        <div class="flex gap-4">
+                            <span class="flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                                생성: <span x-text="videoManageList.filter(v => v.stage === 'generated').length"></span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                                타이밍: <span x-text="videoManageList.filter(v => v.stage === 'timed').length"></span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                                포스팅: <span x-text="videoManageList.filter(v => v.stage === 'posted').length"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1932,9 +2107,19 @@
                     localStorage.setItem('app_lang', lang);
                 },
 
-                mainTab: 'genvideo', // 'genvideo', 'timing-editor', 'youtube', or 'wiki'
+                mainTab: 'genvideo', // 'genvideo', 'timing-editor', 'youtube', 'wiki', or 'video-manage'
                 tab: 'text',
                 wikiCategory: 'tech', // 'tech' (Tech Wiki) or 'news' (Banya Official News)
+
+                // Video Management State
+                videoManageList: [],
+                videoManageListFiltered: [],
+                videoManageLoading: false,
+                videoManageFilter: {
+                    stage: '',
+                    category: '',
+                    search: ''
+                },
                 dragOver: false,
                 file: null,
                 title: '',
@@ -2051,6 +2236,13 @@
                     this.loadGenVideoInfo();
                     this.refreshGenVideoList();
                     this.refreshGenPdfList();
+
+                    // mainTab 변경 감지 - 영상 관리 탭 진입 시 목록 로드
+                    this.$watch('mainTab', (value) => {
+                        if (value === 'video-manage' && this.videoManageList.length === 0) {
+                            this.loadVideoManageList();
+                        }
+                    });
 
                     // 마크다운 에디터 초기화 (tab이 'text'일 때)
                     this.$watch('tab', (value) => {
@@ -3899,6 +4091,107 @@
                         }
                     } catch (error) {
                         console.error('Failed to load categories:', error);
+                    }
+                },
+
+                // ===== Video Management Functions =====
+                async loadVideoManageList() {
+                    this.videoManageLoading = true;
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch('/api/genvideo/manage/list', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.videoManageList = data.videos || [];
+                            this.filterVideoManageList();
+                        } else {
+                            console.error('Failed to load video list:', data.message);
+                        }
+                    } catch (error) {
+                        console.error('Failed to load video manage list:', error);
+                    } finally {
+                        this.videoManageLoading = false;
+                    }
+                },
+
+                filterVideoManageList() {
+                    let filtered = [...this.videoManageList];
+
+                    // 단계 필터
+                    if (this.videoManageFilter.stage) {
+                        filtered = filtered.filter(v => v.stage === this.videoManageFilter.stage);
+                    }
+
+                    // 카테고리 필터
+                    if (this.videoManageFilter.category) {
+                        filtered = filtered.filter(v => v.category === this.videoManageFilter.category);
+                    }
+
+                    // 검색 필터
+                    if (this.videoManageFilter.search) {
+                        const search = this.videoManageFilter.search.toLowerCase();
+                        filtered = filtered.filter(v =>
+                            v.filename?.toLowerCase().includes(search) ||
+                            v.created_by?.toLowerCase().includes(search)
+                        );
+                    }
+
+                    this.videoManageListFiltered = filtered;
+                },
+
+                async deleteVideoManage(videoId, filename) {
+                    if (!confirm(`"${filename}" 영상을 삭제하시겠습니까?\n\n관련 PDF 파일도 함께 삭제됩니다.`)) {
+                        return;
+                    }
+
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const response = await fetch(`/api/genvideo/${videoId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            await this.loadVideoManageList();
+                        } else {
+                            alert('삭제 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('삭제 중 오류가 발생했습니다.');
+                    }
+                },
+
+                goToYoutubeWithVideo(video) {
+                    // YouTube 포스터 탭으로 이동하고 해당 영상 선택
+                    this.mainTab = 'youtube';
+                    this.ytVideoSource = 'genvideo';
+                    this.selectedGenVideo = video.id;
+                    // PDF도 자동 선택
+                    this.ytPdfSource = 'genvideo';
+                    this.selectedGenPdf = video.id;
+                },
+
+                formatDuration(seconds) {
+                    if (!seconds && seconds !== 0) return '-';
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, '0')}`;
+                },
+
+                formatDateTime(isoString) {
+                    if (!isoString) return '-';
+                    try {
+                        const date = new Date(isoString);
+                        const year = date.getFullYear();
+                        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                        const day = date.getDate().toString().padStart(2, '0');
+                        const hours = date.getHours().toString().padStart(2, '0');
+                        const minutes = date.getMinutes().toString().padStart(2, '0');
+                        return `${year}-${month}-${day} ${hours}:${minutes}`;
+                    } catch (e) {
+                        return isoString;
                     }
                 }
             }
