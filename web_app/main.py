@@ -1260,16 +1260,10 @@ async def reencode_video(
                     pdf_path=pdf_path,
                     video_path=video_path,
                     timings=timings,
-                    logo_path=logo_path
+                    logo_path=logo_path,
+                    reencode_id=reencode_id  # 진행률 추적용 ID 전달
                 )
-                # 결과를 진행률 저장소에 저장
-                pdf2mp4.update_progress(
-                    result.get('reencode_id', reencode_id),
-                    'complete' if result.get('status') == 'success' else 'error',
-                    100 if result.get('status') == 'success' else 0,
-                    '✅ 재변환 완료!' if result.get('status') == 'success' else f"❌ 오류: {result.get('message', '')}",
-                    result  # 결과 데이터도 저장
-                )
+                # 완료 시 결과를 진행률 저장소에 저장 (이미 reencode_with_timings에서 처리됨)
 
             # 백그라운드에서 실행
             asyncio.create_task(run_reencode())
@@ -1286,7 +1280,8 @@ async def reencode_video(
                 pdf_path=pdf_path,
                 video_path=video_path,
                 timings=timings,
-                logo_path=logo_path
+                logo_path=logo_path,
+                reencode_id=reencode_id
             )
             return JSONResponse(content=result)
 

@@ -2353,10 +2353,12 @@ class PDF2MP4Service:
         height: int = 1080,
         fps: int = 30,
         dpi: int = 200,
-        logo_path: Optional[str] = None
+        logo_path: Optional[str] = None,
+        reencode_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """편집된 타이밍으로 영상을 재변환합니다."""
-        new_video_id = str(uuid.uuid4())[:8]
+        # reencode_id가 제공되면 사용, 아니면 새로 생성
+        new_video_id = reencode_id or str(uuid.uuid4())[:8]
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_reencode_{new_video_id}_')
         self.register_temp_dir(new_video_id, temp_dir)
 
@@ -2552,14 +2554,16 @@ class PDF2MP4Service:
                 'file_size': os.path.getsize(output_path)
             }
 
-            self.update_progress(new_video_id, 'complete', 100, '✅ 재변환 완료!', None)
+            result = {'status': 'success', 'video': video_info, 'reencode_id': new_video_id}
+            self.update_progress(new_video_id, 'complete', 100, '✅ 재변환 완료!', result)
             print(f"[{new_video_id}] ✅ Re-encoding completed successfully")
-            return {'status': 'success', 'video': video_info, 'reencode_id': new_video_id}
+            return result
 
         except Exception as e:
-            self.update_progress(new_video_id, 'error', 0, f'❌ 오류: {str(e)}', None)
+            error_result = {'status': 'error', 'message': str(e), 'reencode_id': new_video_id}
+            self.update_progress(new_video_id, 'error', 0, f'❌ 오류: {str(e)}', error_result)
             print(f"[{new_video_id}] ❌ Re-encoding failed: {e}")
-            return {'status': 'error', 'message': str(e), 'reencode_id': new_video_id}
+            return error_result
         finally:
             self.cleanup_temp_dir(new_video_id)
             self.clear_process_pid(new_video_id)
