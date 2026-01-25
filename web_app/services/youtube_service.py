@@ -582,7 +582,7 @@ class YouTubeService:
             traceback.print_exc()
             return None
 
-    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, upload_id=None):
+    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, upload_id=None, gen_video_id=None):
         """영상을 처리하고 유튜브에 업로드합니다."""
         if upload_id:
             self.update_upload_progress(upload_id, 'init', 5, '업로드 준비 중...')
@@ -704,6 +704,16 @@ class YouTubeService:
             if upload_id:
                 self.update_upload_progress(upload_id, 'done', 100, '모든 작업 완료!', result)
             
+            # Gen Video ID가 있으면 'posted' 상태로 업데이트
+            if gen_video_id:
+                try:
+                    from services.pdf2mp4_service import PDF2MP4Service
+                    service = PDF2MP4Service()
+                    service.update_video_stage(gen_video_id, 'posted')
+                    print(f"✅ Video stage updated to 'posted' for {gen_video_id}")
+                except Exception as e:
+                    print(f"⚠️ Failed to update video stage: {e}")
+
             return result
 
         except Exception as e:

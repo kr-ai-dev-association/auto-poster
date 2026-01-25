@@ -3399,7 +3399,7 @@
                                                         'bg-purple-500/20 text-purple-400': video.stage === 'reencoded',
                                                         'bg-green-500/20 text-green-400': video.stage === 'posted'
                                                     }"
-                                                    x-text="video.stage === 'generated' ? '생성' : video.stage === 'timed' ? '타이밍' : video.stage === 'reencoded' ? '재변환' : '포스팅'">
+                                                    x-text="video.stage === 'generated' ? '생성' : video.stage === 'timed' ? '타이밍' : video.stage === 'reencoded' ? '재변환' : video.stage === 'posted' ? '포스팅됨' : video.stage">
                                                 </span>
                                             </template>
                                         </td>

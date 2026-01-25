@@ -2209,10 +2209,34 @@ class PDF2MP4Service:
                         info['ocr_lang'] = meta_data.get('ocr_lang', '')
                         info['mode'] = meta_data.get('mode', 'basic')
                         info['pdf_name'] = meta_data.get('pdf_name', '')
+                        # 단계 정보도 메타데이터에 있으면 가져오기
+                        if 'stage' in meta_data:
+                            info['stage'] = meta_data['stage']
                 except Exception as e:
                     print(f"[{video_id}] 메타데이터 읽기 오류: {e}")
             return info
         return None
+
+    def update_video_stage(self, video_id: str, stage: str) -> bool:
+        """비디오의 단계(stage)를 업데이트합니다."""
+        meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
+        try:
+            meta_data = {}
+            if os.path.exists(meta_file):
+                with open(meta_file, 'r', encoding='utf-8') as f:
+                    meta_data = json.load(f)
+            
+            meta_data['stage'] = stage
+            meta_data['updated_at'] = datetime.now().isoformat()
+            
+            with open(meta_file, 'w', encoding='utf-8') as f:
+                json.dump(meta_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"[{video_id}] Video stage updated to: {stage}")
+            return True
+        except Exception as e:
+            print(f"[{video_id}] Failed to update video stage: {e}")
+            return False
 
     def delete_video(self, video_id: str) -> bool:
         path = self.get_video_path(video_id)

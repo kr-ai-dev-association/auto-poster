@@ -765,28 +765,27 @@ async def list_videos_for_management(
         video_id = video.get('id', '')
 
         # 기본 단계 판단
-        stage = 'generated'
+        # 기본 단계 판단
+        stage = video.get('stage', 'generated')
 
-        # 재변환된 영상인지 확인 (메타에 reencoded 플래그가 있거나 파일명에 _edited_ 포함)
-        if video.get('reencoded') or '_edited_' in video.get('filename', ''):
-            stage = 'reencoded'
-        else:
-            # 타이밍 파일 존재 여부로 'timed' 단계 판단
-            timing_file = os.path.join(pdf2mp4.output_dir, f"{video_id}_timing.json")
-            if os.path.exists(timing_file):
-                try:
-                    import json
-                    with open(timing_file, 'r') as f:
-                        timing_data = json.load(f)
-                        # 타이밍이 수정되었는지 확인
-                        if timing_data.get('edited'):
-                            stage = 'timed'
-                except:
-                    pass
-
-        # DB에서 YouTube 업로드 기록 확인하여 'posted' 단계 판단
-        # (YouTube 업로드 기록이 있으면 posted로 표시)
-        # TODO: 추후 업로드 기록 테이블 추가 시 구현
+        # 이미 'posted' 상태라면 유지 (메타데이터에서 읽어옴)
+        if stage != 'posted':
+            # 재변환된 영상인지 확인 (메타에 reencoded 플래그가 있거나 파일명에 _edited_ 포함)
+            if video.get('reencoded') or '_edited_' in video.get('filename', ''):
+                stage = 'reencoded'
+            else:
+                # 타이밍 파일 존재 여부로 'timed' 단계 판단
+                timing_file = os.path.join(pdf2mp4.output_dir, f"{video_id}_timing.json")
+                if os.path.exists(timing_file):
+                    try:
+                        import json
+                        with open(timing_file, 'r') as f:
+                            timing_data = json.load(f)
+                            # 타이밍이 수정되었는지 확인
+                            if timing_data.get('edited'):
+                                stage = 'timed'
+                    except:
+                        pass
 
         enhanced_video = {
             **video,
@@ -1480,7 +1479,7 @@ async def youtube_upload_from_genvideo(
         # 백그라운드 작업 시작
         background_tasks.add_task(
             youtube.process_and_upload,
-            video_content, filename, pdf_content, category, lang, use_thumbnail, upload_id
+            video_content, filename, pdf_content, category, lang, use_thumbnail, upload_id, gen_video_id=video_id
         )
 
         return JSONResponse(content={"status": "processing", "upload_id": upload_id})
