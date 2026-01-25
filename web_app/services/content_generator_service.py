@@ -368,6 +368,14 @@ Create a content plan with {target_slides} slides based on the following topic.
 
 **CRITICAL: ALL content MUST be written in ENGLISH. This includes title, description, all slide titles, content, narrations, hook, call_to_action, and tags. Do NOT use any Korean or other languages.**
 
+**VERY IMPORTANT - FOLLOW USER'S SLIDE STRUCTURE:**
+If the user has provided a detailed slide scenario/structure in the topic (e.g., "슬라이드 1:", "Slide 1:", numbered list), you MUST:
+1. Follow the EXACT slide structure, titles, and content themes provided
+2. Use the user's slide titles as-is (translate to English if needed)
+3. Expand the user's content descriptions into full narrations
+4. Generate image_prompt based on each slide's specific content and theme
+5. Do NOT create your own slide structure - strictly follow the user's outline
+
 **Important:** If the topic requires real-time information or latest news, you MUST use the provided Google Search tool to search for and include the latest information. Include trends and news from 2024 onwards.
 
 ## Topic/Idea:
@@ -392,7 +400,7 @@ Create a content plan with {target_slides} slides based on the following topic.
       "title": "Slide title",
       "content": "Content to cover in this slide (2-3 sentences). Include specific numbers or examples based on search results.",
       "narration": "Narration script for this slide (for TTS, natural conversational tone, minimum 150 characters, 20-30 seconds)",
-      "image_prompt": "Image generation prompt for this slide (English, specific and visual description)",
+      "image_prompt": "Detailed image prompt based on THIS slide's specific content (English, cinematic, visual metaphor of the slide theme)",
       "web_image_query": "Web search query for real photos/images (English, specific search terms)",
       "use_web_image": true/false,
       "duration_seconds": estimated_display_time_seconds
@@ -408,7 +416,7 @@ Create a content plan with {target_slides} slides based on the following topic.
 ## Guidelines:
 1. Each slide's narration is a TTS script, so write in natural conversational English
 2. **Important: Each narration must be at least 150 characters (20-30 seconds). Total video should be 5-7+ minutes with sufficient script content**
-3. image_prompt must be in English, with specific descriptions suitable for AI image generation
+3. **image_prompt MUST be specific to each slide's content** - describe visual elements, metaphors, and scenes that represent the slide's theme
 4. First slide should be a strong intro, last slide should include CTA outro
 5. Include teasers/previews in the middle to maintain viewer retention
 6. **ALL content must be in English (only image_prompt and web_image_query are always in English)**
@@ -422,6 +430,14 @@ Create a content plan with {target_slides} slides based on the following topic.
 다음 주제를 기반으로 {target_slides}개의 슬라이드로 구성된 콘텐츠 기획안을 작성해주세요.
 
 **중요: 모든 콘텐츠는 반드시 한국어로 작성해야 합니다. title, description, 슬라이드의 title, content, narration, hook, call_to_action, tags 모두 한국어로 작성하세요.**
+
+**매우 중요 - 사용자의 슬라이드 구성을 반드시 따르세요:**
+사용자가 주제에 상세한 슬라이드 시나리오/구성을 제공한 경우 (예: "슬라이드 1:", "Slide 1:", 번호 목록 등):
+1. 사용자가 제공한 슬라이드 구조, 제목, 내용 주제를 **정확히** 따르세요
+2. 사용자의 슬라이드 제목을 그대로 사용하세요
+3. 사용자가 작성한 내용 설명을 바탕으로 상세한 나레이션을 확장하세요
+4. 각 슬라이드의 **구체적인 내용과 주제**에 맞는 image_prompt를 생성하세요
+5. 사용자의 구성을 무시하고 새로운 구조를 만들지 마세요 - 사용자의 아웃라인을 엄격히 따르세요
 
 **중요:** 실시간 정보나 최신 뉴스가 필요한 주제라면 반드시 제공된 구글 검색 도구(Google Search)를 사용하여 최신 정보를 검색하고 반영해주세요. 2024년 이후의 최신 트렌드나 뉴스를 적극적으로 포함해야 합니다.
 
@@ -447,7 +463,7 @@ Create a content plan with {target_slides} slides based on the following topic.
       "title": "슬라이드 제목",
       "content": "슬라이드에서 다룰 내용 (2-3문장). 최신 검색 정보를 바탕으로 구체적인 수치나 사례를 포함.",
       "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체, 최소 150자 이상, 20-30초 분량)",
-      "image_prompt": "이 슬라이드용 이미지 생성 프롬프트 (영어, 구체적이고 시각적인 설명)",
+      "image_prompt": "이 슬라이드의 구체적인 내용에 맞는 상세한 이미지 프롬프트 (영어, 시네마틱, 슬라이드 주제의 시각적 메타포)",
       "web_image_query": "이 슬라이드에 사용할 실제 사진/이미지를 웹에서 검색할 쿼리 (영어, 구체적인 검색어)",
       "use_web_image": true/false,
       "duration_seconds": 예상_표시_시간_초
@@ -463,7 +479,7 @@ Create a content plan with {target_slides} slides based on the following topic.
 ## 주의사항:
 1. 각 슬라이드의 narration은 TTS로 읽을 대본이므로 자연스러운 구어체로 작성
 2. **중요: 각 narration은 반드시 150자 이상으로 작성 (20-30초 분량). 전체 영상이 5-7분 이상이 되도록 충분한 분량의 대본 작성 필수**
-3. image_prompt는 반드시 영어로, AI 이미지 생성에 적합한 구체적인 설명
+3. **image_prompt는 각 슬라이드의 내용에 특화되어야 합니다** - 슬라이드 주제를 나타내는 시각적 요소, 메타포, 장면을 구체적으로 설명하세요
 4. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
 5. 중간에 시청 유지를 위한 티저/예고 포함
 6. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt와 web_image_query만 영어)**
