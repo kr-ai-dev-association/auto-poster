@@ -3044,7 +3044,8 @@
                             <!-- Save & Reencode Button (상태에 따라 변경) -->
                             <div class="ml-auto flex gap-2">
                                 <!-- 저장되지 않은 상태: 저장 버튼 -->
-                                <button x-show="!timingEditorSaved" @click="saveTimingsAndPrepareReencode()"
+                                <!-- 저장 상태와 관계없이 항상 표시: 타이밍 저장 -->
+                                <button @click="saveTimings()"
                                     :disabled="timingEditorTimings.length === 0 || timingEditorSaving"
                                     class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all">
                                     <template x-if="timingEditorSaving">
@@ -3083,7 +3084,8 @@
                                 </div>
 
                                 <!-- 저장된 상태: 영상 재변환 버튼 -->
-                                <button x-show="timingEditorSaved" @click="reencodeVideo()"
+                                <!-- 저장 상태와 관계없이 항상 표시: 영상 재변환 -->
+                                <button @click="reencodeVideo()"
                                     :disabled="timingEditorTimings.length === 0 || timingEditorReencoding"
                                     class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
                                     :class="{'animate-pulse': !timingEditorReencoding}">
@@ -4597,8 +4599,17 @@
                             }
 
                             // Load video into player
-                            const videoUrl = `/api/genvideo/download/${this.timingEditorSelectedVideo}?token=${token}`;
-                            this.$refs.timingEditorVideo.src = videoUrl;
+                            const videoPlayer = this.$refs.timingEditorVideo;
+
+                            // 비디오 리셋
+                            videoPlayer.pause();
+                            videoPlayer.removeAttribute('src'); // src 속성 완전히 제거
+                            videoPlayer.load();
+
+                            // 새 URL 설정 (캐시 방지)
+                            const videoUrl = `/api/genvideo/download/${this.timingEditorSelectedVideo}?token=${token}&t=${Date.now()}`;
+                            videoPlayer.src = videoUrl;
+                            videoPlayer.load(); // 명시적 로드 호출
                         } else {
                             console.error('Failed to load timing data');
                             this.timingEditorTimings = [];
