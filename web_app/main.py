@@ -15,6 +15,7 @@ from services.linkedin_service import LinkedinService
 from services.youtube_service import YouTubeService
 from services.crypto_service import CryptoService
 from services.pdf2mp4_service import PDF2MP4Service
+from services.audio_generator_service import audio_generator
 from services import auth_service
 from core import database, models
 
@@ -1471,6 +1472,140 @@ async def youtube_upload_from_genvideo(
             status_code=500,
             content={"status": "error", "message": str(e)}
         )
+
+
+# --- 오디오 생성 API ---
+
+@app.get("/api/audio/voices")
+async def get_available_voices(user: models.User = Depends(get_current_user)):
+    """사용 가능한 TTS 음성 목록을 반환합니다."""
+    voices = audio_generator.get_available_voices()
+    return {"status": "success", "voices": voices}
+
+
+@app.post("/api/audio/generate-script")
+async def generate_script_from_pdf(
+    pdf: UploadFile = File(...),
+    language: str = Form("ko"),
+    style: str = Form("educational"),
+    user: models.User = Depends(get_current_user)
+):
+    """PDF에서 YouTube 영상용 대본을 생성합니다."""
+    try:
+        pdf_bytes = await pdf.read()
+
+        result = await audio_generator.generate_script_from_pdf(
+            pdf_bytes=pdf_bytes,
+            language=language,
+            style=style
+        )
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.post("/api/audio/generate-tts")
+async def generate_audio_from_script(
+    script: str = Form(...),
+    voice: str = Form("Leda"),
+    filename: str = Form(None),
+    user: models.User = Depends(get_current_user)
+):
+    """대본에서 TTS 오디오를 생성합니다."""
+    try:
+        result = await audio_generator.generate_audio_from_script(
+            script=script,
+            output_filename=filename,
+            voice=voice
+        )
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.post("/api/audio/generate")
+async def generate_audio_from_pdf(
+    pdf: UploadFile = File(...),
+    language: str = Form("ko"),
+    style: str = Form("educational"),
+    voice: str = Form("Leda"),
+    filename: str = Form(None),
+    user: models.User = Depends(get_current_user)
+):
+    """PDF에서 직접 오디오를 생성합니다 (대본 생성 + TTS)."""
+    try:
+        pdf_bytes = await pdf.read()
+
+        # 파일명이 없으면 PDF 파일명 사용
+        if not filename and pdf.filename:
+            filename = os.path.splitext(pdf.filename)[0]
+
+        result = await audio_generator.generate_audio_from_pdf(
+            pdf_bytes=pdf_bytes,
+            output_filename=filename,
+            language=language,
+            style=style,
+            voice=voice
+        )
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.get("/api/audio/list")
+async def list_generated_audio(user: models.User = Depends(get_current_user)):
+    """생성된 오디오 파일 목록을 반환합니다."""
+    audio_files = audio_generator.list_generated_audio()
+    return {"status": "success", "audio_files": audio_files}
+
+
+@app.get("/api/audio/download/{filename}")
+async def download_audio(filename: str, token: str = None):
+    """오디오 파일을 다운로드합니다."""
+    # 토큰 검증
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        payload = auth_service.jwt.decode(token, auth_service.SECRET_KEY, algorithms=[auth_service.ALGORITHM])
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    filepath = os.path.join(audio_generator.output_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        filepath,
+        media_type="audio/wav",
+        filename=filename
+    )
+
+
+@app.delete("/api/audio/{filename}")
+async def delete_audio(filename: str, user: models.User = Depends(get_current_user)):
+    """오디오 파일을 삭제합니다."""
+    success = audio_generator.delete_audio(filename)
+    if success:
+        return {"status": "success", "message": "Audio file deleted"}
+    else:
+        raise HTTPException(status_code=404, detail="File not found")
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
