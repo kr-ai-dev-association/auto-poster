@@ -19,19 +19,26 @@ class AudioGeneratorService:
     """PDF에서 대본을 생성하고 TTS로 오디오를 생성하는 서비스"""
 
     def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        if self.api_key:
-            self.client = genai.Client(api_key=self.api_key)
-            self.script_model = 'gemini-2.5-flash'
-            self.tts_model = 'gemini-2.5-flash-preview-tts'
-            self.voice_name = 'Leda'  # 여성 음성
-        else:
-            self.client = None
-            logger.error("GEMINI_API_KEY not found.")
+        self._client = None
+        self.script_model = 'gemini-2.5-flash'
+        self.tts_model = 'gemini-2.5-flash-preview-tts'
+        self.voice_name = 'Leda'  # 여성 음성
 
         # 출력 디렉토리 설정
         self.output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'generated_audio')
         os.makedirs(self.output_dir, exist_ok=True)
+
+    @property
+    def client(self):
+        """Lazy initialization of Gemini client"""
+        if self._client is None:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if api_key:
+                self._client = genai.Client(api_key=api_key)
+                logger.info("Gemini client initialized for AudioGeneratorService")
+            else:
+                logger.error("GEMINI_API_KEY not found.")
+        return self._client
 
     def _pdf_to_images(self, pdf_path: str, dpi: int = 150) -> List[Image.Image]:
         """PDF를 이미지 리스트로 변환"""
