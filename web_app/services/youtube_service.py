@@ -207,14 +207,48 @@ class YouTubeService:
         v_dir = os.path.join(self.base_v_dir, category)
         if not os.path.exists(v_dir):
             return None
-        
+
         logo_files = [f for f in os.listdir(v_dir) if f.lower().endswith('.png') and 'logo' in f.lower()]
         if not logo_files:
             logo_files = [f for f in os.listdir(v_dir) if f.lower().endswith('.png')]
-            
+
         if logo_files:
             return os.path.join(v_dir, logo_files[0])
         return None
+
+    def _compress_pdf(self, pdf_content: bytes) -> bytes:
+        """PDF 파일을 압축합니다."""
+        try:
+            import PyPDF2
+            import io
+            
+            # PDF 읽기
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+            
+            # 새 PDF 작성기 생성
+            pdf_writer = PyPDF2.PdfWriter()
+            
+            # 모든 페이지를 새 PDF에 추가 (압축 옵션 적용)
+            for page in pdf_reader.pages:
+                # 페이지 압축
+                page.compress_content_streams()
+                pdf_writer.add_page(page)
+            
+            # 메타데이터 복사
+            if pdf_reader.metadata:
+                pdf_writer.add_metadata(pdf_reader.metadata)
+            
+            # 압축된 PDF를 바이트로 변환
+            output_buffer = io.BytesIO()
+            pdf_writer.write(output_buffer)
+            compressed_pdf = output_buffer.getvalue()
+            output_buffer.close()
+            
+            return compressed_pdf
+        except Exception as e:
+            print(f"⚠️ PDF 압축 중 오류 발생: {e}")
+            # 압축 실패 시 원본 반환
+            return pdf_content
 
     async def generate_metadata(self, pdf_content, category, lang='ko', text_content: Optional[str] = None):
         """PDF 분석을 통해 유튜브 메타데이터를 생성합니다. YouTube API 인증 없이 Gemini만 사용."""
@@ -250,26 +284,37 @@ class YouTubeService:
         
         # 프롬프트 구성
         prompt = f"""
-        Analyze the provided content (PDF or Text) and generate YouTube-optimized metadata in {lang_str}.
-        
-        [CRITICAL INSTRUCTIONS]
-        1. Title: Create a click-worthy, dramatic title.
-        2. Description: Use the provided [TEMPLATE] below as a reference for style, tone, and structure.
-           - Keep the dramatic storytelling opening.
-           - Integrate the CORE findings and value propositions from the content into the middle section.
-           - Keep the 'Service & Contact' information at the bottom exactly as in the template.
-           - Use Emojis and Unicode bold characters for emphasis (YouTube doesn't support markdown bold).
+        [CRITICAL] You MUST analyze the attached PDF/content and extract its ACTUAL topic, key points, and information.
+        DO NOT just use the template text - the template is ONLY for formatting style reference.
+
+        Generate YouTube-optimized metadata in {lang_str} based on the ACTUAL CONTENT of the PDF/text provided.
+
+        [INSTRUCTIONS]
+        1. Title: Create a click-worthy, dramatic title that reflects the ACTUAL CONTENT of the PDF.
+           - The title must be about the specific topic covered in the PDF, not generic.
+
+        2. Description:
+           - First paragraph: Write a compelling hook about the ACTUAL topic from the PDF.
+           - Middle section: Summarize the KEY FINDINGS and VALUE from the PDF content.
+           - Bottom section: Keep the 'Service & Contact' information from the template.
+           - Use Emojis and Unicode bold characters for emphasis.
            - Ensure URLs are plain text so they become clickable on YouTube.
-        3. Tags: Generate 20+ highly relevant hashtags and keywords in {lang_str}.
-        
-        [TEMPLATE]
+
+        3. Tags: Generate 20+ highly relevant hashtags and keywords in {lang_str} based on the PDF content.
+
+        [TEMPLATE - Use ONLY for formatting style, NOT for content]
         {desc_template}
-        
+
+        [IMPORTANT]
+        - Extract and use the REAL information from the PDF/content.
+        - The title and description MUST reflect what the PDF is actually about.
+        - DO NOT copy the template text verbatim - adapt it to the actual content.
+
         Return ONLY a valid JSON object:
         {{
-          "title": "...",
-          "description": "...",
-          "tags": ["tag1", "tag2", ...]
+          "title": "Specific title about the PDF content",
+          "description": "Description based on actual PDF content...",
+          "tags": ["relevant", "tags", "from", "pdf", "content", ...]
         }}
         """
 
@@ -290,44 +335,62 @@ class YouTubeService:
                 pdf_size_mb = len(pdf_content) / (1024 * 1024)
                 print(f"🤖 Gemini API 호출 중... (PDF 크기: {pdf_size_mb:.1f}MB)")
                 
-                # PDF가 너무 크면 (20MB 이상) 텍스트 추출 방식 사용
-                if pdf_size_mb > 20:
-                    print(f"⚠️ PDF가 너무 큽니다 ({pdf_size_mb:.1f}MB). 텍스트 추출 방식으로 전환합니다...")
+                # 50MB 이상이면 압축 시도
+                if pdf_size_mb > 50:
+                    print(f"📦 PDF가 50MB를 초과합니다 ({pdf_size_mb:.1f}MB). 압축을 시도합니다...")
                     try:
-                        import PyPDF2
-                        import io
-                        
-                        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
-                        extracted_text = ""
-                        
-                        # 최대 50페이지까지만 추출 (너무 길면 잘림)
-                        max_pages = min(50, len(pdf_reader.pages))
-                        for i in range(max_pages):
-                            page = pdf_reader.pages[i]
-                            page_text = page.extract_text() or ""
-                            extracted_text += f"\n[Page {i+1}]\n{page_text}\n"
-                        
-                        if len(extracted_text) > 100000:  # 10만자 이상이면 자름
-                            extracted_text = extracted_text[:100000] + "\n... (내용이 길어 일부만 표시됨)"
-                        
-                        print(f"✅ PDF 텍스트 추출 완료: {len(extracted_text)} 문자")
-                        
-                        # 텍스트 기반으로 전송
-                        combined_prompt = f"{prompt}\n\n[CONTENT]\n{extracted_text}"
-                        response = summarizer.client.models.generate_content(
-                            model=summarizer.model_id,
-                            contents=combined_prompt
-                        )
+                        pdf_content = self._compress_pdf(pdf_content)
+                        compressed_size_mb = len(pdf_content) / (1024 * 1024)
+                        print(f"✅ PDF 압축 완료: {pdf_size_mb:.1f}MB → {compressed_size_mb:.1f}MB ({((1 - compressed_size_mb/pdf_size_mb) * 100):.1f}% 감소)")
+                        pdf_size_mb = compressed_size_mb
                     except Exception as e:
-                        print(f"⚠️ 텍스트 추출 실패: {e}. File API로 시도합니다...")
-                        # 텍스트 추출 실패 시 File API 시도
-                        raise e
+                        print(f"⚠️ PDF 압축 실패: {e}. 원본 파일로 진행합니다.")
+                
+                # 먼저 텍스트 추출 시도 (이미지 기반 PDF 확인용)
+                extracted_text = ""
+                try:
+                    import PyPDF2
+                    import io
+
+                    pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+
+                    # 최대 50페이지까지만 추출
+                    max_pages = min(50, len(pdf_reader.pages))
+                    for i in range(max_pages):
+                        page = pdf_reader.pages[i]
+                        page_text = page.extract_text() or ""
+                        extracted_text += f"\n[Page {i+1}]\n{page_text}\n"
+
+                    extracted_text = extracted_text.strip()
+                    print(f"📝 PDF 텍스트 추출 시도: {len(extracted_text)} 문자")
+                except Exception as e:
+                    print(f"⚠️ PDF 텍스트 추출 실패: {e}")
+                    extracted_text = ""
+
+                # 텍스트가 충분히 추출되었으면 (500자 이상) 텍스트 기반으로 처리
+                if len(extracted_text) >= 500:
+                    print(f"✅ 텍스트 기반 처리 (추출된 텍스트: {len(extracted_text)} 문자)")
+
+                    if len(extracted_text) > 100000:  # 10만자 이상이면 자름
+                        extracted_text = extracted_text[:100000] + "\n... (내용이 길어 일부만 표시됨)"
+
+                    combined_prompt = f"{prompt}\n\n[CONTENT]\n{extracted_text}"
+                    response = summarizer.client.models.generate_content(
+                        model=summarizer.model_id,
+                        contents=combined_prompt
+                    )
                 else:
-                    # PDF 용량이 작으면 File API 사용
+                    # 텍스트가 부족하면 File API 사용 (압축 후 50MB 이하 또는 이미지 기반 PDF)
+                    if pdf_size_mb > 50:
+                        print(f"⚠️ 압축 후에도 PDF가 너무 큽니다 ({pdf_size_mb:.1f}MB). 이미지 기반 PDF라 텍스트 추출 불가.")
+                        raise Exception(f"PDF 파일이 너무 큽니다 ({pdf_size_mb:.1f}MB). 압축 후에도 50MB를 초과합니다. 이미지 기반 PDF는 50MB 이하만 지원됩니다.")
+
+                    print(f"📤 이미지 기반 PDF 감지. File API로 업로드 중... ({pdf_size_mb:.1f}MB)")
+
                     with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
                         tmp_pdf.write(pdf_content)
                         tmp_pdf_path = tmp_pdf.name
-                    
+
                     try:
                         print(f"📤 Uploading PDF to Gemini File API...")
                         pdf_file_ref = summarizer.client.files.upload(
@@ -335,59 +398,58 @@ class YouTubeService:
                             config={'mime_type': 'application/pdf'}
                         )
                         print(f"✅ PDF Uploaded: {pdf_file_ref.name}")
-                        
+
                         # File API로 업로드한 파일은 FileData 형식으로 변환해야 함
-                        # uri 속성이 있으면 사용, 없으면 name 사용
                         file_uri = getattr(pdf_file_ref, 'uri', None) or getattr(pdf_file_ref, 'name', None)
                         if not file_uri:
                             raise Exception("File API 응답에서 URI 또는 name을 찾을 수 없습니다.")
-                        
+
                         file_data = types_genai.FileData(file_uri=file_uri)
                         file_part = types_genai.Part(file_data=file_data)
-                        
+
+                        # 파일을 먼저, 프롬프트를 나중에 전달해야 파일 내용을 분석함
                         response = summarizer.client.models.generate_content(
                             model=summarizer.model_id,
-                            contents=[prompt, file_part]
+                            contents=[file_part, prompt]
                         )
                     except Exception as e:
-                        print(f"⚠️ File API failed: {e}. 텍스트 추출로 폴백합니다...")
-                        # File API 실패 시 텍스트 추출로 폴백
-                        try:
-                            import PyPDF2
-                            import io
-                            
-                            pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
-                            extracted_text = ""
-                            
-                            # 최대 50페이지까지만 추출
-                            max_pages = min(50, len(pdf_reader.pages))
-                            for i in range(max_pages):
-                                page = pdf_reader.pages[i]
-                                page_text = page.extract_text() or ""
-                                extracted_text += f"\n[Page {i+1}]\n{page_text}\n"
-                            
-                            if len(extracted_text) > 100000:  # 10만자 이상이면 자름
-                                extracted_text = extracted_text[:100000] + "\n... (내용이 길어 일부만 표시됨)"
-                            
-                            print(f"✅ PDF 텍스트 추출 완료 (폴백): {len(extracted_text)} 문자")
-                            
-                            # 텍스트 기반으로 전송
-                            combined_prompt = f"{prompt}\n\n[CONTENT]\n{extracted_text}"
-                            response = summarizer.client.models.generate_content(
-                                model=summarizer.model_id,
-                                contents=combined_prompt
-                            )
-                        except Exception as e2:
-                            print(f"❌ 텍스트 추출도 실패: {e2}")
-                            raise Exception(f"PDF 처리 실패: File API와 텍스트 추출 모두 실패했습니다. 원인: {str(e2)}")
+                        print(f"❌ File API 실패: {e}")
+                        raise Exception(f"이미지 기반 PDF 처리 실패. File API 에러: {str(e)}")
                     finally:
                         if os.path.exists(tmp_pdf_path):
                             os.unlink(tmp_pdf_path)
             
             print(f"✅ Gemini API 응답 수신")
-            
+
+            # 응답 검증
+            if not response or not hasattr(response, 'text') or not response.text:
+                # candidates 확인
+                if hasattr(response, 'candidates') and response.candidates:
+                    candidate = response.candidates[0]
+                    if hasattr(candidate, 'finish_reason'):
+                        print(f"⚠️ 응답 종료 이유: {candidate.finish_reason}")
+                    if hasattr(candidate, 'content') and candidate.content:
+                        if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                            texts = [p.text for p in candidate.content.parts if hasattr(p, 'text') and p.text]
+                            if texts:
+                                raw_text = ' '.join(texts).strip()
+                                print(f"📝 Parts에서 텍스트 추출: {len(raw_text)} 문자")
+                            else:
+                                raise Exception("Gemini API 응답이 비어있습니다. (parts에 텍스트 없음)")
+                        else:
+                            raise Exception("Gemini API 응답이 비어있습니다. (parts 없음)")
+                    else:
+                        raise Exception("Gemini API 응답이 비어있습니다. (content 없음)")
+                else:
+                    raise Exception("Gemini API 응답이 비어있습니다. (candidates 없음)")
+            else:
+                raw_text = response.text.strip()
+
+            # 빈 텍스트 체크
+            if not raw_text:
+                raise Exception("Gemini API 응답 텍스트가 비어있습니다.")
+
             # 원본 응답 로깅 (디버깅용)
-            raw_text = response.text.strip()
             print(f"📝 원본 응답 (처음 500자): {raw_text[:500]}")
             
             # Remove any markdown code block wrappers if present
@@ -623,7 +685,7 @@ class YouTubeService:
             else:
                 print(f"✅ 메타데이터 검증 통과")
             
-        return metadata
+            return metadata
         except Exception as e:
             print(f"❌ Error generating metadata: {e}")
             import traceback
@@ -681,8 +743,12 @@ class YouTubeService:
             traceback.print_exc()
             return None
 
-    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, upload_id=None, gen_video_id=None):
-        """영상을 처리하고 유튜브에 업로드합니다."""
+    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, upload_id=None, gen_video_id=None, text_content=None):
+        """영상을 처리하고 유튜브에 업로드합니다.
+
+        Args:
+            text_content: 대본 또는 나레이션 텍스트 (이 값이 있으면 PDF 대신 사용)
+        """
         if upload_id:
             self.update_upload_progress(upload_id, 'init', 5, '업로드 준비 중...')
         v_dir = os.path.join(self.base_v_dir, category)
@@ -715,13 +781,19 @@ class YouTubeService:
                 with open(desc_path, 'r', encoding='utf-8') as f:
                     desc_template = f.read()
 
-            print(f"📝 메타데이터 생성 시작 (PDF: {pdf_path})")
             if upload_id:
                 self.update_upload_progress(upload_id, 'metadata', 15, 'YouTube 메타데이터 생성 중 (AI 분석)...')
-            # YouTube API 인증 없이 메타데이터 생성 (generate_metadata 메서드 사용)
-            with open(pdf_path, 'rb') as f:
-                pdf_content = f.read()
-            metadata = await self.generate_metadata(pdf_content, category, lang)
+
+            # 대본(text_content)이 있으면 우선 사용, 없으면 PDF에서 추출
+            if text_content and len(text_content) >= 100:
+                print(f"📝 메타데이터 생성 시작 (대본 텍스트: {len(text_content)} 문자)")
+                metadata = await self.generate_metadata(None, category, lang, text_content=text_content)
+            else:
+                print(f"📝 메타데이터 생성 시작 (PDF: {pdf_path})")
+                # YouTube API 인증 없이 메타데이터 생성 (generate_metadata 메서드 사용)
+                with open(pdf_path, 'rb') as f:
+                    pdf_content = f.read()
+                metadata = await self.generate_metadata(pdf_content, category, lang)
             print(f"✅ 메타데이터 생성 완료: {metadata.get('title', 'N/A')[:50]}...")
             
             if upload_id:
