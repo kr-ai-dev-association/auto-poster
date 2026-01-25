@@ -7095,6 +7095,11 @@
                         await this.loadCategories();
                     }
 
+                    // 1.5 PDF 목록 로드 (PDF 자동 선택을 위해 필요)
+                    if (this.generatedPdfs.length === 0) {
+                        await this.refreshGenPdfList();
+                    }
+
                     // 2. 영상에서 설정할 카테고리와 언어 값
                     const targetCategory = video.category || null;
                     let targetLang = null;
