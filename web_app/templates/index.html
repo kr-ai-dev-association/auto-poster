@@ -2927,7 +2927,8 @@
                                 class="px-3 py-1.5 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg">
                                 <option value="">전체</option>
                                 <option value="generated">생성</option>
-                                <option value="timed">타이밍 적용</option>
+                                <option value="timed">타이밍 편집</option>
+                                <option value="reencoded">재변환</option>
                                 <option value="posted">포스팅 완료</option>
                             </select>
                         </div>
@@ -2990,7 +2991,7 @@
                                                 <svg class="w-5 h-5 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                                 </svg>
-                                                <span class="text-white truncate max-w-xs" :title="video.filename" x-text="video.filename"></span>
+                                                <span class="text-white break-all" :title="video.filename" x-text="video.filename"></span>
                                             </div>
                                         </td>
                                         <td class="px-4 py-3 text-center">
@@ -2998,9 +2999,10 @@
                                                 :class="{
                                                     'bg-blue-500/20 text-blue-400': video.stage === 'generated',
                                                     'bg-yellow-500/20 text-yellow-400': video.stage === 'timed',
+                                                    'bg-purple-500/20 text-purple-400': video.stage === 'reencoded',
                                                     'bg-green-500/20 text-green-400': video.stage === 'posted'
                                                 }"
-                                                x-text="video.stage === 'generated' ? '생성' : video.stage === 'timed' ? '타이밍' : '포스팅'">
+                                                x-text="video.stage === 'generated' ? '생성' : video.stage === 'timed' ? '타이밍' : video.stage === 'reencoded' ? '재변환' : '포스팅'">
                                             </span>
                                         </td>
                                         <td class="px-4 py-3 text-center text-gray-300" x-text="formatDuration(video.duration)"></td>
@@ -4582,6 +4584,7 @@
 
                             if (response.ok) {
                                 const data = await response.json();
+                                console.log('Reencode progress:', data);
 
                                 if (data.status === 'success') {
                                     this.timingEditorReencodeProgress = data.progress || 0;
@@ -4596,6 +4599,10 @@
                                     if (data.step === 'error') {
                                         return { status: 'error', message: data.message };
                                     }
+                                } else if (data.status === 'not_found') {
+                                    // 아직 진행률이 초기화되지 않음 - 대기
+                                    console.log('Progress not found yet, waiting...');
+                                    this.timingEditorReencodeStatus = '준비 중...';
                                 }
                             }
 

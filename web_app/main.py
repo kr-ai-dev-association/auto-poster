@@ -750,22 +750,22 @@ async def list_videos_for_management(
         # 기본 단계 판단
         stage = 'generated'
 
-        # 타이밍 파일 존재 여부로 'timed' 단계 판단
-        timing_file = os.path.join(pdf2mp4.output_dir, f"{video_id}_timing.json")
-        if os.path.exists(timing_file):
-            try:
-                import json
-                with open(timing_file, 'r') as f:
-                    timing_data = json.load(f)
-                    # 타이밍이 수정되었는지 확인 (편집된 타이밍 파일은 edited 키가 있을 수 있음)
-                    if timing_data.get('edited') or '_edited_' in video.get('filename', ''):
-                        stage = 'timed'
-            except:
-                pass
-
-        # 파일명에 'edited'가 포함되어 있으면 timed 단계
-        if '_edited_' in video.get('filename', ''):
-            stage = 'timed'
+        # 재변환된 영상인지 확인 (메타에 reencoded 플래그가 있거나 파일명에 _edited_ 포함)
+        if video.get('reencoded') or '_edited_' in video.get('filename', ''):
+            stage = 'reencoded'
+        else:
+            # 타이밍 파일 존재 여부로 'timed' 단계 판단
+            timing_file = os.path.join(pdf2mp4.output_dir, f"{video_id}_timing.json")
+            if os.path.exists(timing_file):
+                try:
+                    import json
+                    with open(timing_file, 'r') as f:
+                        timing_data = json.load(f)
+                        # 타이밍이 수정되었는지 확인
+                        if timing_data.get('edited'):
+                            stage = 'timed'
+                except:
+                    pass
 
         # DB에서 YouTube 업로드 기록 확인하여 'posted' 단계 판단
         # (YouTube 업로드 기록이 있으면 posted로 표시)
@@ -1249,6 +1249,10 @@ async def reencode_video(
 
         # 새 reencode_id 생성 (진행률 추적용)
         reencode_id = str(uuid.uuid4())[:8]
+
+        # 진행률 초기화 (백그라운드 태스크 시작 전에 미리 설정)
+        from services.pdf2mp4_service import PDF2MP4Service
+        PDF2MP4Service.update_progress(reencode_id, 'init', 0, '🔄 재변환 준비 중...', None)
 
         if async_mode:
             # 비동기 모드: 즉시 reencode_id 반환하고 백그라운드에서 처리

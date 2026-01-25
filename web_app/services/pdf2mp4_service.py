@@ -2551,7 +2551,8 @@ class PDF2MP4Service:
                 'resolution': f'{width}x{height}',
                 'created_at': datetime.utcnow().isoformat(),
                 'file_path': output_path,
-                'file_size': os.path.getsize(output_path)
+                'file_size': os.path.getsize(output_path),
+                'reencoded': True  # 재변환된 영상임을 표시
             }
 
             result = {'status': 'success', 'video': video_info, 'reencode_id': new_video_id}
