@@ -124,8 +124,13 @@ class ContentGeneratorService:
 
         style_guide = style_guides.get(category, style_guides['educational'])
 
+        # Google Search 도구 설정
+        tools = [types.Tool(google_search=types.GoogleSearch())]
+
         prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가입니다.
 다음 주제를 기반으로 {target_slides}개의 슬라이드로 구성된 콘텐츠 기획안을 작성해주세요.
+
+**중요:** 실시간 정보나 최신 뉴스가 필요한 주제라면 반드시 제공된 구글 검색 도구(Google Search)를 사용하여 최신 정보를 검색하고 반영해주세요. 2024년 이후의 최신 트렌드나 뉴스를 적극적으로 포함해야 합니다.
 
 ## 주제/기획 아이디어:
 {topic}
@@ -147,7 +152,7 @@ class ContentGeneratorService:
     {{
       "slide_number": 1,
       "title": "슬라이드 제목",
-      "content": "슬라이드에서 다룰 내용 (2-3문장)",
+      "content": "슬라이드에서 다룰 내용 (2-3문장). 최신 검색 정보를 바탕으로 구체적인 수치나 사례를 포함.",
       "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체)",
       "image_prompt": "이 슬라이드용 이미지 생성 프롬프트 (영어, 구체적이고 시각적인 설명)",
       "duration_seconds": 예상_표시_시간_초
@@ -166,6 +171,7 @@ class ContentGeneratorService:
 3. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
 4. 중간에 시청 유지를 위한 티저/예고 포함
 5. {'한국어' if language == 'ko' else 'English'}로 title, content, narration 작성
+6. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
 """
 
         try:
@@ -174,6 +180,7 @@ class ContentGeneratorService:
                 model=self.research_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
+                    tools=tools,  # 구글 검색 도구 추가
                     temperature=0.2,
                     max_output_tokens=8192,
                     response_mime_type="application/json"  # Gemini 1.5/2.0 JSON mode 지원
