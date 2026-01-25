@@ -143,6 +143,17 @@ class PDF2MP4Service:
             del cls._progress_store[video_id]
 
     @classmethod
+    def get_in_progress_tasks(cls) -> Dict[str, Dict[str, Any]]:
+        """진행 중인 모든 태스크를 반환합니다."""
+        in_progress = {}
+        for video_id, progress_data in cls._progress_store.items():
+            # 완료되지 않은 태스크만 반환 (stage가 complete, error, cancelled가 아닌 것)
+            stage = progress_data.get('stage', '')
+            if stage not in ['complete', 'error', 'cancelled']:
+                in_progress[video_id] = progress_data
+        return in_progress
+
+    @classmethod
     def request_cancel(cls, video_id: str) -> bool:
         """변환 취소 요청"""
         if video_id in cls._progress_store:
