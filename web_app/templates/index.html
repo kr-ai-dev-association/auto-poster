@@ -725,8 +725,8 @@
                                     <label class="block text-sm font-bold text-gray-300 mb-2">카테고리 선택</label>
                                     <select x-model="ytCategory"
                                         class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
-                                        <template x-for="cat in categories" :key="cat">
-                                            <option :value="cat" x-text="cat"></option>
+                                        <template x-for="cat in categories" :key="cat.id">
+                                            <option :value="cat.id" x-text="cat.name_ko + ' (' + cat.name_en + ')'"></option>
                                         </template>
                                     </select>
                                 </div>
@@ -734,8 +734,9 @@
                                     <label class="block text-sm font-bold text-gray-300 mb-2">메타데이터 언어 선택</label>
                                     <select x-model="ytLang"
                                         class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
-                                        <option value="ko">한국어 (Korean)</option>
-                                        <option value="en">영어 (English)</option>
+                                        <template x-for="lang in languages" :key="lang.id">
+                                            <option :value="lang.id" x-text="lang.name_ko + ' (' + lang.name_en + ')'"></option>
+                                        </template>
                                     </select>
                                 </div>
                                 <!-- Video Source Selection -->
@@ -1305,11 +1306,9 @@
                                             <label class="block text-xs text-gray-400 mb-1">카테고리</label>
                                             <select x-model="contentGenCategory"
                                                 class="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-xs">
-                                                <option value="educational">교육</option>
-                                                <option value="entertainment">엔터테인먼트</option>
-                                                <option value="tech">기술</option>
-                                                <option value="gaming">게임</option>
-                                                <option value="lifestyle">라이프스타일</option>
+                                                <template x-for="cat in categories" :key="cat.id">
+                                                    <option :value="cat.id" x-text="cat.name_ko"></option>
+                                                </template>
                                             </select>
                                         </div>
                                         <div>
@@ -1327,8 +1326,9 @@
                                             <label class="block text-xs text-gray-400 mb-1">언어</label>
                                             <select x-model="contentGenLanguage"
                                                 class="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-xs">
-                                                <option value="ko">한국어</option>
-                                                <option value="en">English</option>
+                                                <template x-for="lang in languages" :key="lang.id">
+                                                    <option :value="lang.id" x-text="lang.name_ko"></option>
+                                                </template>
                                             </select>
                                         </div>
                                     </div>
@@ -1593,6 +1593,87 @@
                             </div>
                         </div>
 
+                        <!-- Content Image Preview Modal (Moved) -->
+                        <div x-show="contentGenImagePreview"
+                            class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+                            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
+                            x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150"
+                            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                            @click.self="contentGenImagePreview = null"
+                            @keydown.escape.window="contentGenImagePreview = null"
+                            @keydown.left.window="navigateContentImage(-1)"
+                            @keydown.right.window="navigateContentImage(1)">
+
+                            <!-- Close Button -->
+                            <button @click="contentGenImagePreview = null"
+                                class="absolute top-4 right-4 z-10 p-2 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+
+                            <!-- Navigation Arrows -->
+                            <button x-show="contentGenImageList.length > 1" @click.stop="navigateContentImage(-1)"
+                                class="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 19l-7-7 7-7">
+                                    </path>
+                                </svg>
+                            </button>
+                            <button x-show="contentGenImageList.length > 1" @click.stop="navigateContentImage(1)"
+                                class="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 5l7 7-7 7">
+                                    </path>
+                                </svg>
+                            </button>
+
+                            <!-- Image Container -->
+                            <div class="max-w-[90vw] max-h-[85vh] flex flex-col items-center" @click.stop>
+                                <img x-show="contentGenImagePreview?.filename"
+                                    :src="contentGenImagePreview?.filename ? '/api/content/image/download/' + contentGenImagePreview.filename + '?token=' + localStorage.getItem('access_token') : ''"
+                                    class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
+
+                                <!-- Image Info -->
+                                <div class="mt-4 flex items-center gap-4 text-white">
+                                    <span class="px-3 py-1 bg-blue-600/50 rounded-full text-sm font-medium">
+                                        슬라이드 #<span x-text="contentGenImagePreview?.slide_number"></span>
+                                    </span>
+                                    <span class="text-gray-400 text-sm"
+                                        x-text="contentGenImagePreview?.filename"></span>
+                                    <span x-show="contentGenImageList.length > 1" class="text-gray-500 text-sm">
+                                        (<span x-text="contentGenImagePreviewIndex + 1"></span> / <span
+                                            x-text="contentGenImageList.length"></span>)
+                                    </span>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="mt-3 flex gap-2">
+                                    <button @click="openContentImageInNewTab(contentGenImagePreview?.filename)"
+                                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14">
+                                            </path>
+                                        </svg>
+                                        새 탭에서 열기
+                                    </button>
+                                    <button @click="deleteContentImage(contentGenImagePreview?.filename)"
+                                        class="px-4 py-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg text-sm flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                            </path>
+                                        </svg>
+                                        삭제
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 3단계: PDF 생성 -->
                         <div class="flex flex-col gap-4">
                             <div class="glass-card p-6 flex flex-col">
@@ -1832,8 +1913,9 @@
                                             <label class="block text-sm text-gray-400 mb-2">대본 언어</label>
                                             <select x-model="audioGenLanguage"
                                                 class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
-                                                <option value="ko">한국어</option>
-                                                <option value="en">English</option>
+                                                <template x-for="lang in languages" :key="lang.id">
+                                                    <option :value="lang.id" x-text="lang.name_ko"></option>
+                                                </template>
                                             </select>
                                         </div>
 
@@ -2389,9 +2471,9 @@
                                                 <select x-model="genVideoCategory"
                                                     @change="genVideoLogoTimestamp = Date.now()"
                                                     class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                                    <template x-for="cat in categories" :key="cat">
-                                                        <option :value="cat" x-text="cat"
-                                                            :selected="cat === genVideoCategory"></option>
+                                                    <template x-for="cat in categories" :key="cat.id">
+                                                        <option :value="cat.id" x-text="cat.name_ko"
+                                                            :selected="cat.id === genVideoCategory"></option>
                                                     </template>
                                                 </select>
                                                 <div
@@ -2772,8 +2854,7 @@
                 </div>
 
                 <!-- Content Image Preview Modal -->
-                <div x-show="contentGenImagePreview"
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+                <div x-show="false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
                     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
                     x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
@@ -3311,8 +3392,8 @@
                             <select x-model="videoManageFilter.category" @change="filterVideoManageList()"
                                 class="px-3 py-1.5 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg">
                                 <option value="">전체</option>
-                                <template x-for="cat in categories" :key="cat">
-                                    <option :value="cat" x-text="cat"></option>
+                                <template x-for="cat in categories" :key="cat.id">
+                                    <option :value="cat.id" x-text="cat.name_ko"></option>
                                 </template>
                             </select>
                         </div>
@@ -3407,10 +3488,10 @@
                                         </td>
                                         <td class="px-4 py-3 text-center text-gray-300"
                                             x-text="formatDuration(video.duration)"></td>
-                                        <td class="px-4 py-3 text-center text-gray-300" x-text="video.category || '-'">
+                                        <td class="px-4 py-3 text-center text-gray-300" x-text="getCategoryName(video.category) || '-'">
                                         </td>
                                         <td class="px-4 py-3 text-center text-gray-300"
-                                            x-text="video.ocr_lang === 'korean' ? '한국어' : video.ocr_lang === 'en' ? '영어' : video.ocr_lang || '-'">
+                                            x-text="getLanguageName(video.ocr_lang === 'korean' ? 'ko' : video.ocr_lang) || '-'">
                                         </td>
                                         <td class="px-4 py-3 text-center text-gray-300"
                                             x-text="video.created_by || '-'"></td>
@@ -3691,7 +3772,10 @@
                 genVideoCurrentId: null,
                 generatedVideos: [],
                 smartModeAvailable: true,
-                categories: [], // 카테고리 목록
+                categories: [], // 카테고리 목록 [{id, name_ko, name_en, description_ko, description_en}]
+                languages: [], // 언어 목록 [{id, name_ko, name_en}]
+                defaultCategory: 'tech',
+                defaultLanguage: 'ko',
 
                 // Timing Editor State
                 timingEditorSelectedVideo: '',
@@ -6983,27 +7067,40 @@
                 async loadCategories() {
                     try {
                         const token = localStorage.getItem('access_token');
-                        const response = await fetch('/api/genvideo/categories', {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const data = await response.json();
-                        if (data.status === 'success') {
-                            this.categories = data.categories;
-                            // 카테고리 정렬: 'tech'를 맨 앞으로
-                            if (this.categories.includes('tech')) {
-                                this.categories = ['tech', ...this.categories.filter(c => c !== 'tech')];
-                            }
+
+                        // 카테고리와 언어 동시 로드
+                        const [catResponse, langResponse] = await Promise.all([
+                            fetch('/api/common/categories', {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            }),
+                            fetch('/api/common/languages', {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            })
+                        ]);
+
+                        const catData = await catResponse.json();
+                        const langData = await langResponse.json();
+
+                        // 카테고리 설정
+                        if (catData.status === 'success') {
+                            this.categories = catData.categories;
+                            this.defaultCategory = catData.default || 'tech';
 
                             // 카테고리 기본값 설정
                             if (this.categories.length > 0) {
-                                // ytCategory: 값이 비어있거나 유효하지 않으면 첫 번째 카테고리 ('tech')
-                                if (!this.ytCategory || !this.categories.includes(this.ytCategory)) {
-                                    this.ytCategory = this.categories[0];
+                                const categoryIds = this.categories.map(c => c.id);
+                                // ytCategory: 값이 비어있거나 유효하지 않으면 기본 카테고리
+                                if (!this.ytCategory || !categoryIds.includes(this.ytCategory)) {
+                                    this.ytCategory = this.defaultCategory;
                                     console.log('Set default ytCategory:', this.ytCategory);
                                 }
-                                // genVideoCategory: 항상 'tech'를 기본값으로, 없으면 첫 번째 카테고리
-                                if (!this.genVideoCategory) {
-                                    this.genVideoCategory = this.categories.includes('tech') ? 'tech' : this.categories[0];
+                                // genVideoCategory: 기본값 설정
+                                if (!this.genVideoCategory || !categoryIds.includes(this.genVideoCategory)) {
+                                    this.genVideoCategory = this.defaultCategory;
+                                }
+                                // contentGenCategory: 기본값 설정
+                                if (!this.contentGenCategory || !categoryIds.includes(this.contentGenCategory)) {
+                                    this.contentGenCategory = this.defaultCategory;
                                 }
                                 // 로고 이미지 새로고침
                                 this.$nextTick(() => {
@@ -7011,9 +7108,50 @@
                                 });
                             }
                         }
+
+                        // 언어 설정
+                        if (langData.status === 'success') {
+                            this.languages = langData.languages;
+                            this.defaultLanguage = langData.default || 'ko';
+
+                            // 언어 기본값 설정
+                            if (this.languages.length > 0) {
+                                const languageIds = this.languages.map(l => l.id);
+                                // ytLang: 값이 유효하지 않으면 기본 언어
+                                if (!languageIds.includes(this.ytLang)) {
+                                    this.ytLang = this.defaultLanguage;
+                                }
+                                // audioGenLanguage: 기본값 설정
+                                if (!languageIds.includes(this.audioGenLanguage)) {
+                                    this.audioGenLanguage = this.defaultLanguage;
+                                }
+                                // contentGenLanguage: 기본값 설정
+                                if (!languageIds.includes(this.contentGenLanguage)) {
+                                    this.contentGenLanguage = this.defaultLanguage;
+                                }
+                            }
+                        }
                     } catch (error) {
-                        console.error('Failed to load categories:', error);
+                        console.error('Failed to load categories/languages:', error);
                     }
+                },
+
+                // Helper: 카테고리 ID로 이름 반환
+                getCategoryName(categoryId, lang = 'ko') {
+                    const cat = this.categories.find(c => c.id === categoryId);
+                    if (cat) {
+                        return lang === 'en' ? cat.name_en : cat.name_ko;
+                    }
+                    return categoryId;
+                },
+
+                // Helper: 언어 ID로 이름 반환
+                getLanguageName(languageId, displayLang = 'ko') {
+                    const lang = this.languages.find(l => l.id === languageId);
+                    if (lang) {
+                        return displayLang === 'en' ? lang.name_en : lang.name_ko;
+                    }
+                    return languageId;
                 },
 
                 // ===== Video Management Functions =====
