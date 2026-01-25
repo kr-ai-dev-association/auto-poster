@@ -196,7 +196,12 @@ class YouTubeService:
             if os.path.isdir(item_path) and not item.startswith('.'):
                 categories.append(item)
 
-        return sorted(categories)
+        categories.sort()
+        if 'tech' in categories:
+            categories.remove('tech')
+            categories.insert(0, 'tech')
+        
+        return categories
 
     def get_logo_path(self, category):
         v_dir = os.path.join(self.base_v_dir, category)
@@ -645,8 +650,6 @@ class YouTubeService:
                 if not is_valid:
                     error_msg = "업로드 전 메타데이터 검증 실패:\n" + "\n".join(f"  - {e}" for e in errors)
                     raise Exception(error_msg)
-                else:
-                    print(f"✅ 메타데이터 자동 수정 완료")
                 else:
                     print(f"✅ 메타데이터 자동 수정 완료")
             else:

@@ -6978,12 +6978,17 @@
                         const data = await response.json();
                         if (data.status === 'success') {
                             this.categories = data.categories;
+                            // 카테고리 정렬: 'tech'를 맨 앞으로
+                            if (this.categories.includes('tech')) {
+                                this.categories = ['tech', ...this.categories.filter(c => c !== 'tech')];
+                            }
+
                             // 카테고리 기본값 설정
                             if (this.categories.length > 0) {
-                                // ytCategory: 값이 비어있을 때만 첫 번째 카테고리로 설정
-                                // (goToYoutubeWithVideo에서 설정된 값은 유지)
-                                if (!this.ytCategory) {
+                                // ytCategory: 값이 비어있거나 유효하지 않으면 첫 번째 카테고리 ('tech')
+                                if (!this.ytCategory || !this.categories.includes(this.ytCategory)) {
                                     this.ytCategory = this.categories[0];
+                                    console.log('Set default ytCategory:', this.ytCategory);
                                 }
                                 // genVideoCategory: 항상 'tech'를 기본값으로, 없으면 첫 번째 카테고리
                                 if (!this.genVideoCategory) {
