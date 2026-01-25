@@ -148,13 +148,34 @@ class ContentGeneratorService:
             response_text = response.text.strip()
 
             # JSON 추출
-            json_start = response_text.find('{')
-            json_end = response_text.rfind('}') + 1
-            if json_start != -1 and json_end > json_start:
-                json_str = response_text[json_start:json_end]
-                content_plan = json.loads(json_str)
+            # JSON 추출 (Markdown 코드 블록 지원 강화)
+            import re
+            json_str = ""
+            # 1. ```json ... ``` 패턴 시도
+            json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
             else:
-                raise ValueError("Failed to extract JSON from response")
+                # 2. ``` ... ``` 패턴 시도 (언어 지정 없을 때)
+                json_match = re.search(r'```\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                else:
+                    # 3. 단순히 가장 바깥쪽 중괄호 찾기
+                    json_start = response_text.find('{')
+                    json_end = response_text.rfind('}') + 1
+                    if json_start != -1 and json_end > json_start:
+                        json_str = response_text[json_start:json_end]
+                    else:
+                        raise ValueError("Failed to extract JSON from response: No JSON object found")
+
+            # JSON 파싱
+            try:
+                content_plan = json.loads(json_str)
+            except json.JSONDecodeError:
+                # 파싱 실패 시, 혹시 모를 trailing comma 제거 후 재시도 등 추가 처리 가능하지만,
+                # 일단은 에러 메시지를 명확히 함
+                raise ValueError(f"Failed to parse extracted JSON: {json_str[:100]}...")
 
             # 기획안 저장
             plan_id = uuid.uuid4().hex[:8]
