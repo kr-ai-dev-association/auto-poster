@@ -3753,8 +3753,8 @@
                                                         stroke-width="2"
                                                         d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                                 </svg>
-                                                <span class="text-white break-all" :title="video.filename"
-                                                    x-text="video.filename"></span>
+                                                <span class="text-white break-all" :title="video.title || video.filename"
+                                                    x-text="video.title || video.filename"></span>
                                             </div>
                                         </td>
                                         <td class="px-4 py-3 text-center">
@@ -3791,7 +3791,7 @@
                                         <td class="px-4 py-3 text-center text-gray-300" x-text="getCategoryName(video.category) || '-'">
                                         </td>
                                         <td class="px-4 py-3 text-center text-gray-300"
-                                            x-text="getLanguageName(video.ocr_lang === 'korean' ? 'ko' : video.ocr_lang) || '-'">
+                                            x-text="getLanguageName(video.language || (video.ocr_lang === 'korean' ? 'ko' : video.ocr_lang)) || '-'">
                                         </td>
                                         <td class="px-4 py-3 text-center text-gray-300"
                                             x-text="video.created_by || '-'"></td>

@@ -2200,8 +2200,35 @@ class PDF2MP4Service:
                                 video_data['created_by'] = meta_data.get('created_by', video_data.get('created_by', ''))
                                 video_data['duration'] = meta_data.get('duration', video_data.get('duration', 0))
                                 video_data['pdf_name'] = meta_data.get('pdf_name', '')
+                                video_data['stage'] = meta_data.get('stage', '')
+                                video_data['content_id'] = meta_data.get('content_id', video_id)
                         except Exception as e:
                             print(f"Error loading meta file for {video_id}: {e}")
+
+                    # PDF 메타데이터에서 language, title 가져오기
+                    content_id = video_data.get('content_id', video_id)
+                    pdf_meta_file = os.path.join(self.pdf_dir, f"{content_id}.json")
+                    if os.path.exists(pdf_meta_file):
+                        try:
+                            with open(pdf_meta_file, 'r', encoding='utf-8') as pf:
+                                pdf_meta = json.load(pf)
+                                video_data['language'] = pdf_meta.get('language', '')
+                                video_data['title'] = pdf_meta.get('title', '')
+                        except Exception as e:
+                            print(f"Error loading PDF meta for {content_id}: {e}")
+
+                    # 기획안에서 title 가져오기 (PDF 메타에 없는 경우)
+                    if not video_data.get('title'):
+                        plan_file = os.path.join(os.path.dirname(self.output_dir), 'generated_content', f"plan_{content_id}.json")
+                        if os.path.exists(plan_file):
+                            try:
+                                with open(plan_file, 'r', encoding='utf-8') as plf:
+                                    plan_data = json.load(plf)
+                                    video_data['title'] = plan_data.get('title', '')
+                                    if not video_data.get('language'):
+                                        video_data['language'] = plan_data.get('language', '')
+                            except Exception as e:
+                                print(f"Error loading plan for {content_id}: {e}")
 
                     # 메타 파일이 없는 경우 파일명에서 PDF 이름 추출 시도
                     if not video_data.get('pdf_name'):

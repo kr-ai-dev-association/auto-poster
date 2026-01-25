@@ -377,39 +377,62 @@ class YouTubeService:
                 desc_template = f.read()
 
         lang_str = "Korean" if lang == 'ko' else "English"
-        
+
+        # 템플릿에서 고정 섹션 추출 (서비스 안내, SEO 키워드)
+        fixed_section_ko = ""
+        fixed_section_en = ""
+
+        if desc_template:
+            # 한국어 템플릿에서 고정 섹션 추출
+            if "📢 서비스 및 협업 안내" in desc_template:
+                idx = desc_template.find("📢 서비스 및 협업 안내")
+                fixed_section_ko = desc_template[idx:].strip()
+            # 영어 템플릿에서 고정 섹션 추출
+            elif "📢 Service & Collaboration" in desc_template:
+                idx = desc_template.find("📢 Service & Collaboration")
+                fixed_section_en = desc_template[idx:].strip()
+
+        fixed_section = fixed_section_ko or fixed_section_en
+
         # 프롬프트 구성
         prompt = f"""
         [CRITICAL] You MUST analyze the attached PDF/content and extract its ACTUAL topic, key points, and information.
-        DO NOT just use the template text - the template is ONLY for formatting style reference.
-
         Generate YouTube-optimized metadata in {lang_str} based on the ACTUAL CONTENT of the PDF/text provided.
 
         [INSTRUCTIONS]
         1. Title: Create a click-worthy, dramatic title that reflects the ACTUAL CONTENT of the PDF.
            - The title must be about the specific topic covered in the PDF, not generic.
 
-        2. Description:
-           - First paragraph: Write a compelling hook about the ACTUAL topic from the PDF.
-           - Middle section: Summarize the KEY FINDINGS and VALUE from the PDF content.
-           - Bottom section: Keep the 'Service & Contact' information from the template.
-           - Use Emojis and Unicode bold characters for emphasis.
-           - Ensure URLs are plain text so they become clickable on YouTube.
+        2. Description STRUCTURE (MUST follow this exact format):
+
+           PART 1 - CONTENT SECTION (Write based on PDF content):
+           - Opening hook: A dramatic one-line quote or statement about the topic
+           - Context paragraph: Explain the situation/problem from the PDF
+           - Main content: Key points, findings, and value from the PDF (use emojis and formatting)
+           - Call-to-action: Encourage viewers to watch
+
+           PART 2 - FIXED SECTION (COPY EXACTLY as provided below):
+           You MUST include this EXACT text at the end of the description, without any modifications:
+
+           {fixed_section}
 
         3. Tags: Generate 20+ highly relevant hashtags and keywords in {lang_str} based on the PDF content.
+           Include both topic-specific tags AND the fixed brand tags from the template.
 
-        [TEMPLATE - Use ONLY for formatting style, NOT for content]
+        [REFERENCE TEMPLATE - for formatting style]
         {desc_template}
 
-        [IMPORTANT]
-        - Extract and use the REAL information from the PDF/content.
-        - The title and description MUST reflect what the PDF is actually about.
-        - DO NOT copy the template text verbatim - adapt it to the actual content.
+        [CRITICAL RULES]
+        - The description MUST end with the exact fixed section provided above (Service & Collaboration, SEO & Keywords)
+        - DO NOT modify, omit, or rewrite the fixed section - copy it EXACTLY
+        - Only the content section (PART 1) should be written based on the PDF content
+        - Use the same emoji style and formatting as the template
+        - Ensure URLs are plain text so they become clickable on YouTube
 
         Return ONLY a valid JSON object:
         {{
           "title": "Specific title about the PDF content",
-          "description": "Description based on actual PDF content...",
+          "description": "Content section based on PDF...\\n\\n📢 서비스 및 협업 안내\\n... (exact fixed section)",
           "tags": ["relevant", "tags", "from", "pdf", "content", ...]
         }}
         """
