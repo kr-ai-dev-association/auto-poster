@@ -6436,6 +6436,21 @@
                     this.ytVideoSource = 'genvideo';
                     this.selectedGenVideo = video.id;
 
+                    // 카테고리 설정 (영상의 카테고리가 있으면 사용)
+                    if (video.category && this.categories.includes(video.category)) {
+                        this.ytCategory = video.category;
+                    }
+
+                    // 메타데이터 언어 설정 (영상의 OCR 언어 기반)
+                    if (video.ocr_lang) {
+                        // ocr_lang 값을 ytLang 형식으로 변환 (korean -> ko, en -> en)
+                        if (video.ocr_lang === 'korean' || video.ocr_lang === 'ko') {
+                            this.ytLang = 'ko';
+                        } else if (video.ocr_lang === 'en' || video.ocr_lang === 'english') {
+                            this.ytLang = 'en';
+                        }
+                    }
+
                     // PDF 자동 선택: pdf_name으로 generatedPdfs에서 찾기
                     this.ytPdfSource = 'genvideo';
                     if (video.pdf_name && this.generatedPdfs.length > 0) {
