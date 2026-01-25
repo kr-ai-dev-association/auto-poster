@@ -59,7 +59,7 @@ class ContentGeneratorService:
 
     def __init__(self):
         self._client = None
-        self.research_model = 'gemini-2.5-flash'  # Deep research용
+        self.research_model = 'gemini-2.0-flash'  # Stable version for JSON output
         self.image_model = 'gemini-2.0-flash-exp'  # 이미지 생성용 (Imagen 3)
 
         # 출력 디렉토리 설정
@@ -174,8 +174,9 @@ class ContentGeneratorService:
                 model=self.research_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.8,
-                    max_output_tokens=8192
+                    temperature=0.2,
+                    max_output_tokens=8192,
+                    response_mime_type="application/json"  # Gemini 1.5/2.0 JSON mode 지원
                 )
             )
 
@@ -199,6 +200,7 @@ class ContentGeneratorService:
                     if extracted:
                         json_str = extracted
                     else:
+                        logger.error(f"Failed to extract JSON. Raw response start: {response_text[:1000]}")
                         raise ValueError("Failed to extract JSON from response: No JSON object found")
 
             # JSON 파싱
