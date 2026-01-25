@@ -3940,7 +3940,7 @@
                     localStorage.setItem('app_lang', lang);
                 },
 
-                mainTab: 'audio-generator', // 'audio-generator', 'genvideo', 'timing-editor', 'youtube', 'wiki', or 'video-manage'
+                mainTab: 'content-generator', // 'content-generator', 'audio-generator', 'genvideo', 'timing-editor', 'youtube', 'wiki', or 'video-manage'
                 tab: 'text',
                 wikiCategory: 'tech', // 'tech' (Tech Wiki) or 'news' (Banya Official News)
 
@@ -4022,7 +4022,7 @@
 
                 // Auto Pipeline State
                 autoPipelineTopic: '',
-                autoPipelineCategory: 'educational',
+                autoPipelineCategory: 'tech',
                 autoPipelineSlideCount: 15,
                 autoPipelineLanguage: 'ko',
                 autoPipelineInstructions: '',
@@ -7482,6 +7482,10 @@
                                 // contentGenCategory: 기본값 설정
                                 if (!this.contentGenCategory || !categoryIds.includes(this.contentGenCategory)) {
                                     this.contentGenCategory = this.defaultCategory;
+                                }
+                                // autoPipelineCategory: 기본값 설정
+                                if (!this.autoPipelineCategory || !categoryIds.includes(this.autoPipelineCategory)) {
+                                    this.autoPipelineCategory = this.defaultCategory;
                                 }
                                 // 로고 이미지 새로고침
                                 this.$nextTick(() => {

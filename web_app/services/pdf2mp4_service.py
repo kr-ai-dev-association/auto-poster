@@ -1411,7 +1411,8 @@ class PDF2MP4Service:
         youtube_service = None,
         category: str = '',
         created_by: str = '',
-        content_id: str = None
+        content_id: str = None,
+        title: str = None
     ) -> Dict[str, Any]:
         """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정
 
@@ -1422,6 +1423,7 @@ class PDF2MP4Service:
         category: 영상 카테고리
         created_by: 생성자 이메일
         content_id: 통합 콘텐츠 ID (파이프라인에서 전달, 없으면 자동 생성)
+        title: 영상 제목 (파일명으로 사용, 없으면 기존 방식 사용)
         """
         if not WHISPER_AVAILABLE:
             return {
@@ -1540,7 +1542,15 @@ class PDF2MP4Service:
                     print(f"[{video_id}] 마지막 슬라이드 연장: {last_end:.1f}초 → {target_duration:.1f}초")
 
             # 7. 영상 출력
-            output_filename = f"{os.path.splitext(filename)[0]}_smart_{video_id}.mp4"
+            # 제목이 있으면 제목으로 파일명 생성, 없으면 기존 방식
+            if title:
+                # 파일명에 사용할 수 없는 문자 제거
+                import re
+                safe_title = re.sub(r'[\\/*?:"<>|]', '', title)
+                safe_title = safe_title.strip()[:100]  # 최대 100자
+                output_filename = f"{safe_title}_{video_id}.mp4"
+            else:
+                output_filename = f"{os.path.splitext(filename)[0]}_smart_{video_id}.mp4"
             output_path = os.path.join(self.output_dir, output_filename)
 
             video_duration = page_timings[-1]['start'] + page_timings[-1]['duration'] if page_timings else 0

@@ -270,7 +270,8 @@ class AutoPipelineService:
                 logo_path=logo_path,
                 category=category,
                 created_by=user_email or '',
-                content_id=content_id  # 통합 ID 전달
+                content_id=content_id,  # 통합 ID 전달
+                title=title  # 기획안 제목을 파일명으로 사용
             )
 
             if video_result.get('status') != 'success':
@@ -289,6 +290,9 @@ class AutoPipelineService:
                 'duration': video_result.get('duration')
             }
             self.pipelines[pipeline_id]['steps_completed'].append('video_generation')
+
+            # 동영상 생성 완료 후 스테이지를 'generated'로 설정
+            pdf2mp4_svc.update_video_stage(video_id, 'generated')
 
             # ===== Step 7: YouTube 업로드 =====
             update_status('youtube_upload', 85, 'YouTube 업로드 중...')
@@ -327,6 +331,8 @@ class AutoPipelineService:
                                 'url': youtube_url
                             }
                             self.pipelines[pipeline_id]['steps_completed'].append('youtube_upload')
+                            # YouTube 업로드 완료 후 스테이지를 'posted'로 업데이트
+                            pdf2mp4_svc.update_video_stage(video_id, 'posted')
                             break
                         elif progress.get('step') == 'error':
                             raise Exception(progress.get('message', 'Upload failed'))
