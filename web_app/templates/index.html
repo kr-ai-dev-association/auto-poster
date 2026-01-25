@@ -2825,6 +2825,9 @@
                                                 <div class="text-xs text-gray-400 flex items-center gap-3 mt-1">
                                                     <span x-text="formatBytes(pdf.size)"></span>
                                                     <span x-show="pdf.pages" x-text="pdf.pages + ' 페이지'"></span>
+                                                    <span x-show="pdf.category"
+                                                        class="px-1.5 py-0.5 bg-purple-600/30 text-purple-300 rounded text-xs"
+                                                        x-text="categories.find(c => c.id === pdf.category)?.[currentLanguage === 'ko' ? 'name_ko' : 'name_en'] || pdf.category"></span>
                                                     <span
                                                         x-text="pdf.created_at ? new Date(pdf.created_at * 1000).toLocaleDateString('ko-KR') : ''"></span>
                                                 </div>
@@ -5820,6 +5823,12 @@
                             original_name: pdf.original_name || pdf.filename
                         };
 
+                        // PDF의 카테고리가 있으면 로고 선택에 자동 반영
+                        if (pdf.category && this.categories.some(cat => cat.id === pdf.category)) {
+                            this.genVideoCategory = pdf.category;
+                            this.genVideoLogoTimestamp = Date.now(); // 로고 이미지 새로고침
+                        }
+
                         // 모달 닫기
                         this.showGeneratedPdfPicker = false;
 
@@ -6782,7 +6791,27 @@
                             this.genVideoOcrLang = 'en';      // 영어
                         }
 
-                        // 6. 영상 생성 탭으로 이동
+                        // 6. PDF 소스의 카테고리 정보가 있으면 로고 카테고리 자동 설정
+                        if (this.audioGenPdfSource?.type === 'content' && this.audioGenPdfSource?.filename) {
+                            try {
+                                const pdfListResponse = await fetch('/api/content/pdfs', {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                const pdfListData = await pdfListResponse.json();
+                                if (pdfListData.status === 'success' && pdfListData.pdfs) {
+                                    const matchedPdf = pdfListData.pdfs.find(p => p.filename === this.audioGenPdfSource.filename);
+                                    if (matchedPdf?.category && this.categories.some(cat => cat.id === matchedPdf.category)) {
+                                        this.genVideoCategory = matchedPdf.category;
+                                        this.genVideoLogoTimestamp = Date.now();
+                                        console.log('Set category from PDF metadata:', matchedPdf.category);
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('Failed to get PDF category:', e);
+                            }
+                        }
+
+                        // 7. 영상 생성 탭으로 이동
                         this.mainTab = 'genvideo';
 
                     } catch (error) {
@@ -6855,6 +6884,24 @@
                                 let pdfUrl;
                                 if (pdfSource.type === 'content') {
                                     pdfUrl = `/api/content/pdf/download/${pdfSource.filename}?token=${token}`;
+
+                                    // Content Generator PDF의 카테고리 정보 조회
+                                    try {
+                                        const pdfListResponse = await fetch('/api/content/pdfs', {
+                                            headers: { 'Authorization': `Bearer ${token}` }
+                                        });
+                                        const pdfListData = await pdfListResponse.json();
+                                        if (pdfListData.status === 'success' && pdfListData.pdfs) {
+                                            const matchedPdf = pdfListData.pdfs.find(p => p.filename === pdfSource.filename);
+                                            if (matchedPdf?.category && this.categories.some(cat => cat.id === matchedPdf.category)) {
+                                                this.genVideoCategory = matchedPdf.category;
+                                                this.genVideoLogoTimestamp = Date.now();
+                                                console.log('Set category from PDF metadata:', matchedPdf.category);
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.log('Failed to get PDF category:', e);
+                                    }
                                 } else if (pdfSource.type === 'genvideo') {
                                     pdfUrl = `/api/genvideo/pdf/download/${pdfSource.id || pdfSource.filename}?token=${token}`;
                                 }
@@ -6920,6 +6967,13 @@
                                             this.genVideoPdf = pdfFile;
                                             pdfLoaded = true;
                                             console.log('Found and downloaded PDF from content pdfs:', contentMatchingPdf);
+
+                                            // 카테고리 정보가 있으면 로고 카테고리 자동 설정
+                                            if (contentMatchingPdf.category && this.categories.some(cat => cat.id === contentMatchingPdf.category)) {
+                                                this.genVideoCategory = contentMatchingPdf.category;
+                                                this.genVideoLogoTimestamp = Date.now();
+                                                console.log('Set category from matched PDF:', contentMatchingPdf.category);
+                                            }
                                         }
                                     }
                                 }

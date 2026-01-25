@@ -177,14 +177,16 @@ class ContentGeneratorService:
 
         try:
             # 비동기 클라이언트 사용하여 이벤트 루프 차단 방지
+            # 주의: Google Search 도구와 response_mime_type="application/json"은 동시 사용 불가
+            # Search 도구 사용 시 JSON 모드를 비활성화하고 수동으로 JSON 추출
             response = await self.async_client.models.generate_content(
                 model=self.research_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     tools=tools,  # 구글 검색 도구 추가
                     temperature=0.2,
-                    max_output_tokens=8192,
-                    response_mime_type="application/json"  # Gemini 1.5/2.0 JSON mode 지원
+                    max_output_tokens=8192
+                    # response_mime_type 제거 - Search 도구와 호환 불가
                 )
             )
 

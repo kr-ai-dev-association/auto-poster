@@ -1714,6 +1714,35 @@ async def delete_audio_task(task_id: str, user: models.User = Depends(get_curren
     return {"status": "success", "message": "Task deleted"}
 
 
+# ========== Common API (Categories & Languages) ==========
+
+# 통합 카테고리 데이터
+CATEGORIES = [
+    {"id": "tech", "name_ko": "테크", "name_en": "Tech", "description_ko": "기술, IT, AI 관련 콘텐츠", "description_en": "Technology, IT, AI content"},
+    {"id": "entertainment", "name_ko": "엔터테인먼트", "name_en": "Entertainment", "description_ko": "영화, 음악, 연예 콘텐츠", "description_en": "Movies, music, celebrity content"},
+    {"id": "beauty", "name_ko": "뷰티", "name_en": "Beauty", "description_ko": "화장품, 스킨케어, 메이크업", "description_en": "Cosmetics, skincare, makeup"},
+    {"id": "lifestyle", "name_ko": "라이프스타일", "name_en": "Lifestyle", "description_ko": "일상, 여행, 음식, 패션", "description_en": "Daily life, travel, food, fashion"},
+]
+
+# 통합 언어 데이터
+LANGUAGES = [
+    {"id": "ko", "name_ko": "한국어", "name_en": "Korean"},
+    {"id": "en", "name_ko": "영어", "name_en": "English"},
+]
+
+
+@app.get("/api/common/categories")
+async def get_categories(user: models.User = Depends(get_current_user)):
+    """카테고리 목록을 반환합니다."""
+    return JSONResponse(content={"status": "success", "categories": CATEGORIES})
+
+
+@app.get("/api/common/languages")
+async def get_languages(user: models.User = Depends(get_current_user)):
+    """언어 목록을 반환합니다."""
+    return JSONResponse(content={"status": "success", "languages": LANGUAGES})
+
+
 # ========== Content Generator API ==========
 
 @app.post("/api/content/generate-plan")
