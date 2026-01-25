@@ -6344,12 +6344,15 @@
                             this.categories = data.categories;
                             // 카테고리 기본값 설정
                             if (this.categories.length > 0) {
-                                // ytCategory: 값이 없거나 유효하지 않으면 첫 번째 카테고리
-                                if (!this.ytCategory || !this.categories.includes(this.ytCategory)) {
+                                // ytCategory: 값이 비어있을 때만 첫 번째 카테고리로 설정
+                                // (goToYoutubeWithVideo에서 설정된 값은 유지)
+                                if (!this.ytCategory) {
                                     this.ytCategory = this.categories[0];
                                 }
                                 // genVideoCategory: 항상 'tech'를 기본값으로, 없으면 첫 번째 카테고리
-                                this.genVideoCategory = this.categories.includes('tech') ? 'tech' : this.categories[0];
+                                if (!this.genVideoCategory) {
+                                    this.genVideoCategory = this.categories.includes('tech') ? 'tech' : this.categories[0];
+                                }
                                 // 로고 이미지 새로고침
                                 this.$nextTick(() => {
                                     this.genVideoLogoTimestamp = Date.now();
@@ -6436,9 +6439,10 @@
                     this.ytVideoSource = 'genvideo';
                     this.selectedGenVideo = video.id;
 
-                    // 카테고리 설정 (영상의 카테고리가 있으면 사용)
-                    if (video.category && this.categories.includes(video.category)) {
+                    // 카테고리 설정 (영상의 카테고리가 있으면 무조건 사용)
+                    if (video.category) {
                         this.ytCategory = video.category;
+                        console.log('Setting ytCategory to:', video.category);
                     }
 
                     // 메타데이터 언어 설정 (영상의 OCR 언어 기반)
@@ -6449,6 +6453,7 @@
                         } else if (video.ocr_lang === 'en' || video.ocr_lang === 'english') {
                             this.ytLang = 'en';
                         }
+                        console.log('Setting ytLang to:', this.ytLang, 'from ocr_lang:', video.ocr_lang);
                     }
 
                     // PDF 자동 선택: pdf_name으로 generatedPdfs에서 찾기
