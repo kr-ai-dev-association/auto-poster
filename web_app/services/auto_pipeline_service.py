@@ -32,18 +32,42 @@ class AutoPipelineService:
         """모든 파이프라인 목록을 반환합니다."""
         return list(self.pipelines.values())
 
+    def create_pipeline_id(self) -> str:
+        """새 파이프라인 ID를 생성합니다."""
+        return content_id_service.generate_content_id('pipe')
+
+    def init_pipeline(self, pipeline_id: str, topic: str, category: str, language: str, user_id: int = None) -> Dict[str, Any]:
+        """파이프라인을 초기화하고 상태를 설정합니다."""
+        self.pipelines[pipeline_id] = {
+            'id': pipeline_id,
+            'content_id': pipeline_id,
+            'topic': topic,
+            'category': category,
+            'language': language,
+            'status': 'starting',
+            'current_step': 'initializing',
+            'progress': 0,
+            'steps_completed': [],
+            'error': None,
+            'result': {},
+            'user_id': user_id
+        }
+        return self.pipelines[pipeline_id]
+
     async def run_full_pipeline(
         self,
         topic: str,
-        category: str = 'educational',
+        category: str = 'tech',
         target_slides: int = 15,
         language: str = 'ko',
         additional_instructions: str = '',
-        voice: str = 'Kore',
+        voice: str = 'Leda',
         script_style: str = 'educational',
         youtube_privacy: str = 'private',
         progress_callback: Callable = None,
-        user_id: int = None
+        user_id: int = None,
+        user_email: str = None,
+        pipeline_id: str = None
     ) -> Dict[str, Any]:
         """
         전체 파이프라인을 실행합니다.
@@ -63,27 +87,36 @@ class AutoPipelineService:
         Returns:
             Dict containing pipeline result
         """
-        # 통합 콘텐츠 ID 생성 (전체 파이프라인에서 일관되게 사용)
-        content_id = content_id_service.generate_content_id('pipe')
-        pipeline_id = content_id  # pipeline_id도 content_id와 동일하게 사용
+        # 통합 콘텐츠 ID 생성 또는 기존 ID 사용
+        if pipeline_id:
+            content_id = pipeline_id
+        else:
+            content_id = content_id_service.generate_content_id('pipe')
+            pipeline_id = content_id
+
         start_time = datetime.now()
 
-        # 파이프라인 상태 초기화
-        self.pipelines[pipeline_id] = {
-            'id': pipeline_id,
-            'content_id': content_id,  # 통합 ID 저장
-            'topic': topic,
-            'category': category,
-            'language': language,
-            'status': 'running',
-            'current_step': 'initializing',
-            'progress': 0,
-            'steps_completed': [],
-            'error': None,
-            'result': {},
-            'started_at': start_time.isoformat(),
-            'user_id': user_id
-        }
+        # 파이프라인 상태 업데이트 (init_pipeline에서 이미 생성했을 수 있음)
+        if pipeline_id not in self.pipelines:
+            self.pipelines[pipeline_id] = {
+                'id': pipeline_id,
+                'content_id': content_id,
+                'topic': topic,
+                'category': category,
+                'language': language,
+                'status': 'running',
+                'current_step': 'initializing',
+                'progress': 0,
+                'steps_completed': [],
+                'error': None,
+                'result': {},
+                'started_at': start_time.isoformat(),
+                'user_id': user_id
+            }
+        else:
+            # 기존 상태 업데이트
+            self.pipelines[pipeline_id]['status'] = 'running'
+            self.pipelines[pipeline_id]['started_at'] = start_time.isoformat()
 
         def update_status(step: str, progress: int, message: str = ''):
             self.pipelines[pipeline_id]['current_step'] = step
@@ -165,22 +198,31 @@ class AutoPipelineService:
             self.pipelines[pipeline_id]['steps_completed'].append('pdf_generation')
 
             # ===== Step 4: 대본 생성 =====
-            update_status('script_generation', 55, '대본 생성 중...')
-            logger.info(f"[Pipeline {pipeline_id}] Step 4: Generating script")
+            update_status('script_generation', 55, 'AI 대본 생성 중...')
+            logger.info(f"[Pipeline {pipeline_id}] Step 4: Generating script from PDF")
 
-            # 기획안의 narration들을 합쳐서 대본으로 사용
-            slides = plan.get('slides', [])
-            narrations = [slide.get('narration', '') for slide in slides]
-            full_script = '\n\n'.join(narrations)
+            # PDF를 기반으로 AI가 풍부한 대본 생성 (기획안 narration보다 훨씬 상세함)
+            script_result = await audio_generator.generate_script_from_pdf(
+                pdf_path=pdf_path,
+                language=language,
+                style=script_style
+            )
+
+            if script_result.get('status') != 'success':
+                raise Exception(f"Script generation failed: {script_result.get('message')}")
+
+            full_script = script_result.get('script', '')
+            logger.info(f"[Pipeline {pipeline_id}] Script generated: {len(full_script)} chars")
 
             self.pipelines[pipeline_id]['result']['script'] = {
                 'length': len(full_script),
-                'slide_count': len(narrations)
+                'char_count': script_result.get('char_count', 0),
+                'estimated_duration': script_result.get('estimated_duration', 0)
             }
             self.pipelines[pipeline_id]['steps_completed'].append('script_generation')
 
             # ===== Step 5: 오디오 생성 =====
-            update_status('audio_generation', 60, 'TTS 오디오 생성 중...')
+            update_status('audio_generation', 65, 'TTS 오디오 생성 중...')
             logger.info(f"[Pipeline {pipeline_id}] Step 5: Generating audio")
 
             audio_result = await audio_generator.generate_audio_from_script(
@@ -227,15 +269,17 @@ class AutoPipelineService:
                 audio_filename=os.path.basename(audio_path),
                 logo_path=logo_path,
                 category=category,
-                created_by=str(user_id) if user_id else '',
+                created_by=user_email or '',
                 content_id=content_id  # 통합 ID 전달
             )
 
             if video_result.get('status') != 'success':
                 raise Exception(f"Video generation failed: {video_result.get('message')}")
 
-            video_path = video_result.get('output_path')
-            video_id = video_result.get('video_id')
+            # video_info 객체에서 경로 추출
+            video_info = video_result.get('video', {})
+            video_path = video_info.get('file_path')
+            video_id = video_result.get('video_id') or content_id
             video_filename = os.path.basename(video_path) if video_path else f"auto_{plan_id}.mp4"
 
             self.pipelines[pipeline_id]['result']['video'] = {

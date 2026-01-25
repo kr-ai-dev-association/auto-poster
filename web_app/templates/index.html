@@ -1366,12 +1366,10 @@
                                             <label class="block text-xs text-gray-400 mb-1">TTS 음성</label>
                                             <select x-model="autoPipelineVoice"
                                                 class="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm">
-                                                <option value="Kore">Kore (한국어 여성)</option>
-                                                <option value="Charon">Charon (깊은 남성)</option>
-                                                <option value="Fenrir">Fenrir (차분한 남성)</option>
-                                                <option value="Aoede">Aoede (밝은 여성)</option>
-                                                <option value="Puck">Puck (활발한)</option>
-                                                <option value="Leda">Leda (부드러운 여성)</option>
+                                                <template x-for="voice in audioGenVoices" :key="voice.name">
+                                                    <option :value="voice.name"
+                                                        x-text="voice.name + ' (' + voice.gender + ')'"></option>
+                                                </template>
                                             </select>
                         </div>
                     </div>
@@ -4028,7 +4026,7 @@
                 autoPipelineSlideCount: 15,
                 autoPipelineLanguage: 'ko',
                 autoPipelineInstructions: '',
-                autoPipelineVoice: 'Kore',
+                autoPipelineVoice: 'Leda',
                 autoPipelinePrivacy: 'private',
                 autoPipelineRunning: false,
                 autoPipelineId: null,

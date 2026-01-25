@@ -387,7 +387,7 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
       "slide_number": 1,
       "title": "슬라이드 제목",
       "content": "슬라이드에서 다룰 내용 (2-3문장). 최신 검색 정보를 바탕으로 구체적인 수치나 사례를 포함.",
-      "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체)",
+      "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체, 최소 150자 이상, 20-30초 분량)",
       "image_prompt": "이 슬라이드용 이미지 생성 프롬프트 (영어, 구체적이고 시각적인 설명)",
       "web_image_query": "이 슬라이드에 사용할 실제 사진/이미지를 웹에서 검색할 쿼리 (영어, 구체적인 검색어)",
       "use_web_image": true/false,
@@ -403,13 +403,15 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
 
 ## 주의사항:
 1. 각 슬라이드의 narration은 TTS로 읽을 대본이므로 자연스러운 구어체로 작성
-2. image_prompt는 반드시 영어로, AI 이미지 생성에 적합한 구체적인 설명
-3. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
-4. 중간에 시청 유지를 위한 티저/예고 포함
-5. {'한국어' if language == 'ko' else 'English'}로 title, content, narration 작성
-6. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
-7. web_image_query: 실제 사진이 필요한 슬라이드에 대해 웹 검색 쿼리를 작성 (예: 제품 사진, 유명인, 장소, 이벤트 등)
-8. use_web_image: 해당 슬라이드에 AI 생성 이미지 대신 웹에서 다운로드한 실제 이미지를 사용할지 여부 (실제 사진이 더 적합한 경우 true)
+2. **중요: 각 narration은 반드시 150자 이상으로 작성 (20-30초 분량). 전체 영상이 5-7분 이상이 되도록 충분한 분량의 대본 작성 필수**
+3. image_prompt는 반드시 영어로, AI 이미지 생성에 적합한 구체적인 설명
+4. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
+5. 중간에 시청 유지를 위한 티저/예고 포함
+6. {'한국어' if language == 'ko' else 'English'}로 title, content, narration 작성
+7. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
+8. web_image_query: 실제 사진이 필요한 슬라이드에 대해 웹 검색 쿼리를 작성 (예: 제품 사진, 유명인, 장소, 이벤트 등)
+9. use_web_image: 해당 슬라이드에 AI 생성 이미지 대신 웹에서 다운로드한 실제 이미지를 사용할지 여부 (실제 사진이 더 적합한 경우 true)
+10. **전체 narration 합계가 최소 2500자 이상이 되도록 작성 (약 5분 분량)**
 """
 
         try:
@@ -470,6 +472,7 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
             content_plan['content_id'] = plan_id  # 통합 ID로도 저장
             content_plan['created_at'] = datetime.now().isoformat()
             content_plan['language'] = language
+            content_plan['category'] = category  # 사용자가 선택한 카테고리로 강제 설정
 
             with open(plan_path, 'w', encoding='utf-8') as f:
                 json.dump(content_plan, f, ensure_ascii=False, indent=2)

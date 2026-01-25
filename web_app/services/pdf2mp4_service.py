@@ -2127,13 +2127,22 @@ class PDF2MP4Service:
 
     def get_video_list(self) -> List[Dict[str, Any]]:
         """생성된 영상 목록 조회"""
+        import re
         videos = []
         if os.path.exists(self.output_dir):
             for f in os.listdir(self.output_dir):
                 if f.endswith('.mp4'):
                     path = os.path.join(self.output_dir, f)
-                    parts = f.rsplit('_', 1)
-                    video_id = parts[1].replace('.mp4', '') if len(parts) > 1 else f.replace('.mp4', '')
+
+                    # video_id 추출 로직 개선
+                    # 1. 파이프라인 형식: pipe_YYYYMMDD_xxxxxxxx_smart_pipe_YYYYMMDD_xxxxxxxx.mp4
+                    # 2. 일반 형식: filename_xxxxxxxx.mp4
+                    pipe_match = re.match(r'^(pipe_\d{8}_[a-f0-9]{8})_', f)
+                    if pipe_match:
+                        video_id = pipe_match.group(1)
+                    else:
+                        parts = f.rsplit('_', 1)
+                        video_id = parts[1].replace('.mp4', '') if len(parts) > 1 else f.replace('.mp4', '')
 
                     video_data = {
                         'id': video_id,

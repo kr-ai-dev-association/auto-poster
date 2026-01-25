@@ -1978,22 +1978,17 @@ async def start_auto_pipeline(
     user: models.User = Depends(get_current_user)
 ):
     """전체 자동화 파이프라인을 시작합니다."""
-    pipeline_id = str(uuid.uuid4())[:8]
+    # 통합 content_id를 파이프라인 ID로 사용
+    pipeline_id = auto_pipeline.create_pipeline_id()
 
-    # 파이프라인 초기화
-    auto_pipeline.pipelines[pipeline_id] = {
-        'id': pipeline_id,
-        'topic': request.topic,
-        'category': request.category,
-        'language': request.language,
-        'status': 'starting',
-        'current_step': 'initializing',
-        'progress': 0,
-        'steps_completed': [],
-        'error': None,
-        'result': {},
-        'user_id': user.id
-    }
+    # 파이프라인 초기화 (서비스에 위임)
+    auto_pipeline.init_pipeline(
+        pipeline_id=pipeline_id,
+        topic=request.topic,
+        category=request.category,
+        language=request.language,
+        user_id=user.id
+    )
 
     # 백그라운드에서 파이프라인 실행
     async def run_pipeline():
@@ -2007,7 +2002,9 @@ async def start_auto_pipeline(
                 voice=request.voice,
                 script_style=request.script_style,
                 youtube_privacy=request.youtube_privacy,
-                user_id=user.id
+                user_id=user.id,
+                user_email=user.email,
+                pipeline_id=pipeline_id
             )
         except Exception as e:
             import traceback
