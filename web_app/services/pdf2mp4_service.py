@@ -1345,7 +1345,8 @@ class PDF2MP4Service:
                 'duration': video_duration,
                 'mode': 'basic',
                 'pdf_name': filename,  # 원본 PDF 파일명
-                'created_at': datetime.utcnow().isoformat()
+                'created_at': datetime.utcnow().isoformat(),
+                'stage': 'generated'  # 초기 스테이지: 생성 완료
             }
             with open(meta_file, 'w', encoding='utf-8') as f:
                 json.dump(meta_data, f, ensure_ascii=False, indent=2)
@@ -1632,7 +1633,8 @@ class PDF2MP4Service:
                 'duration': video_duration,
                 'mode': 'smart',
                 'pdf_name': filename,  # 원본 PDF 파일명
-                'created_at': datetime.utcnow().isoformat()
+                'created_at': datetime.utcnow().isoformat(),
+                'stage': 'generated'  # 초기 스테이지: 생성 완료
             }
             with open(meta_file, 'w', encoding='utf-8') as f:
                 json.dump(meta_data, f, ensure_ascii=False, indent=2)
@@ -2623,7 +2625,8 @@ class PDF2MP4Service:
                 'mode': 'edited',
                 'original_video_id': video_id,
                 'pdf_name': os.path.basename(new_pdf_path),
-                'created_at': datetime.utcnow().isoformat()
+                'created_at': datetime.utcnow().isoformat(),
+                'stage': 'reencoded'  # 재변환 완료 스테이지
             }
             # 기존 메타데이터에서 정보 복사
             if os.path.exists(old_meta_file):

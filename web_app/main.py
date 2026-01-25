@@ -1230,6 +1230,9 @@ async def save_video_timing(
         with open(timing_file, 'w', encoding='utf-8') as f:
             json.dump(timing_data, f, ensure_ascii=False, indent=2)
 
+        # 스테이지를 'timed'로 업데이트
+        pdf2mp4.update_video_stage(video_id, 'timed')
+
         return JSONResponse(content={"status": "success", "message": "Timing saved"})
     except Exception as e:
         return JSONResponse(
