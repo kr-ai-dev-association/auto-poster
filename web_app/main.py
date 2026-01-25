@@ -1950,6 +1950,111 @@ async def delete_generated_pdf(filename: str, user: models.User = Depends(get_cu
         raise HTTPException(status_code=404, detail="File not found")
 
 
+# ========== Auto Pipeline API ==========
+
+from services.auto_pipeline_service import auto_pipeline
+
+
+class PipelineStartRequest(BaseModel):
+    topic: str
+    category: str = 'educational'
+    target_slides: int = 15
+    language: str = 'ko'
+    additional_instructions: str = ''
+    voice: str = 'Kore'
+    script_style: str = 'educational'
+    youtube_privacy: str = 'private'
+
+
+@app.post("/api/pipeline/start")
+async def start_auto_pipeline(
+    request: PipelineStartRequest,
+    background_tasks: BackgroundTasks,
+    user: models.User = Depends(get_current_user)
+):
+    """전체 자동화 파이프라인을 시작합니다."""
+    pipeline_id = str(uuid.uuid4())[:8]
+
+    # 파이프라인 초기화
+    auto_pipeline.pipelines[pipeline_id] = {
+        'id': pipeline_id,
+        'topic': request.topic,
+        'category': request.category,
+        'language': request.language,
+        'status': 'starting',
+        'current_step': 'initializing',
+        'progress': 0,
+        'steps_completed': [],
+        'error': None,
+        'result': {},
+        'user_id': user.id
+    }
+
+    # 백그라운드에서 파이프라인 실행
+    async def run_pipeline():
+        try:
+            await auto_pipeline.run_full_pipeline(
+                topic=request.topic,
+                category=request.category,
+                target_slides=request.target_slides,
+                language=request.language,
+                additional_instructions=request.additional_instructions,
+                voice=request.voice,
+                script_style=request.script_style,
+                youtube_privacy=request.youtube_privacy,
+                user_id=user.id
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            auto_pipeline.pipelines[pipeline_id]['status'] = 'failed'
+            auto_pipeline.pipelines[pipeline_id]['error'] = str(e)
+
+    # asyncio.create_task로 백그라운드 실행
+    asyncio.create_task(run_pipeline())
+
+    return JSONResponse(content={
+        "status": "started",
+        "pipeline_id": pipeline_id,
+        "message": "파이프라인이 시작되었습니다."
+    })
+
+
+@app.get("/api/pipeline/status/{pipeline_id}")
+async def get_pipeline_status(pipeline_id: str, user: models.User = Depends(get_current_user)):
+    """파이프라인 상태를 조회합니다."""
+    pipeline = auto_pipeline.get_pipeline_status(pipeline_id)
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    return JSONResponse(content={
+        "status": "success",
+        "pipeline": pipeline
+    })
+
+
+@app.get("/api/pipeline/list")
+async def list_pipelines(user: models.User = Depends(get_current_user)):
+    """사용자의 파이프라인 목록을 반환합니다."""
+    pipelines = auto_pipeline.list_pipelines()
+    # 사용자 필터링 (선택적)
+    user_pipelines = [p for p in pipelines if p.get('user_id') == user.id]
+    return JSONResponse(content={
+        "status": "success",
+        "pipelines": user_pipelines
+    })
+
+
+@app.post("/api/pipeline/cancel/{pipeline_id}")
+async def cancel_pipeline(pipeline_id: str, user: models.User = Depends(get_current_user)):
+    """파이프라인을 취소합니다."""
+    success = auto_pipeline.cancel_pipeline(pipeline_id)
+    if success:
+        return {"status": "success", "message": "Pipeline cancelled"}
+    else:
+        raise HTTPException(status_code=400, detail="Cannot cancel pipeline")
+
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 

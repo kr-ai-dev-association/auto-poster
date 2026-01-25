@@ -1265,19 +1265,318 @@
 
             <!-- Content Generator Section -->
             <div x-show="mainTab === 'content-generator'" class="flex flex-col h-full animate-fade-in">
-                <!-- Reset Button (Top Right) -->
-                <div class="w-full px-6 pt-4 pb-2 flex justify-end">
-                    <button @click="resetContentGenerator()"
+                <!-- 탭 선택: 수동 / 자동 -->
+                <div class="w-full px-6 pt-4 pb-2 flex items-center justify-between">
+                    <!-- 탭 버튼 -->
+                    <div class="flex gap-2">
+                        <button @click="contentGenMode = 'manual'"
+                            :class="contentGenMode === 'manual' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            수동
+                        </button>
+                        <button @click="contentGenMode = 'auto'"
+                            :class="contentGenMode === 'auto' ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            자동 (전체 파이프라인)
+                        </button>
+                    </div>
+                    <!-- Reset Button -->
+                    <button @click="contentGenMode === 'auto' ? resetAutoPipeline() : resetContentGenerator()"
                         class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-                            </path>
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                         초기화
                     </button>
                 </div>
-                <div class="flex-grow overflow-y-auto px-6 py-4">
+
+                <!-- 자동 모드 탭 -->
+                <div x-show="contentGenMode === 'auto'" class="flex-grow overflow-y-auto px-6 py-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- 좌측: 설정 패널 -->
+                        <div class="flex flex-col gap-6">
+                            <!-- 자동 파이프라인 설정 카드 -->
+                            <div class="glass-card p-6 flex-1">
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-white">전체 자동화 파이프라인</h3>
+                                        <p class="text-sm text-gray-400">기획 → 이미지 → PDF → 대본 → 오디오 → 비디오 → YouTube</p>
+                                    </div>
+                                </div>
+                                <div class="space-y-5">
+                                    <!-- 주제 입력 -->
+                                    <div>
+                                        <label class="block text-sm text-gray-300 mb-2 font-medium">콘텐츠 주제/아이디어 *</label>
+                                        <textarea x-model="autoPipelineTopic" rows="4"
+                                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                                            placeholder="예: 2026년 최신 AI 코딩 도구 비교 분석&#10;&#10;최신 트렌드, 주요 기능, 장단점 비교 등을 포함해주세요"></textarea>
+                                    </div>
+                                    <!-- 추가 지시사항 -->
+                                    <div>
+                                        <label class="block text-sm text-gray-300 mb-2 font-medium">추가 지시사항 (선택)</label>
+                                        <textarea x-model="autoPipelineInstructions" rows="2"
+                                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none text-sm"
+                                            placeholder="예: 초보자 대상으로 설명해주세요, 실무 예제 포함"></textarea>
+                                    </div>
+                                    <!-- 설정 옵션 그리드 -->
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs text-gray-400 mb-1">카테고리</label>
+                                            <select x-model="autoPipelineCategory"
+                                                class="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm">
+                                                <template x-for="cat in categories" :key="cat.id">
+                                                    <option :value="cat.id" x-text="cat.name_ko"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-400 mb-1">슬라이드 수</label>
+                                            <select x-model="autoPipelineSlideCount"
+                                                class="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm">
+                                                <option value="10">10장</option>
+                                                <option value="12">12장</option>
+                                                <option value="15">15장</option>
+                                                <option value="18">18장</option>
+                                                <option value="20">20장</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-400 mb-1">언어</label>
+                                            <select x-model="autoPipelineLanguage"
+                                                class="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm">
+                                                <template x-for="lang in languages" :key="lang.id">
+                                                    <option :value="lang.id" x-text="lang.name_ko"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-400 mb-1">TTS 음성</label>
+                                            <select x-model="autoPipelineVoice"
+                                                class="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm">
+                                                <option value="Kore">Kore (한국어 여성)</option>
+                                                <option value="Charon">Charon (깊은 남성)</option>
+                                                <option value="Fenrir">Fenrir (차분한 남성)</option>
+                                                <option value="Aoede">Aoede (밝은 여성)</option>
+                                                <option value="Puck">Puck (활발한)</option>
+                                                <option value="Leda">Leda (부드러운 여성)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- YouTube 설정 -->
+                                    <div class="bg-gray-700/50 rounded-lg p-4">
+                                        <h4 class="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                            </svg>
+                                            YouTube 업로드 설정
+                                        </h4>
+                                        <div class="flex gap-6">
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" x-model="autoPipelinePrivacy" value="private" class="w-4 h-4 text-green-600 bg-gray-700 border-gray-600">
+                                                <span class="text-sm text-gray-300">비공개</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" x-model="autoPipelinePrivacy" value="unlisted" class="w-4 h-4 text-green-600 bg-gray-700 border-gray-600">
+                                                <span class="text-sm text-gray-300">일부 공개</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" x-model="autoPipelinePrivacy" value="public" class="w-4 h-4 text-green-600 bg-gray-700 border-gray-600">
+                                                <span class="text-sm text-gray-300">공개</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <!-- 파이프라인 시작 버튼 -->
+                                    <button @click="startAutoPipeline()" :disabled="!autoPipelineTopic || autoPipelineRunning"
+                                        class="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-3 text-lg">
+                                        <svg x-show="autoPipelineRunning" class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <svg x-show="!autoPipelineRunning" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                        <span x-text="autoPipelineRunning ? '파이프라인 실행 중...' : '전체 자동화 시작'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 우측: 진행 상황 및 결과 패널 -->
+                        <div class="flex flex-col gap-6">
+                            <!-- 파이프라인 워크플로우 시각화 -->
+                            <div class="glass-card p-6">
+                                <h4 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                    </svg>
+                                    파이프라인 진행 상황
+                                </h4>
+
+                                <!-- 단계별 상태 (가로 스텝퍼) -->
+                                <div class="mb-6">
+                                    <div class="flex items-center justify-between">
+                                        <template x-for="(step, index) in autoPipelineSteps" :key="step.id">
+                                            <div class="flex flex-col items-center flex-1">
+                                                <div class="relative flex items-center w-full">
+                                                    <!-- 연결선 (첫번째 제외) -->
+                                                    <div x-show="index > 0" class="flex-1 h-1 transition-colors duration-300"
+                                                        :class="autoPipelineCompletedSteps.includes(autoPipelineSteps[index-1]?.id) ? 'bg-green-500' : 'bg-gray-700'"></div>
+                                                    <!-- 원형 스텝 -->
+                                                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 flex-shrink-0"
+                                                        :class="{
+                                                            'bg-green-600 text-white shadow-lg shadow-green-500/30': autoPipelineCompletedSteps.includes(step.id),
+                                                            'bg-blue-600 text-white animate-pulse shadow-lg shadow-blue-500/30': autoPipelineCurrentStep === step.id,
+                                                            'bg-gray-700 text-gray-400': !autoPipelineCompletedSteps.includes(step.id) && autoPipelineCurrentStep !== step.id
+                                                        }">
+                                                        <svg x-show="autoPipelineCompletedSteps.includes(step.id)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                        <span x-show="!autoPipelineCompletedSteps.includes(step.id)" x-text="index + 1"></span>
+                                                    </div>
+                                                    <!-- 연결선 (마지막 제외) -->
+                                                    <div x-show="index < autoPipelineSteps.length - 1" class="flex-1 h-1 transition-colors duration-300"
+                                                        :class="autoPipelineCompletedSteps.includes(step.id) ? 'bg-green-500' : 'bg-gray-700'"></div>
+                                                </div>
+                                                <span class="text-xs text-gray-400 mt-2 text-center" x-text="step.label"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- 진행 바 -->
+                                <div class="mb-4" x-show="autoPipelineId">
+                                    <div class="flex justify-between text-sm text-gray-400 mb-2">
+                                        <span x-text="autoPipelineMessage || '대기 중...'"></span>
+                                        <span class="font-mono" x-text="autoPipelineProgress + '%'"></span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
+                                        <div class="h-4 rounded-full transition-all duration-500 flex items-center justify-center text-xs font-medium"
+                                            :class="autoPipelineStatus === 'failed' ? 'bg-red-500' : autoPipelineStatus === 'completed' ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'"
+                                            :style="'width: ' + autoPipelineProgress + '%'">
+                                            <span x-show="autoPipelineProgress > 10" class="text-white" x-text="autoPipelineProgress + '%'"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 대기 상태 안내 -->
+                                <div x-show="!autoPipelineId" class="text-center py-8 text-gray-500">
+                                    <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                    <p>주제를 입력하고 자동화를 시작하세요</p>
+                                    <p class="text-sm mt-1">전체 과정이 자동으로 진행됩니다</p>
+                                </div>
+
+                                <!-- 취소 버튼 -->
+                                <button x-show="autoPipelineRunning" @click="cancelAutoPipeline()"
+                                    class="w-full mt-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                    파이프라인 취소
+                                </button>
+                            </div>
+
+                            <!-- 결과 표시 -->
+                            <div x-show="autoPipelineStatus === 'completed'" class="glass-card p-6 border border-green-700/50 bg-green-900/20">
+                                <h5 class="text-green-400 font-semibold mb-4 flex items-center gap-2 text-lg">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    파이프라인 완료!
+                                </h5>
+                                <div class="space-y-3">
+                                    <div x-show="autoPipelineResult?.title" class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                                        <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                        </svg>
+                                        <div>
+                                            <p class="text-xs text-gray-500">제목</p>
+                                            <p class="text-white font-medium" x-text="autoPipelineResult?.title"></p>
+                                        </div>
+                                    </div>
+                                    <div x-show="autoPipelineResult?.youtube_url" class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                                        <svg class="w-5 h-5 text-red-500 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                        </svg>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-xs text-gray-500">YouTube 링크</p>
+                                            <a :href="autoPipelineResult?.youtube_url" target="_blank"
+                                                class="text-blue-400 hover:text-blue-300 hover:underline break-all"
+                                                x-text="autoPipelineResult?.youtube_url"></a>
+                                        </div>
+                                    </div>
+                                    <div x-show="autoPipelineResult?.duration" class="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
+                                        <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <div>
+                                            <p class="text-xs text-gray-500">소요 시간</p>
+                                            <p class="text-white font-medium" x-text="autoPipelineResult?.duration"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 에러 표시 -->
+                            <div x-show="autoPipelineStatus === 'failed'" class="glass-card p-6 border border-red-700/50 bg-red-900/20">
+                                <h5 class="text-red-400 font-semibold mb-3 flex items-center gap-2 text-lg">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    파이프라인 실패
+                                </h5>
+                                <div class="p-3 bg-red-900/30 rounded-lg">
+                                    <p class="text-sm text-red-300" x-text="autoPipelineError"></p>
+                                </div>
+                                <button @click="resetAutoPipeline()" class="mt-4 w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors">
+                                    다시 시도
+                                </button>
+                            </div>
+
+                            <!-- 히스토리 (최근 완료된 파이프라인) -->
+                            <div x-show="autoPipelineHistory.length > 0" class="glass-card p-6">
+                                <h4 class="text-sm font-semibold text-gray-400 mb-3 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    최근 파이프라인
+                                </h4>
+                                <div class="space-y-2 max-h-40 overflow-y-auto">
+                                    <template x-for="item in autoPipelineHistory.slice(0, 5)" :key="item.id">
+                                        <div class="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg text-sm">
+                                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                                <span class="w-2 h-2 rounded-full flex-shrink-0"
+                                                    :class="item.status === 'completed' ? 'bg-green-500' : 'bg-red-500'"></span>
+                                                <span class="text-gray-300 truncate" x-text="item.title || item.topic"></span>
+                                            </div>
+                                            <a x-show="item.youtube_url" :href="item.youtube_url" target="_blank"
+                                                class="text-blue-400 hover:text-blue-300 text-xs flex-shrink-0 ml-2">
+                                                YouTube
+                                            </a>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 수동 모드 탭 (기존 콘텐츠) -->
+                <div x-show="contentGenMode === 'manual'" class="flex-grow overflow-y-auto px-6 py-4">
                     <!-- 3단계 워크플로우 -->
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -3702,6 +4001,7 @@
                 generatedPdfs: [],
 
                 // Content Generator State
+                contentGenMode: 'manual', // 'manual' or 'auto'
                 contentGenTopic: '',
                 contentGenCategory: 'educational',
                 contentGenSlideCount: 15,
@@ -3721,6 +4021,35 @@
                 contentGenSelectedPlanForImages: null, // 이미지 목록 표시용 선택된 기획안
                 contentGenImagePreview: null, // 이미지 미리보기 모달용
                 contentGenImagePreviewIndex: 0, // 현재 미리보기 인덱스
+
+                // Auto Pipeline State
+                autoPipelineTopic: '',
+                autoPipelineCategory: 'educational',
+                autoPipelineSlideCount: 15,
+                autoPipelineLanguage: 'ko',
+                autoPipelineInstructions: '',
+                autoPipelineVoice: 'Kore',
+                autoPipelinePrivacy: 'private',
+                autoPipelineRunning: false,
+                autoPipelineId: null,
+                autoPipelineStatus: '', // 'running', 'completed', 'failed'
+                autoPipelineProgress: 0,
+                autoPipelineMessage: '',
+                autoPipelineCurrentStep: '',
+                autoPipelineCompletedSteps: [],
+                autoPipelineResult: null,
+                autoPipelineError: '',
+                autoPipelineHistory: [],
+                autoPipelineSteps: [
+                    { id: 'plan_generation', label: '기획' },
+                    { id: 'image_generation', label: '이미지' },
+                    { id: 'pdf_generation', label: 'PDF' },
+                    { id: 'script_generation', label: '대본' },
+                    { id: 'audio_generation', label: '오디오' },
+                    { id: 'video_generation', label: '비디오' },
+                    { id: 'youtube_upload', label: 'YouTube' }
+                ],
+                autoPipelinePollingInterval: null,
 
                 // Audio Generator State
                 audioGenPdfFile: null,
@@ -7405,6 +7734,175 @@
                         return `${year}-${month}-${day} ${hours}:${minutes}`;
                     } catch (e) {
                         return isoString;
+                    }
+                },
+
+                // ===== Auto Pipeline Functions =====
+                async startAutoPipeline() {
+                    if (!this.autoPipelineTopic || this.autoPipelineRunning) return;
+
+                    this.autoPipelineRunning = true;
+                    this.autoPipelineStatus = 'running';
+                    this.autoPipelineProgress = 0;
+                    this.autoPipelineMessage = '파이프라인 시작 중...';
+                    this.autoPipelineCurrentStep = '';
+                    this.autoPipelineCompletedSteps = [];
+                    this.autoPipelineResult = null;
+                    this.autoPipelineError = '';
+                    this.autoPipelineId = null;
+
+                    const token = localStorage.getItem('access_token');
+
+                    try {
+                        const response = await fetch('/api/pipeline/start', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                topic: this.autoPipelineTopic,
+                                category: this.autoPipelineCategory,
+                                target_slides: parseInt(this.autoPipelineSlideCount),
+                                language: this.autoPipelineLanguage,
+                                additional_instructions: this.autoPipelineInstructions,
+                                voice: this.autoPipelineVoice,
+                                youtube_privacy: this.autoPipelinePrivacy
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.status === 'started') {
+                            this.autoPipelineId = data.pipeline_id;
+                            // 폴링 시작
+                            this.startPipelinePolling();
+                        } else {
+                            throw new Error(data.message || '파이프라인 시작 실패');
+                        }
+                    } catch (error) {
+                        console.error('Pipeline start error:', error);
+                        this.autoPipelineStatus = 'failed';
+                        this.autoPipelineError = error.message;
+                        this.autoPipelineRunning = false;
+                    }
+                },
+
+                startPipelinePolling() {
+                    if (this.autoPipelinePollingInterval) {
+                        clearInterval(this.autoPipelinePollingInterval);
+                    }
+
+                    this.autoPipelinePollingInterval = setInterval(async () => {
+                        await this.pollPipelineStatus();
+                    }, 2000); // 2초마다 폴링
+                },
+
+                async pollPipelineStatus() {
+                    if (!this.autoPipelineId) return;
+
+                    const token = localStorage.getItem('access_token');
+
+                    try {
+                        const response = await fetch(`/api/pipeline/status/${this.autoPipelineId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch pipeline status');
+                        }
+
+                        const data = await response.json();
+                        const pipeline = data.pipeline;
+
+                        if (pipeline) {
+                            this.autoPipelineProgress = pipeline.progress || 0;
+                            this.autoPipelineMessage = pipeline.message || '';
+                            this.autoPipelineCurrentStep = pipeline.current_step || '';
+                            this.autoPipelineCompletedSteps = pipeline.steps_completed || [];
+
+                            if (pipeline.status === 'completed') {
+                                this.autoPipelineStatus = 'completed';
+                                this.autoPipelineRunning = false;
+                                this.autoPipelineResult = {
+                                    title: pipeline.result?.title,
+                                    youtube_url: pipeline.result?.youtube?.url,
+                                    duration: pipeline.duration
+                                };
+                                this.stopPipelinePolling();
+
+                                // 히스토리에 추가
+                                this.autoPipelineHistory.unshift({
+                                    id: this.autoPipelineId,
+                                    topic: this.autoPipelineTopic,
+                                    status: 'completed',
+                                    title: pipeline.result?.title,
+                                    youtube_url: pipeline.result?.youtube?.url,
+                                    completed_at: pipeline.completed_at
+                                });
+                            } else if (pipeline.status === 'failed') {
+                                this.autoPipelineStatus = 'failed';
+                                this.autoPipelineRunning = false;
+                                this.autoPipelineError = pipeline.error || '알 수 없는 오류';
+                                this.stopPipelinePolling();
+
+                                // 히스토리에 추가
+                                this.autoPipelineHistory.unshift({
+                                    id: this.autoPipelineId,
+                                    topic: this.autoPipelineTopic,
+                                    status: 'failed',
+                                    error: pipeline.error,
+                                    completed_at: pipeline.completed_at
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Pipeline polling error:', error);
+                    }
+                },
+
+                stopPipelinePolling() {
+                    if (this.autoPipelinePollingInterval) {
+                        clearInterval(this.autoPipelinePollingInterval);
+                        this.autoPipelinePollingInterval = null;
+                    }
+                },
+
+                resetAutoPipeline() {
+                    this.stopPipelinePolling();
+                    this.autoPipelineTopic = '';
+                    this.autoPipelineInstructions = '';
+                    this.autoPipelineRunning = false;
+                    this.autoPipelineId = null;
+                    this.autoPipelineStatus = '';
+                    this.autoPipelineProgress = 0;
+                    this.autoPipelineMessage = '';
+                    this.autoPipelineCurrentStep = '';
+                    this.autoPipelineCompletedSteps = [];
+                    this.autoPipelineResult = null;
+                    this.autoPipelineError = '';
+                },
+
+                async cancelAutoPipeline() {
+                    if (!this.autoPipelineId || !this.autoPipelineRunning) return;
+
+                    const token = localStorage.getItem('access_token');
+
+                    try {
+                        const response = await fetch(`/api/pipeline/cancel/${this.autoPipelineId}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.autoPipelineStatus = 'failed';
+                            this.autoPipelineError = '사용자에 의해 취소됨';
+                            this.autoPipelineRunning = false;
+                            this.stopPipelinePolling();
+                        }
+                    } catch (error) {
+                        console.error('Pipeline cancel error:', error);
                     }
                 }
             }

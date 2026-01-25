@@ -207,11 +207,11 @@ class YouTubeService:
         v_dir = os.path.join(self.base_v_dir, category)
         if not os.path.exists(v_dir):
             return None
-
+        
         logo_files = [f for f in os.listdir(v_dir) if f.lower().endswith('.png') and 'logo' in f.lower()]
         if not logo_files:
             logo_files = [f for f in os.listdir(v_dir) if f.lower().endswith('.png')]
-
+            
         if logo_files:
             return os.path.join(v_dir, logo_files[0])
         return None
@@ -287,34 +287,102 @@ class YouTubeService:
                 )
             else:
                 # PDF 처리 로직
-                print(f"🤖 Gemini API 호출 중... (PDF 크기: {len(pdf_content)} bytes)")
+                pdf_size_mb = len(pdf_content) / (1024 * 1024)
+                print(f"🤖 Gemini API 호출 중... (PDF 크기: {pdf_size_mb:.1f}MB)")
                 
-                # PDF 용량이 크므로 File API 사용
-                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
-                    tmp_pdf.write(pdf_content)
-                    tmp_pdf_path = tmp_pdf.name
-                
-                try:
-                    print(f"📤 Uploading PDF to Gemini File API...")
-                    pdf_file_ref = summarizer.client.files.upload(
-                        file=tmp_pdf_path,
-                        config={'mime_type': 'application/pdf'}
-                    )
-                    print(f"✅ PDF Uploaded: {pdf_file_ref.name}")
+                # PDF가 너무 크면 (20MB 이상) 텍스트 추출 방식 사용
+                if pdf_size_mb > 20:
+                    print(f"⚠️ PDF가 너무 큽니다 ({pdf_size_mb:.1f}MB). 텍스트 추출 방식으로 전환합니다...")
+                    try:
+                        import PyPDF2
+                        import io
+                        
+                        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+                        extracted_text = ""
+                        
+                        # 최대 50페이지까지만 추출 (너무 길면 잘림)
+                        max_pages = min(50, len(pdf_reader.pages))
+                        for i in range(max_pages):
+                            page = pdf_reader.pages[i]
+                            page_text = page.extract_text() or ""
+                            extracted_text += f"\n[Page {i+1}]\n{page_text}\n"
+                        
+                        if len(extracted_text) > 100000:  # 10만자 이상이면 자름
+                            extracted_text = extracted_text[:100000] + "\n... (내용이 길어 일부만 표시됨)"
+                        
+                        print(f"✅ PDF 텍스트 추출 완료: {len(extracted_text)} 문자")
+                        
+                        # 텍스트 기반으로 전송
+                        combined_prompt = f"{prompt}\n\n[CONTENT]\n{extracted_text}"
+                        response = summarizer.client.models.generate_content(
+                            model=summarizer.model_id,
+                            contents=combined_prompt
+                        )
+                    except Exception as e:
+                        print(f"⚠️ 텍스트 추출 실패: {e}. File API로 시도합니다...")
+                        # 텍스트 추출 실패 시 File API 시도
+                        raise e
+                else:
+                    # PDF 용량이 작으면 File API 사용
+                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
+                        tmp_pdf.write(pdf_content)
+                        tmp_pdf_path = tmp_pdf.name
                     
-                    response = summarizer.client.models.generate_content(
-                        model=summarizer.model_id,
-                        contents=[prompt, pdf_file_ref]
-                    )
-                except Exception as e:
-                    print(f"⚠️ File API failed: {e}. Falling back to inline (likely to fail if >20MB).")
-                    response = summarizer.client.models.generate_content(
-                        model=summarizer.model_id,
-                        contents=[prompt, types_genai.Part.from_bytes(data=pdf_content, mime_type='application/pdf')]
-                    )
-                finally:
-                    if os.path.exists(tmp_pdf_path):
-                        os.unlink(tmp_pdf_path)
+                    try:
+                        print(f"📤 Uploading PDF to Gemini File API...")
+                        pdf_file_ref = summarizer.client.files.upload(
+                            file=tmp_pdf_path,
+                            config={'mime_type': 'application/pdf'}
+                        )
+                        print(f"✅ PDF Uploaded: {pdf_file_ref.name}")
+                        
+                        # File API로 업로드한 파일은 FileData 형식으로 변환해야 함
+                        # uri 속성이 있으면 사용, 없으면 name 사용
+                        file_uri = getattr(pdf_file_ref, 'uri', None) or getattr(pdf_file_ref, 'name', None)
+                        if not file_uri:
+                            raise Exception("File API 응답에서 URI 또는 name을 찾을 수 없습니다.")
+                        
+                        file_data = types_genai.FileData(file_uri=file_uri)
+                        file_part = types_genai.Part(file_data=file_data)
+                        
+                        response = summarizer.client.models.generate_content(
+                            model=summarizer.model_id,
+                            contents=[prompt, file_part]
+                        )
+                    except Exception as e:
+                        print(f"⚠️ File API failed: {e}. 텍스트 추출로 폴백합니다...")
+                        # File API 실패 시 텍스트 추출로 폴백
+                        try:
+                            import PyPDF2
+                            import io
+                            
+                            pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+                            extracted_text = ""
+                            
+                            # 최대 50페이지까지만 추출
+                            max_pages = min(50, len(pdf_reader.pages))
+                            for i in range(max_pages):
+                                page = pdf_reader.pages[i]
+                                page_text = page.extract_text() or ""
+                                extracted_text += f"\n[Page {i+1}]\n{page_text}\n"
+                            
+                            if len(extracted_text) > 100000:  # 10만자 이상이면 자름
+                                extracted_text = extracted_text[:100000] + "\n... (내용이 길어 일부만 표시됨)"
+                            
+                            print(f"✅ PDF 텍스트 추출 완료 (폴백): {len(extracted_text)} 문자")
+                            
+                            # 텍스트 기반으로 전송
+                            combined_prompt = f"{prompt}\n\n[CONTENT]\n{extracted_text}"
+                            response = summarizer.client.models.generate_content(
+                                model=summarizer.model_id,
+                                contents=combined_prompt
+                            )
+                        except Exception as e2:
+                            print(f"❌ 텍스트 추출도 실패: {e2}")
+                            raise Exception(f"PDF 처리 실패: File API와 텍스트 추출 모두 실패했습니다. 원인: {str(e2)}")
+                    finally:
+                        if os.path.exists(tmp_pdf_path):
+                            os.unlink(tmp_pdf_path)
             
             print(f"✅ Gemini API 응답 수신")
             
@@ -555,7 +623,7 @@ class YouTubeService:
             else:
                 print(f"✅ 메타데이터 검증 통과")
             
-            return metadata
+        return metadata
         except Exception as e:
             print(f"❌ Error generating metadata: {e}")
             import traceback
@@ -625,7 +693,7 @@ class YouTubeService:
         video_path = os.path.join(v_dir, f"raw_{filename}")
         with open(video_path, "wb") as f:
             f.write(video_content)
-
+        
         pdf_path = os.path.join(v_dir, "temp_metadata_source.pdf")
         with open(pdf_path, "wb") as f:
             f.write(pdf_content)
@@ -716,7 +784,7 @@ class YouTubeService:
                 if upload_id:
                     self.update_upload_progress(upload_id, 'error', 0, f'업로드 실패: {str(e)}')
                 raise
-
+            
             if not video_id:
                 raise Exception("YouTube upload failed")
 
