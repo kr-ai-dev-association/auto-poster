@@ -310,7 +310,7 @@ class YouTubeService:
                     print(f"⚠️ File API failed: {e}. Falling back to inline (likely to fail if >20MB).")
                     response = summarizer.client.models.generate_content(
                         model=summarizer.model_id,
-                        contents=[prompt, types_Part.from_bytes(data=pdf_content, mime_type='application/pdf')]
+                        contents=[prompt, types_genai.Part.from_bytes(data=pdf_content, mime_type='application/pdf')]
                     )
                 finally:
                     if os.path.exists(tmp_pdf_path):
