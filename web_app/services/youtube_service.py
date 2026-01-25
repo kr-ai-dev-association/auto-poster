@@ -216,7 +216,7 @@ class YouTubeService:
             return os.path.join(v_dir, logo_files[0])
         return None
 
-    async def generate_metadata(self, pdf_content, category, lang='ko'):
+    async def generate_metadata(self, pdf_content, category, lang='ko', text_content: Optional[str] = None):
         """PDF 분석을 통해 유튜브 메타데이터를 생성합니다. YouTube API 인증 없이 Gemini만 사용."""
         from core.summarizer import GeminiSummarizer
         
