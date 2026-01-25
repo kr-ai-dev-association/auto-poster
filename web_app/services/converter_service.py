@@ -153,7 +153,7 @@ class ConverterService:
         # 7. 정리 (자동 생성 모드일 때만 temp_dir 정리)
         if image_mode == "auto":
             temp_dir = f"temp_{wiki_id}"
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
         if success:
             return {

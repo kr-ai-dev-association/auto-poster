@@ -10,6 +10,7 @@ from .audio_generator_service import audio_generator
 from .pdf2mp4_service import PDF2MP4Service
 from .youtube_service import YouTubeService
 from .slack_service import slack_service
+from .content_id_service import content_id_service
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +63,15 @@ class AutoPipelineService:
         Returns:
             Dict containing pipeline result
         """
-        pipeline_id = uuid.uuid4().hex[:8]
+        # 통합 콘텐츠 ID 생성 (전체 파이프라인에서 일관되게 사용)
+        content_id = content_id_service.generate_content_id('pipe')
+        pipeline_id = content_id  # pipeline_id도 content_id와 동일하게 사용
         start_time = datetime.now()
 
         # 파이프라인 상태 초기화
         self.pipelines[pipeline_id] = {
             'id': pipeline_id,
+            'content_id': content_id,  # 통합 ID 저장
             'topic': topic,
             'category': category,
             'language': language,
@@ -99,7 +103,8 @@ class AutoPipelineService:
                 category=category,
                 target_slides=target_slides,
                 language=language,
-                additional_instructions=additional_instructions
+                additional_instructions=additional_instructions,
+                content_id=content_id  # 통합 ID 전달
             )
 
             if plan_result.get('status') != 'success':
@@ -182,7 +187,7 @@ class AutoPipelineService:
                 script=full_script,
                 voice=voice,
                 language=language,
-                output_filename=f"auto_{plan_id}"
+                content_id=content_id  # 통합 ID 전달 (파일명으로 사용됨)
             )
 
             if audio_result.get('status') != 'success':
@@ -214,7 +219,7 @@ class AutoPipelineService:
             # 로고 경로 설정
             logo_path = youtube_svc.get_logo_path(category)
 
-            # Smart 모드로 비디오 생성
+            # Smart 모드로 비디오 생성 (통합 ID 전달)
             video_result = await pdf2mp4_svc.convert_smart(
                 pdf_content=pdf_content,
                 filename=pdf_filename,
@@ -222,7 +227,8 @@ class AutoPipelineService:
                 audio_filename=os.path.basename(audio_path),
                 logo_path=logo_path,
                 category=category,
-                created_by=str(user_id) if user_id else ''
+                created_by=str(user_id) if user_id else '',
+                content_id=content_id  # 통합 ID 전달
             )
 
             if video_result.get('status') != 'success':
@@ -251,15 +257,17 @@ class AutoPipelineService:
                     video_content = f.read()
 
                 # YouTube 업로드 (process_and_upload 사용)
+                # 대본(full_script)을 전달하여 메타데이터 생성 시 활용
                 upload_id = uuid.uuid4().hex[:8]
                 await youtube_svc.process_and_upload(
                     video_content=video_content,
                     filename=video_filename,
-                    pdf_content=pdf_content,  # 메타데이터 생성용
+                    pdf_content=pdf_content,  # 썸네일 생성용
                     category=category,
                     lang=language,
                     use_thumbnail=True,
-                    upload_id=upload_id
+                    upload_id=upload_id,
+                    text_content=full_script  # 대본을 메타데이터 생성에 활용
                 )
 
                 # 업로드 결과 폴링
@@ -302,6 +310,24 @@ class AutoPipelineService:
 
             logger.info(f"[Pipeline {pipeline_id}] Completed successfully in {duration}")
 
+            # 파이프라인 결과를 파일로 저장 (통합 ID로 추적 가능)
+            pipeline_result = {
+                'status': 'success',
+                'content_id': content_id,
+                'pipeline_id': pipeline_id,
+                'title': title,
+                'topic': topic,
+                'category': category,
+                'language': language,
+                'youtube_url': youtube_url,
+                'duration': duration,
+                'steps_completed': self.pipelines[pipeline_id]['steps_completed'],
+                'result': self.pipelines[pipeline_id]['result'],
+                'started_at': start_time.isoformat(),
+                'completed_at': end_time.isoformat()
+            }
+            content_id_service.save_pipeline_result(content_id, pipeline_result)
+
             # Slack 알림 전송
             await slack_service.notify_pipeline_complete(
                 title=title,
@@ -314,6 +340,7 @@ class AutoPipelineService:
 
             return {
                 'status': 'success',
+                'content_id': content_id,  # 통합 ID 반환
                 'pipeline_id': pipeline_id,
                 'title': title,
                 'plan_id': plan_id,
@@ -343,8 +370,24 @@ class AutoPipelineService:
                 error=error_msg
             )
 
+            # 실패 결과도 저장
+            error_result = {
+                'status': 'error',
+                'content_id': content_id,
+                'pipeline_id': pipeline_id,
+                'topic': topic,
+                'category': category,
+                'error': error_msg,
+                'steps_completed': self.pipelines[pipeline_id]['steps_completed'],
+                'started_at': start_time.isoformat(),
+                'completed_at': end_time.isoformat(),
+                'duration': duration
+            }
+            content_id_service.save_pipeline_result(content_id, error_result)
+
             return {
                 'status': 'error',
+                'content_id': content_id,  # 통합 ID 반환
                 'pipeline_id': pipeline_id,
                 'message': error_msg,
                 'steps_completed': self.pipelines[pipeline_id]['steps_completed'],

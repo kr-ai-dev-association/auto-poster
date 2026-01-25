@@ -1509,11 +1509,16 @@ async def youtube_upload_from_genvideo(
         # 업로드 ID 생성 및 초기 상태 설정
         upload_id = str(uuid.uuid4())
         YouTubeService.update_upload_progress(upload_id, 'init', 0, '업로드 요청 접수됨 (Gen Video)')
-        
+
+        # Gen Video의 트랜스크립트 가져오기 (메타데이터 생성에 활용)
+        text_content = pdf2mp4.get_video_transcript(video_id)
+        if text_content:
+            print(f"📝 Gen Video 트랜스크립트 발견: {len(text_content)} 문자")
+
         # 백그라운드 작업 시작
         background_tasks.add_task(
             youtube.process_and_upload,
-            video_content, filename, pdf_content, category, lang, use_thumbnail, upload_id, gen_video_id=video_id
+            video_content, filename, pdf_content, category, lang, use_thumbnail, upload_id, gen_video_id=video_id, text_content=text_content
         )
 
         return JSONResponse(content={"status": "processing", "upload_id": upload_id})

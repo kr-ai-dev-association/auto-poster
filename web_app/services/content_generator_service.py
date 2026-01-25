@@ -325,7 +325,8 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
         category: str = 'educational',
         target_slides: int = 15,
         language: str = 'ko',
-        additional_instructions: str = ''
+        additional_instructions: str = '',
+        content_id: str = None
     ) -> Dict[str, Any]:
         """
         주제를 기반으로 슬라이드 콘텐츠 기획을 생성합니다.
@@ -336,6 +337,7 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
             target_slides: 목표 슬라이드 수 (10-20)
             language: 출력 언어
             additional_instructions: 추가 지시사항
+            content_id: 통합 콘텐츠 ID (파이프라인에서 전달, None이면 자동 생성)
 
         Returns:
             Dict containing content plan with slides
@@ -456,12 +458,16 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
                 logger.error(f"JSON Decode Error. Extracted text preview: {json_str[:200]}...")
                 raise ValueError(f"Failed to parse extracted JSON: {e}")
 
-            # 기획안 저장
-            plan_id = uuid.uuid4().hex[:8]
+            # 기획안 저장 (content_id가 있으면 사용, 없으면 기존 방식)
+            if content_id:
+                plan_id = content_id
+            else:
+                plan_id = uuid.uuid4().hex[:8]
             plan_filename = f"plan_{plan_id}.json"
             plan_path = os.path.join(self.output_dir, plan_filename)
 
             content_plan['plan_id'] = plan_id
+            content_plan['content_id'] = plan_id  # 통합 ID로도 저장
             content_plan['created_at'] = datetime.now().isoformat()
             content_plan['language'] = language
 
@@ -473,6 +479,7 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
             return {
                 'status': 'success',
                 'plan_id': plan_id,
+                'content_id': plan_id,  # 통합 ID 반환
                 'plan': content_plan
             }
 
@@ -792,9 +799,15 @@ Incorporate relevant visual elements from the references while creating a cohesi
         # 슬라이드 번호순 정렬
         image_files.sort(key=lambda x: x[0])
 
-        # PDF 생성
-        safe_title = "".join(c for c in pdf_title if c.isalnum() or c in (' ', '-', '_')).strip()[:50]
-        pdf_filename = f"{safe_title}_{plan_id}.pdf"
+        # PDF 생성 (content_id 기반 파일명 사용)
+        # plan_id가 content_id 형식이면 그대로 사용, 아니면 기존 방식
+        if plan_id.startswith('pipe_') or '_' in plan_id and len(plan_id) > 16:
+            # 통합 ID 형식: {content_id}.pdf
+            pdf_filename = f"{plan_id}.pdf"
+        else:
+            # 기존 형식: {safe_title}_{plan_id}.pdf
+            safe_title = "".join(c for c in pdf_title if c.isalnum() or c in (' ', '-', '_')).strip()[:50]
+            pdf_filename = f"{safe_title}_{plan_id}.pdf"
         pdf_path = os.path.join(self.pdf_dir, pdf_filename)
 
         # 16:9 비율의 PDF 페이지 크기 (1920x1080 픽셀 기준)
@@ -815,6 +828,7 @@ Incorporate relevant visual elements from the references while creating a cohesi
         meta_path = pdf_path.rsplit('.', 1)[0] + '.json'
         meta_data = {
             'plan_id': plan_id,
+            'content_id': plan_id,  # 통합 ID
             'title': pdf_title,
             'filename': pdf_filename,
             'slide_count': len(image_files),
@@ -833,7 +847,8 @@ Incorporate relevant visual elements from the references while creating a cohesi
             'pdf_path': pdf_path,
             'filename': pdf_filename,
             'slide_count': len(image_files),
-            'plan_id': plan_id
+            'plan_id': plan_id,
+            'content_id': plan_id  # 통합 ID 반환
         }
 
     def list_generated_pdfs(self) -> List[Dict[str, Any]]:

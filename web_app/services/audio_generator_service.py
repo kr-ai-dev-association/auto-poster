@@ -215,7 +215,9 @@ class AudioGeneratorService:
         script: str,
         output_filename: str = None,
         voice: str = None,
-        metadata: Dict[str, Any] = None
+        language: str = 'ko',
+        metadata: Dict[str, Any] = None,
+        content_id: str = None
     ) -> Dict[str, Any]:
         """
         대본에서 TTS를 사용하여 오디오를 생성합니다.
@@ -224,7 +226,9 @@ class AudioGeneratorService:
             script: 읽을 대본 텍스트
             output_filename: 출력 파일명 (확장자 제외)
             voice: 음성 이름 (기본값: Leda)
+            language: 언어 코드
             metadata: 저장할 메타데이터 (language, style, pdf_filename 등)
+            content_id: 통합 콘텐츠 ID (파이프라인에서 전달)
 
         Returns:
             Dict containing audio file path and metadata
@@ -234,7 +238,10 @@ class AudioGeneratorService:
 
         voice = voice or self.voice_name
 
-        if not output_filename:
+        # content_id가 있으면 통합 ID 기반 파일명 사용
+        if content_id:
+            output_filename = content_id
+        elif not output_filename:
             import uuid
             output_filename = f"audio_{uuid.uuid4().hex[:8]}"
 
@@ -336,13 +343,17 @@ class AudioGeneratorService:
                 'file_size': file_size,
                 'voice': voice,
                 'script': script,
+                'language': language,
                 **(metadata or {})
             }
+            # content_id가 있으면 추가
+            if content_id:
+                meta_data['content_id'] = content_id
             with open(meta_path, 'w', encoding='utf-8') as f:
                 json.dump(meta_data, f, ensure_ascii=False, indent=2)
             logger.info(f"Metadata saved: {meta_path}")
 
-            return {
+            result = {
                 'status': 'success',
                 'audio_path': output_path,
                 'filename': actual_filename,
@@ -350,6 +361,9 @@ class AudioGeneratorService:
                 'file_size': file_size,
                 'voice': voice
             }
+            if content_id:
+                result['content_id'] = content_id
+            return result
 
         except Exception as e:
             logger.error(f"Audio generation failed: {e}")

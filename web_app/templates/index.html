@@ -32,10 +32,10 @@
                     <div x-show="!sidebarCollapsed">
                         <h1 class="text-lg font-bold tracking-tight text-white">Auto Poster</h1>
                         <p class="text-gray-500 text-xs">Multi-Platform Posting</p>
-                    </div>
+                </div>
                 </div>
             </div>
-
+            
             <nav class="flex-grow space-y-1" :class="sidebarCollapsed ? 'px-2 mt-2' : 'px-3 mt-4'">
                 <!-- Content Generator (콘텐츠 생성) -->
                 <button @click="mainTab = 'content-generator'"
@@ -134,7 +134,7 @@
                     </svg>
                     <span x-show="!sidebarCollapsed" class="truncate">영상 관리</span>
                 </button>
-
+                
                 <!-- Admin Menu (Conditional) -->
                 <template x-if="user?.is_super_admin">
                     <div class="mt-4 pt-4 border-t border-gray-700/50 space-y-1">
@@ -250,8 +250,8 @@
                             <a href="#" @click.prevent="setLang('en'); langOpen = false"
                                 class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"><span
                                     class="mr-2">🇺🇸</span> English</a>
-                        </div>
                     </div>
+                </div>
 
                     <!-- User Profile Dropdown -->
                     <div class="relative" x-data="{ profileOpen: false }">
@@ -393,7 +393,7 @@
                                 @click="$refs.fileInput.click()">
                                 <input type="file" x-ref="fileInput" class="hidden" @change="handleFile($event)"
                                     accept=".md">
-
+                                
                                 <template x-if="!file">
                                     <div class="space-y-4">
                                         <svg class="mx-auto h-20 w-20 text-gray-400" stroke="currentColor" fill="none"
@@ -464,8 +464,8 @@
                                                     <span class="text-gray-400 ml-1 text-xs">(링크 직접 삽입)</span>
                                                 </span>
                                             </label>
-                                        </div>
-                                    </div>
+                            </div>
+                        </div>
 
                                     <!-- 우측: 구글 드라이브 이미지 삽입 가이드 -->
                                     <div
@@ -489,7 +489,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M19 9l-7 7-7-7" />
                                             </svg>
-                                        </button>
+                            </button>
 
                                         <!-- 접힌 상태에서 보이는 요약 -->
                                         <div x-show="!guidePanelExpanded" class="px-4 pb-4 space-y-2">
@@ -588,7 +588,7 @@
                             </div>
                         </div>
 
-                        <!-- Result Area -->
+                            <!-- Result Area -->
                         <div class="mt-6 space-y-6 pb-10">
                             <div x-show="result" x-cloak class="p-6 rounded-lg shadow-sm border"
                                 :class="result?.status === 'success' ? 'bg-green-900 border-green-700' : 'bg-red-900 border-red-700'">
@@ -623,7 +623,7 @@
                                                             class="px-6 py-2 bg-green-600 text-white rounded-md font-bold hover:bg-green-700 transition shadow-md">👉
                                                             리포트 보러가기</a>
                                                     </div>
-
+                                                    
                                                     <!-- LinkedIn 공유 섹션 -->
                                                     <div class="mt-6 pt-6 border-t border-green-700">
                                                         <h4 class="text-lg font-bold text-green-300 mb-4">👁️ 미리보기</h4>
@@ -714,11 +714,11 @@
                         초기화
                     </button>
                 </div>
-
+                
                 <div class="w-full px-6 pb-10 flex-grow overflow-y-auto">
                     <div class="glass-panel rounded-xl p-8 shadow-sm">
                         <h3 class="text-xl font-bold text-white mb-6">📹 새로운 영상 업로드</h3>
-
+                        
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div class="space-y-6">
                                 <div>
@@ -767,14 +767,14 @@
                                             Video)</label>
                                         <div @dragover.prevent="ytDragOver = true"
                                             @dragleave.prevent="ytDragOver = false" @drop.prevent="handleYtDrop($event)"
-                                            @click="$refs.ytFileInput.click()"
+                                        @click="$refs.ytFileInput.click()"
                                             :class="{'border-red-500 bg-red-900': ytDragOver, 'border-gray-600 bg-gray-700': !ytDragOver}"
                                             class="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[150px] flex flex-col justify-center items-center">
                                             <input type="file" x-ref="ytFileInput" class="hidden"
                                                 @change="handleYtFile($event)" accept="video/*">
-
-                                            <template x-if="!ytFile">
-                                                <div class="space-y-2">
+                                        
+                                        <template x-if="!ytFile">
+                                            <div class="space-y-2">
                                                     <svg class="mx-auto h-10 w-10 text-gray-400" fill="none"
                                                         stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -782,12 +782,12 @@
                                                             d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                                     </svg>
                                                     <p class="text-sm text-gray-300 font-medium">클릭하거나 영상을 드래그하세요</p>
-                                                    <p class="text-xs text-gray-400">MP4, MOV, AVI 등 영상 파일</p>
-                                                </div>
-                                            </template>
+                                                <p class="text-xs text-gray-400">MP4, MOV, AVI 등 영상 파일</p>
+                                            </div>
+                                        </template>
 
-                                            <template x-if="ytFile">
-                                                <div class="space-y-2">
+                                        <template x-if="ytFile">
+                                            <div class="space-y-2">
                                                     <svg class="mx-auto h-10 w-10 text-red-500" fill="none"
                                                         stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -799,10 +799,10 @@
                                                     </p>
                                                     <button @click.stop="ytFile = null"
                                                         class="text-xs text-red-400 hover:text-red-300 underline font-medium">제거</button>
-                                                </div>
-                                            </template>
-                                        </div>
+                                            </div>
+                                        </template>
                                     </div>
+                                </div>
 
                                     <!-- Gen Video Selection -->
                                     <div x-show="ytVideoSource === 'genvideo'">
@@ -867,15 +867,15 @@
                                     <!-- 직접 업로드 모드 -->
                                     <div x-show="ytPdfSource === 'upload'">
                                         <div @dragover.prevent="pdfDragOver = true"
-                                            @dragleave.prevent="pdfDragOver = false"
+                                        @dragleave.prevent="pdfDragOver = false"
                                             @drop.prevent="handlePdfDrop($event)" @click="$refs.pdfFileInput.click()"
                                             :class="{'border-blue-500 bg-blue-900': pdfDragOver, 'border-gray-600 bg-gray-700': !pdfDragOver}"
                                             class="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-600 transition-colors cursor-pointer min-h-[120px] flex flex-col justify-center items-center">
                                             <input type="file" x-ref="pdfFileInput" class="hidden"
                                                 @change="handlePdfFile($event)" accept=".pdf">
-
-                                            <template x-if="!pdfFile">
-                                                <div class="space-y-1">
+                                        
+                                        <template x-if="!pdfFile">
+                                            <div class="space-y-1">
                                                     <svg class="mx-auto h-8 w-8 text-gray-400" fill="none"
                                                         stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -884,11 +884,11 @@
                                                     </svg>
                                                     <p class="text-xs text-gray-300 font-medium">참조할 PDF 파일을 드래그하거나
                                                         클릭하세요</p>
-                                                </div>
-                                            </template>
+                                            </div>
+                                        </template>
 
-                                            <template x-if="pdfFile">
-                                                <div class="space-y-1">
+                                        <template x-if="pdfFile">
+                                            <div class="space-y-1">
                                                     <svg class="mx-auto h-8 w-8 text-blue-500" fill="none"
                                                         stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -898,10 +898,10 @@
                                                     <p class="text-xs font-bold text-white" x-text="pdfFile.name"></p>
                                                     <button @click.stop="pdfFile = null"
                                                         class="text-xs text-red-400 hover:text-red-300 underline">제거</button>
-                                                </div>
-                                            </template>
-                                        </div>
+                                            </div>
+                                        </template>
                                     </div>
+                                </div>
 
                                     <!-- Gen Video PDF 선택 모드 -->
                                     <div x-show="ytPdfSource === 'genvideo'">
@@ -933,7 +933,7 @@
                                                             class="font-medium text-white"
                                                             x-text="generatedPdfs.find(p => p.id === selectedGenPdf)?.original_name"></span>
                                                     </p>
-                                                </div>
+                                            </div>
                                             </template>
                                         </div>
                                     </div>
@@ -943,7 +943,7 @@
                                         class="h-4 w-4 text-red-600 focus:ring-red-500 bg-gray-700 border-gray-600 rounded">
                                     <label for="use_thumbnail" class="ml-2 block text-sm text-gray-300">PDF 첫 페이지를 썸네일로
                                         사용</label>
-                                </div>
+                            </div>
 
                             </div>
 
@@ -1038,7 +1038,7 @@
                                                         class="px-6 py-2 bg-red-600 text-white rounded-md font-bold hover:bg-red-700 transition shadow-md">🎬
                                                         영상 확인하기</a>
                                                 </div>
-
+                                                
                                                 <!-- LinkedIn 공유 섹션 -->
                                                 <div class="mt-6 pt-6 border-t border-green-700">
                                                     <h4 class="text-lg font-bold text-green-300 mb-4">📢 LinkedIn에 홍보하기
@@ -1137,7 +1137,7 @@
                                     <button
                                         @click="ytMetadata = null; ytValidation = null; ytMetadataEditing = false; ytMetadataEdited = null;"
                                         class="text-blue-400 hover:text-blue-300 text-sm font-medium">닫기</button>
-                                </div>
+                            </div>
                             </div>
 
                             <!-- 검증 결과 표시 -->
@@ -1180,13 +1180,13 @@
                             <div class="space-y-4">
                                 <!-- 편집 모드가 아닐 때 -->
                                 <template x-if="!ytMetadataEditing">
-                                    <div>
+                                <div>
                                         <div>
                                             <label class="block text-xs font-bold text-blue-300 uppercase mb-1">영상
                                                 제목</label>
                                             <div class="bg-gray-800 border border-blue-700 rounded p-3 text-sm font-bold text-white"
                                                 x-text="ytMetadata?.title"></div>
-                                        </div>
+                                </div>
                                         <div class="mt-4">
                                             <label class="block text-xs font-bold text-blue-300 uppercase mb-1">상세
                                                 설명</label>
@@ -1210,7 +1210,7 @@
 
                                 <!-- 편집 모드일 때 -->
                                 <template x-if="ytMetadataEditing">
-                                    <div>
+                                <div>
                                         <div>
                                             <label class="block text-xs font-bold text-blue-300 uppercase mb-1">
                                                 영상 제목 <span class="text-gray-400">(최대 100자)</span>
@@ -1310,8 +1310,8 @@
                                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                         </svg>
-                                    </div>
-                                    <div>
+                                </div>
+                                <div>
                                         <h3 class="text-xl font-bold text-white">전체 자동화 파이프라인</h3>
                                         <p class="text-sm text-gray-400">기획 → 이미지 → PDF → 대본 → 오디오 → 비디오 → YouTube</p>
                                     </div>
@@ -1339,9 +1339,9 @@
                                                 class="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm">
                                                 <template x-for="cat in categories" :key="cat.id">
                                                     <option :value="cat.id" x-text="cat.name_ko"></option>
-                                                </template>
+                                        </template>
                                             </select>
-                                        </div>
+                                    </div>
                                         <div>
                                             <label class="block text-xs text-gray-400 mb-1">슬라이드 수</label>
                                             <select x-model="autoPipelineSlideCount"
@@ -1352,7 +1352,7 @@
                                                 <option value="18">18장</option>
                                                 <option value="20">20장</option>
                                             </select>
-                                        </div>
+                                </div>
                                         <div>
                                             <label class="block text-xs text-gray-400 mb-1">언어</label>
                                             <select x-model="autoPipelineLanguage"
@@ -1361,7 +1361,7 @@
                                                     <option :value="lang.id" x-text="lang.name_ko"></option>
                                                 </template>
                                             </select>
-                                        </div>
+                            </div>
                                         <div>
                                             <label class="block text-xs text-gray-400 mb-1">TTS 음성</label>
                                             <select x-model="autoPipelineVoice"
@@ -1373,8 +1373,8 @@
                                                 <option value="Puck">Puck (활발한)</option>
                                                 <option value="Leda">Leda (부드러운 여성)</option>
                                             </select>
-                                        </div>
-                                    </div>
+                        </div>
+                    </div>
                                     <!-- YouTube 설정 -->
                                     <div class="bg-gray-700/50 rounded-lg p-4">
                                         <h4 class="text-sm font-medium text-white mb-3 flex items-center gap-2">
@@ -4144,7 +4144,7 @@
                         window.location.href = '/login';
                         return;
                     }
-
+                    
                     try {
                         const response = await fetch('/api/auth/me', {
                             headers: { 'Authorization': `Bearer ${token}` }
@@ -5577,7 +5577,7 @@
                         alert('Gen Video에서 PDF를 선택해주세요.');
                         return;
                     }
-
+                    
                     this.ytLoading = true;
                     const formData = new FormData();
 
@@ -5585,7 +5585,7 @@
                     if (this.ytPdfSource === 'genvideo') {
                         formData.append('pdf_id', this.selectedGenPdf);
                     } else {
-                        formData.append('pdf', this.pdfFile);
+                    formData.append('pdf', this.pdfFile);
                     }
                     formData.append('category', this.ytCategory);
                     formData.append('lang', this.ytLang);
@@ -5665,8 +5665,8 @@
                             body: JSON.stringify(metadataToValidate)
                         });
 
-                        const data = await response.json();
-                        if (data.status === 'success') {
+                            const data = await response.json();
+                            if (data.status === 'success') {
                             this.ytValidation = data.validation;
 
                             if (data.validation.is_valid) {
@@ -5810,7 +5810,7 @@
                             const errorData = await response.json().catch(() => ({ message: '서버 오류가 발생했습니다.' }));
                             this.result = { status: 'error', message: errorData.message || `HTTP ${response.status} 오류` };
                         } else {
-                            this.result = await response.json();
+                        this.result = await response.json();
                         }
                     } catch (error) {
                         this.result = { status: 'error', message: error.message || '네트워크 오류가 발생했습니다.' };
@@ -5824,7 +5824,7 @@
                         alert('변환된 HTML이 없습니다.');
                         return;
                     }
-
+                    
                     const htmlContent = lang === 'ko' ? this.result.preview_html_ko : this.result.preview_html_en;
                     const previewWindow = window.open('', '_blank', 'width=1200,height=800');
                     previewWindow.document.write(htmlContent);
@@ -5906,24 +5906,24 @@
                             });
                         } else {
                             // 직접 업로드한 경우
-                            const formData = new FormData();
-                            formData.append('video', this.ytFile);
+                    const formData = new FormData();
+                    formData.append('video', this.ytFile);
 
                             // PDF 소스에 따라 파라미터 설정
                             if (this.ytPdfSource === 'genvideo') {
                                 formData.append('pdf_id', this.selectedGenPdf);
                             } else {
-                                formData.append('pdf', this.pdfFile);
+                    formData.append('pdf', this.pdfFile);
                             }
-                            formData.append('category', this.ytCategory);
+                    formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
                             formData.append('use_thumbnail', this.useThumbnail);
 
                             response = await fetch('/api/youtube/upload', {
-                                method: 'POST',
-                                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-                                body: formData
-                            });
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                            body: formData
+                        });
                         }
 
                         const initialResult = await response.json();
@@ -7162,8 +7162,8 @@
                             <audio controls autoplay style="width:100%;">
                                 <source src="${audioUrl}" type="audio/wav">
                             </audio>
-                        </body>
-                        </html>
+</body>
+</html>
                     `);
                 },
 

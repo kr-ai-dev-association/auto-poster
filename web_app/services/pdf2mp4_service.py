@@ -1410,7 +1410,8 @@ class PDF2MP4Service:
         subtitle_level: int = 1,
         youtube_service = None,
         category: str = '',
-        created_by: str = ''
+        created_by: str = '',
+        content_id: str = None
     ) -> Dict[str, Any]:
         """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정
 
@@ -1420,6 +1421,7 @@ class PDF2MP4Service:
         youtube_service: 자막 생성을 위한 YouTubeService 인스턴스
         category: 영상 카테고리
         created_by: 생성자 이메일
+        content_id: 통합 콘텐츠 ID (파이프라인에서 전달, 없으면 자동 생성)
         """
         if not WHISPER_AVAILABLE:
             return {
@@ -1433,7 +1435,8 @@ class PDF2MP4Service:
                 'message': 'Smart mode requires an audio file.'
             }
 
-        video_id = str(uuid.uuid4())[:8]
+        # content_id가 있으면 사용, 없으면 기존 방식으로 생성
+        video_id = content_id if content_id else str(uuid.uuid4())[:8]
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_smart_{video_id}_')
         self.register_temp_dir(video_id, temp_dir)
 
@@ -1571,6 +1574,7 @@ class PDF2MP4Service:
 
             video_info = {
                 'id': video_id,
+                'content_id': video_id,  # 통합 ID
                 'filename': output_filename,
                 'original_pdf': filename,
                 'pdf_path': pdf_path,
@@ -1599,6 +1603,7 @@ class PDF2MP4Service:
                 })
 
             timing_data = {
+                'content_id': video_id,  # 통합 ID
                 'timings': page_timings,
                 'page_texts': page_texts if page_texts else [],
                 'transcript_segments': simplified_segments  # Whisper 세그먼트 추가
@@ -1610,6 +1615,7 @@ class PDF2MP4Service:
             # 메타데이터 파일 저장 (영상 관리용)
             meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
             meta_data = {
+                'content_id': video_id,  # 통합 ID (video_id가 content_id와 동일)
                 'category': category,
                 'ocr_lang': ocr_lang,
                 'created_by': created_by,
@@ -2216,6 +2222,65 @@ class PDF2MP4Service:
                 except Exception as e:
                     print(f"[{video_id}] 메타데이터 읽기 오류: {e}")
             return info
+        return None
+
+    def get_video_transcript(self, video_id: str) -> Optional[str]:
+        """비디오의 트랜스크립트 텍스트를 반환합니다.
+
+        다음 순서로 트랜스크립트를 찾습니다:
+        1. generated_audio 디렉토리의 JSON 파일 (script 필드) - 가장 완전한 대본
+        2. _timing.json 파일의 transcript_segments (Whisper 변환)
+        3. _timing.json 파일의 page_texts (OCR)
+
+        Args:
+            video_id: 비디오 ID
+
+        Returns:
+            트랜스크립트 텍스트 또는 None
+        """
+        # 1. generated_audio 디렉토리에서 대본 찾기 (가장 완전한 대본)
+        audio_dir = os.path.join(os.path.dirname(self.output_dir), 'generated_audio')
+        if os.path.exists(audio_dir):
+            for f in os.listdir(audio_dir):
+                if f.endswith('.json') and video_id in f:
+                    audio_json_path = os.path.join(audio_dir, f)
+                    try:
+                        with open(audio_json_path, 'r', encoding='utf-8') as af:
+                            audio_data = json.load(af)
+                            script = audio_data.get('script', '')
+                            if script and len(script) >= 100:
+                                print(f"[{video_id}] 오디오 대본 추출: {len(script)} 문자 (from {f})")
+                                return script
+                    except Exception as e:
+                        print(f"[{video_id}] 오디오 대본 읽기 오류: {e}")
+
+        # 2. _timing.json 파일에서 트랜스크립트 찾기
+        timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
+        if os.path.exists(timing_file):
+            try:
+                with open(timing_file, 'r', encoding='utf-8') as f:
+                    timing_data = json.load(f)
+
+                # Whisper 트랜스크립트 우선 사용
+                transcript_segments = timing_data.get('transcript_segments', [])
+                if transcript_segments:
+                    transcript_text = ' '.join([seg.get('text', '').strip() for seg in transcript_segments])
+                    if transcript_text and len(transcript_text) >= 100:
+                        print(f"[{video_id}] Whisper 트랜스크립트 추출: {len(transcript_text)} 문자")
+                        return transcript_text
+
+                # Whisper 트랜스크립트가 없거나 짧으면 OCR 텍스트 사용
+                page_texts = timing_data.get('page_texts', [])
+                if page_texts:
+                    ocr_text = '\n\n'.join([text.strip() for text in page_texts if text.strip()])
+                    if ocr_text and len(ocr_text) >= 100:
+                        print(f"[{video_id}] OCR 텍스트 추출: {len(ocr_text)} 문자")
+                        return ocr_text
+
+            except Exception as e:
+                print(f"[{video_id}] 타이밍 파일 읽기 오류: {e}")
+
+        print(f"[{video_id}] 트랜스크립트/대본 없음 또는 너무 짧음")
         return None
 
     def update_video_stage(self, video_id: str, stage: str) -> bool:
