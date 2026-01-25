@@ -1015,11 +1015,13 @@ async def get_slide_image(
     db: Session = Depends(database.get_db),
     user: models.User = Depends(get_current_user)
 ):
-    """특정 슬라이드의 이미지와 OCR 텍스트를 반환합니다."""
+    """특정 슬라이드의 이미지와 OCR 텍스트를 반환합니다 (로고 합성 포함)."""
     import json
     from pdf2image import convert_from_bytes
     import base64
     from io import BytesIO
+    from PIL import Image
+    import numpy as np
 
     if not pdf2mp4:
         return JSONResponse(
@@ -1054,10 +1056,52 @@ async def get_slide_image(
 
         img = images[0]
 
+        # 메타 파일에서 카테고리 가져와서 로고 경로 결정
+        logo_path = None
+        video_info = pdf2mp4.get_video_info(video_id)
+        category = video_info.get('category', '') if video_info else ''
+        if category:
+            logo_path = youtube.get_logo_path(category)
+        if not logo_path:
+            categories = youtube.get_categories()
+            if categories:
+                logo_path = youtube.get_logo_path(categories[0])
+
+        # 로고 합성하여 리사이즈 (영상과 동일한 방식)
+        logo_img = None
+        if logo_path and os.path.exists(logo_path):
+            logo_img = Image.open(logo_path).convert('RGBA')
+
+        # _resize_image와 유사한 로직으로 로고 합성
+        width, height = 800, 600  # 미리보기 크기
+        orig_width, orig_height = img.size
+        ratio = min(width / orig_width, height / orig_height)
+        new_width = int(orig_width * ratio)
+        new_height = int(orig_height * ratio)
+
+        img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        background = Image.new('RGB', (width, height), (0, 0, 0))
+        offset_x = (width - new_width) // 2
+        offset_y = (height - new_height) // 2
+        background.paste(img_resized, (offset_x, offset_y))
+
+        # 로고 합성
+        if logo_img is not None:
+            logo_target_width = int(new_width * 0.10)
+            if logo_target_width > 0:
+                logo_ratio = logo_target_width / logo_img.width
+                logo_new_height = int(logo_img.height * logo_ratio)
+                logo_resized = logo_img.resize((logo_target_width, logo_new_height), Image.Resampling.LANCZOS)
+                logo_x = width - logo_target_width
+                logo_y = height - logo_new_height
+                if logo_resized.mode == 'RGBA':
+                    background.paste(logo_resized, (logo_x, logo_y), logo_resized)
+                else:
+                    background.paste(logo_resized, (logo_x, logo_y))
+
         # 이미지를 base64로 인코딩
         buffered = BytesIO()
-        img.thumbnail((800, 600))  # 적절한 크기로 리사이즈
-        img.save(buffered, format="PNG", optimize=True)
+        background.save(buffered, format="PNG", optimize=True)
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
         # OCR 텍스트 (캐시된 타이밍 파일에서 가져오거나 간단한 텍스트 추출)
