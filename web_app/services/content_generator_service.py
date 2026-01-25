@@ -9,7 +9,8 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from google import genai
 from google.genai import types
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
 from reportlab.lib.pagesizes import landscape, A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
@@ -60,7 +61,7 @@ class ContentGeneratorService:
     def __init__(self):
         self._client = None
         self.research_model = 'gemini-2.0-flash'  # Stable version for JSON output
-        self.image_model = 'gemini-2.0-flash-exp'  # 이미지 생성용 (Imagen 3)
+        self.image_model = 'gemini-3-pro-image-preview'  # Nano Banana Pro
 
         # 출력 디렉토리 설정
         self.output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'generated_content')
@@ -264,6 +265,8 @@ class ContentGeneratorService:
     ) -> Dict[str, Any]:
         """
         슬라이드용 이미지를 생성합니다.
+        Nano Banana Pro (Gemini 3) 모델을 사용하여 고품질 배경 이미지를 생성하고,
+        Python PIL을 사용하여 텍스트를 합성합니다 (한글 렌더링 품질 확보).
 
         Args:
             image_prompt: 이미지 생성 프롬프트
@@ -281,70 +284,35 @@ class ContentGeneratorService:
         if not self.client:
             raise ValueError("Gemini client not initialized.")
 
-        # 슬라이드 텍스트 정보 구성
-        text_info = ""
-        if title:
-            text_info += f"Title: {title}\n"
-        if content:
-            # content가 리스트인 경우 불릿 포인트로 변환
-            if isinstance(content, list):
-                content_text = "\n".join([f"• {item}" for item in content])
-            else:
-                content_text = content
-            text_info += f"Key Points:\n{content_text}\n"
-        if narration:
-            # narration은 요약해서 포함 (너무 길면 자르기)
-            narration_summary = narration[:200] + "..." if len(narration) > 200 else narration
-            text_info += f"Context: {narration_summary}\n"
+        # 이미지 프롬프트 강화 - 텍스트 제외 요청
+        enhanced_prompt = f"""Generate a high-quality background image for a presentation slide using Nano Banana Pro style.
 
-        # 이미지 프롬프트 강화 - 텍스트 포함 지시
-        lang_instruction = "한국어" if language == 'ko' else "English"
-
-        enhanced_prompt = f"""Create a professional YouTube video slide image with the following specifications:
-
-## Visual Content:
+## Visual Description:
 {image_prompt}
 
-## Text Overlay Requirements:
-The image MUST include the following text elements rendered directly on the image:
-
-1. **Slide Number Badge**: Display "#{slide_number}" in a small rounded badge at the top-left corner with semi-transparent dark background.
-
-2. **Title Area** (top section with semi-transparent dark gradient overlay):
-   - Title text in {lang_instruction}: "{title}"
-   - Use large, bold, white text that is clearly readable
-   - Position at the top of the image
-
-3. **Content Area** (bottom section with semi-transparent dark gradient overlay):
-{f'   - Display key points in {lang_instruction}:' if content else ''}
-{content_text if content and isinstance(content, str) else ''}
-{chr(10).join([f"   • {item}" for item in content]) if content and isinstance(content, list) else ''}
-   - Use medium-sized white text
-   - Position at the bottom of the image
-
 ## Style Requirements:
-- Style: {style}, high quality, 16:9 aspect ratio (1920x1080)
-- Professional YouTube thumbnail/slide aesthetic
-- Vibrant, engaging colors for the background visual
-- Semi-transparent dark overlays (gradient) for text areas to ensure readability
-- Clean, modern typography
-- Text must be {lang_instruction} and perfectly legible
-- The visual content should complement the text, not compete with it
+- Style: {style}, Nano Banana Pro aesthetic, 16:9 aspect ratio (1920x1080)
+- Minimalist, clean, and professional
+- Vibrant and engaging colors
+- Composition should allow space for text overlay (top and bottom)
+- High aesthetic quality, detailed textures, cinematic lighting
 
-## Important:
-- ALL text MUST be included and clearly readable in the final image
-- Use appropriate font sizes: large for title, medium for content
-- Ensure high contrast between text and background"""
+## IMPORTANT:
+- DO NOT include any text, words, letters, or numbers in the image.
+- This image will be used as a background, so keep the central area relatively clean or balanced.
+- Pure visual representation of the concept.
+"""
 
         logger.info(f"Generating image for slide {slide_number}: {title[:30] if title else image_prompt[:30]}...")
 
         try:
             # Gemini 사용 (비동기 클라이언트)
+            # 모델ID: gemini-3-pro-image-preview
             response = await self.async_client.models.generate_content(
-                model="gemini-2.0-flash-exp",
+                model=self.image_model,
                 contents=enhanced_prompt,
                 config=types.GenerateContentConfig(
-                    response_modalities=['TEXT', 'IMAGE']
+                    response_modalities=['IMAGE']
                 )
             )
 
@@ -358,17 +326,20 @@ The image MUST include the following text elements rendered directly on the imag
             if not image_data:
                 raise ValueError("No image generated")
 
-            # 이미지 저장
+            # 이미지 처리
             image_filename = f"{plan_id}_slide_{slide_number:02d}.png"
             image_path = os.path.join(self.output_dir, image_filename)
 
-            # PIL로 이미지 처리 및 16:9 리사이즈
+            # PIL로 이미지 로드
             img = Image.open(io.BytesIO(image_data))
             img = img.convert('RGB')
 
             # 16:9 비율로 리사이즈 (1920x1080)
             target_width, target_height = 1920, 1080
             img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            # 텍스트 오버레이 합성 (한글 렌더링 해결)
+            img = self._add_text_overlay(img, slide_number, title, content)
 
             img.save(image_path, 'PNG', quality=95)
 
@@ -681,6 +652,116 @@ The image MUST include the following text elements rendered directly on the imag
         images.sort(key=lambda x: x['slide_number'])
 
         return images
+
+
+    def _add_text_overlay(self, img: Image.Image, slide_number: int, title: str, content: str) -> Image.Image:
+        """이미지 위에 텍스트(제목, 내용, 번호)를 합성합니다."""
+        draw = ImageDraw.Draw(img)
+        width, height = img.size
+        
+        # 폰트 로드 (설치된 NotoSansCJK 사용)
+        try:
+            # 폰트 크기 설정 (1920x1080 기준)
+            title_font_size = 60
+            content_font_size = 40
+            badge_font_size = 30
+            
+            font_bold = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", title_font_size)
+            font_regular = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", content_font_size)
+            font_badge = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", badge_font_size)
+        except OSError:
+            logger.warning("Korean font not found, using default. Text might not render correctly.")
+            font_bold = ImageFont.load_default()
+            font_regular = ImageFont.load_default()
+            font_badge = ImageFont.load_default()
+
+        # 1. 슬라이드 번호 배지 (좌측 상단)
+        badge_text = f"#{slide_number}"
+        badge_padding = 15
+        bbox = draw.textbbox((0, 0), badge_text, font=font_badge)
+        badge_w = bbox[2] - bbox[0] + badge_padding * 2
+        badge_h = bbox[3] - bbox[1] + badge_padding * 2
+        
+        # 배지 배경 (반투명 검정)
+        # PIL draw.rectangle은 투명도 지원 안함 -> 별도 레이어 필요
+        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        draw_overlay = ImageDraw.Draw(overlay)
+        
+        draw_overlay.rounded_rectangle(
+            [(20, 20), (20 + badge_w, 20 + badge_h)],
+            radius=10, fill=(0, 0, 0, 160)
+        )
+        
+        # 2. 제목 영역 (상단) - 그라데이션 대신 반투명 박스
+        # 제목 줄바꿈
+        wrapped_title = textwrap.fill(title, width=30) # 대략적인 글자수 제한
+        
+        # 제목 높이 계산
+        title_bbox = draw.multiline_textbbox((0, 0), wrapped_title, font=font_bold, spacing=10)
+        title_h = title_bbox[3] - title_bbox[1] + 60 # 여백 포함
+        
+        # 상단 오버레이
+        draw_overlay.rectangle(
+            [(0, 0), (width, 150 + title_h)], # 넉넉하게
+            fill=(0, 0, 0, 100) # 전체 상단 어둡게
+        )
+        
+        # 3. 내용 영역 (하단)
+        if content:
+            # 리스트인 경우 텍스트로 변환
+            if isinstance(content, list):
+                content_text = "\n".join([f"• {item}" for item in content])
+            else:
+                content_text = content
+                
+            wrapped_content = ""
+            for line in content_text.split('\n'):
+                wrapped_content += textwrap.fill(line, width=50) + "\n"
+            
+            # 하단 오버레이 (그라데이션 효과를 위해 여러 겹 또는 단순히 박스)
+            # 여기서는 심플하게 하단 박스
+            content_bbox = draw.multiline_textbbox((0, 0), wrapped_content, font=font_regular, spacing=15)
+            content_h = content_bbox[3] - content_bbox[1] + 80
+            
+            draw_overlay.rectangle(
+                [(0, height - content_h - 50), (width, height)],
+                fill=(0, 0, 0, 140)
+            )
+
+        # 오버레이 합성
+        img = Image.alpha_composite(img.convert('RGBA'), overlay)
+        draw = ImageDraw.Draw(img) # 다시 draw 생성 (합성된 이미지용)
+
+        # 텍스트 그리기 (흰색)
+        
+        # 배지 텍스트
+        draw.text((20 + badge_padding, 20 + badge_padding), badge_text, font=font_badge, fill="white", anchor="lt")
+        
+        # 제목 텍스트 (중앙 정렬 또는 좌측 정렬)
+        # 상단 영역 중앙
+        draw.multiline_text(
+            (width/2, 100), 
+            wrapped_title, 
+            font=font_bold, 
+            fill="white", 
+            anchor="ma", 
+            align="center",
+            spacing=10
+        )
+        
+        # 내용 텍스트 (하단 중앙)
+        if content:
+            draw.multiline_text(
+                (width/2, height - 100),
+                wrapped_content,
+                font=font_regular,
+                fill="white",
+                anchor="md", # middle-down (하단 기준)
+                align="center",
+                spacing=15
+            )
+            
+        return img.convert('RGB')
 
 
 # 싱글톤 인스턴스
