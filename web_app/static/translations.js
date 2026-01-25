@@ -2,7 +2,7 @@ const translations = {
     ko: {
         // Sidebar
         "sidebar.wiki": "위키 오토 포스터",
-        "sidebar.youtube": "유튜브 포스터",
+        "sidebar.youtube": "유투브 포스터",
         "sidebar.genvideo": "영상 생성",
         "sidebar.admin.users": "회원 관리",
         "sidebar.admin.files": "보안 파일 관리",
@@ -31,7 +31,7 @@ const translations = {
         "wiki.img.manual.desc": "(MD 파일에 이미지 링크를 직접 삽입)",
 
         // Youtube Tab
-        "yt.title": "🎬 유튜브 포스터",
+        "yt.title": "🎬 유투브 포스터",
         "yt.subtitle": "AI 기반 영상 편집 및 유튜브 업로드 자동화",
         "yt.upload.title": "📹 새로운 영상 업로드",
         "yt.cat.label": "카테고리 선택",

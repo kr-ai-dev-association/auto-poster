@@ -97,7 +97,7 @@
                     <span x-show="!sidebarCollapsed" class="truncate">타이밍 편집</span>
                 </button>
 
-                <!-- YouTube (유튜브 포스터) -->
+                <!-- YouTube (유투브 포스터) -->
                 <button @click="mainTab = 'youtube'"
                     class="w-full flex items-center text-sm font-medium rounded-lg transition-all"
                     :class="[
@@ -6434,7 +6434,13 @@
                 },
 
                 goToYoutubeWithVideo(video) {
-                    // YouTube 포스터 탭으로 이동하고 해당 영상 선택
+                    console.log('goToYoutubeWithVideo called with video:', video);
+                    console.log('video.category:', video.category);
+                    console.log('video.ocr_lang:', video.ocr_lang);
+                    console.log('Current ytCategory before:', this.ytCategory);
+                    console.log('Current ytLang before:', this.ytLang);
+
+                    // 유투브 포스터 탭으로 이동하고 해당 영상 선택
                     this.mainTab = 'youtube';
                     this.ytVideoSource = 'genvideo';
                     this.selectedGenVideo = video.id;
@@ -6443,6 +6449,8 @@
                     if (video.category) {
                         this.ytCategory = video.category;
                         console.log('Setting ytCategory to:', video.category);
+                    } else {
+                        console.log('video.category is empty or undefined');
                     }
 
                     // 메타데이터 언어 설정 (영상의 OCR 언어 기반)
@@ -6454,7 +6462,12 @@
                             this.ytLang = 'en';
                         }
                         console.log('Setting ytLang to:', this.ytLang, 'from ocr_lang:', video.ocr_lang);
+                    } else {
+                        console.log('video.ocr_lang is empty or undefined');
                     }
+
+                    console.log('Current ytCategory after:', this.ytCategory);
+                    console.log('Current ytLang after:', this.ytLang);
 
                     // PDF 자동 선택: pdf_name으로 generatedPdfs에서 찾기
                     this.ytPdfSource = 'genvideo';
