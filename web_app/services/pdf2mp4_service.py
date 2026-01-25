@@ -2426,15 +2426,35 @@ class PDF2MP4Service:
             for f in os.listdir(self.pdf_dir):
                 if f.endswith('.pdf'):
                     path = os.path.join(self.pdf_dir, f)
-                    parts = f.rsplit('_', 1)
-                    pdf_id = parts[1].replace('.pdf', '') if len(parts) > 1 else f.replace('.pdf', '')
+
+                    # JSON 메타데이터 파일에서 정보 로드
+                    meta_path = path.rsplit('.', 1)[0] + '.json'
+                    metadata = {}
+                    if os.path.exists(meta_path):
+                        try:
+                            with open(meta_path, 'r', encoding='utf-8') as mf:
+                                metadata = json.load(mf)
+                        except Exception:
+                            pass
+
+                    # ID 결정: 메타데이터의 plan_id 또는 파일명에서 추출
+                    if metadata.get('plan_id'):
+                        pdf_id = metadata['plan_id']
+                    else:
+                        # 기존 방식 (fallback)
+                        parts = f.rsplit('_', 1)
+                        pdf_id = parts[1].replace('.pdf', '') if len(parts) > 1 else f.replace('.pdf', '')
 
                     pdfs.append({
                         'id': pdf_id,
                         'filename': f,
-                        'original_name': parts[0] + '.pdf' if len(parts) > 1 else f,
+                        'original_name': f,  # 원본 파일명 그대로 사용
+                        'title': metadata.get('title', f.replace('.pdf', '')),
                         'file_path': path,
                         'file_size': os.path.getsize(path),
+                        'slide_count': metadata.get('slide_count', 0),
+                        'language': metadata.get('language', 'ko'),
+                        'category': metadata.get('category', ''),
                         'created_at': datetime.fromtimestamp(os.path.getctime(path)).isoformat()
                     })
 
@@ -2454,13 +2474,27 @@ class PDF2MP4Service:
         path = self.get_pdf_path(pdf_id)
         if path and os.path.exists(path):
             filename = os.path.basename(path)
-            parts = filename.rsplit('_', 1)
+
+            # JSON 메타데이터 파일에서 정보 로드
+            meta_path = path.rsplit('.', 1)[0] + '.json'
+            metadata = {}
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, 'r', encoding='utf-8') as mf:
+                        metadata = json.load(mf)
+                except Exception:
+                    pass
+
             return {
                 'id': pdf_id,
                 'filename': filename,
-                'original_name': parts[0] + '.pdf' if len(parts) > 1 else filename,
+                'original_name': filename,  # 원본 파일명 그대로 사용
+                'title': metadata.get('title', filename.replace('.pdf', '')),
                 'file_path': path,
                 'file_size': os.path.getsize(path),
+                'slide_count': metadata.get('slide_count', 0),
+                'language': metadata.get('language', 'ko'),
+                'category': metadata.get('category', ''),
                 'created_at': datetime.fromtimestamp(os.path.getctime(path)).isoformat()
             }
         return None
