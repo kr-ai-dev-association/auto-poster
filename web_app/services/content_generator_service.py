@@ -285,13 +285,13 @@ class ContentGeneratorService:
             raise ValueError("Gemini client not initialized.")
 
         # 이미지 프롬프트 강화 - 텍스트 제외 요청
-        enhanced_prompt = f"""Generate a high-quality background image for a presentation slide using Nano Banana Pro style.
+        enhanced_prompt = f"""Generate a high-quality background image for a presentation slide.
 
 ## Visual Description:
 {image_prompt}
 
 ## Style Requirements:
-- Style: {style}, Nano Banana Pro aesthetic, 16:9 aspect ratio (1920x1080)
+- Style: {style}, 16:9 aspect ratio (1920x1080)
 - Minimalist, clean, and professional
 - Vibrant and engaging colors
 - Composition should allow space for text overlay (top and bottom)
