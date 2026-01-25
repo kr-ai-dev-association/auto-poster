@@ -1551,7 +1551,13 @@ class PDF2MP4Service:
                 safe_title = safe_title.strip()[:100]  # 최대 100자
                 output_filename = f"{safe_title}_{video_id}.mp4"
             else:
-                output_filename = f"{os.path.splitext(filename)[0]}_smart_{video_id}.mp4"
+                # filename에서 확장자 제거한 base_name
+                base_name = os.path.splitext(filename)[0]
+                # base_name과 video_id가 같으면 중복 방지
+                if base_name == video_id:
+                    output_filename = f"{video_id}.mp4"
+                else:
+                    output_filename = f"{base_name}_smart_{video_id}.mp4"
             output_path = os.path.join(self.output_dir, output_filename)
 
             video_duration = page_timings[-1]['start'] + page_timings[-1]['duration'] if page_timings else 0
