@@ -5,8 +5,11 @@ import base64
 import uuid
 import logging
 import asyncio
+import re
+import aiohttp
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from urllib.parse import urljoin, urlparse
 from google import genai
 from google.genai import types
 from PIL import Image, ImageDraw, ImageFont
@@ -15,6 +18,7 @@ from reportlab.lib.pagesizes import landscape, A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
 
 load_dotenv()
 
@@ -66,8 +70,10 @@ class ContentGeneratorService:
         # 출력 디렉토리 설정
         self.output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'generated_content')
         self.pdf_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'generated_pdfs')
+        self.web_images_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'generated_content', 'web_images')
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.pdf_dir, exist_ok=True)
+        os.makedirs(self.web_images_dir, exist_ok=True)
 
     @property
     def client(self):
@@ -86,6 +92,231 @@ class ContentGeneratorService:
         """Get async client for non-blocking API calls"""
         if self.client:
             return self.client.aio
+        return None
+
+    async def scrape_images_from_url(self, url: str, min_width: int = 400, min_height: int = 300, max_images: int = 5) -> List[Dict[str, Any]]:
+        """
+        URL에서 이미지를 스크래핑합니다.
+
+        Args:
+            url: 스크래핑할 웹 페이지 URL
+            min_width: 최소 이미지 너비 (작은 아이콘 제외)
+            min_height: 최소 이미지 높이
+            max_images: 최대 가져올 이미지 수
+
+        Returns:
+            List of image info dicts with 'url', 'alt', 'width', 'height'
+        """
+        images = []
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5'
+        }
+
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+                async with session.get(url, headers=headers, ssl=False) as response:
+                    if response.status != 200:
+                        logger.warning(f"Failed to fetch URL {url}: status {response.status}")
+                        return images
+
+                    html = await response.text()
+                    soup = BeautifulSoup(html, 'html.parser')
+
+                    # img 태그 찾기
+                    for img in soup.find_all('img'):
+                        if len(images) >= max_images:
+                            break
+
+                        img_url = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
+                        if not img_url:
+                            continue
+
+                        # 상대 경로를 절대 경로로 변환
+                        img_url = urljoin(url, img_url)
+
+                        # 데이터 URI 스킵
+                        if img_url.startswith('data:'):
+                            continue
+
+                        # 작은 이미지 스킵 (아이콘, 로고 등)
+                        width = img.get('width', '')
+                        height = img.get('height', '')
+
+                        try:
+                            w = int(str(width).replace('px', '')) if width else 0
+                            h = int(str(height).replace('px', '')) if height else 0
+                            if (w > 0 and w < min_width) or (h > 0 and h < min_height):
+                                continue
+                        except ValueError:
+                            pass
+
+                        # SVG 스킵
+                        if '.svg' in img_url.lower():
+                            continue
+
+                        images.append({
+                            'url': img_url,
+                            'alt': img.get('alt', ''),
+                            'width': width,
+                            'height': height
+                        })
+
+                    # og:image 메타 태그도 체크
+                    og_image = soup.find('meta', property='og:image')
+                    if og_image and og_image.get('content'):
+                        og_url = urljoin(url, og_image['content'])
+                        if not any(i['url'] == og_url for i in images):
+                            images.insert(0, {
+                                'url': og_url,
+                                'alt': 'Open Graph Image',
+                                'width': '',
+                                'height': ''
+                            })
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout while scraping {url}")
+        except Exception as e:
+            logger.warning(f"Error scraping images from {url}: {e}")
+
+        return images[:max_images]
+
+    async def download_web_image(self, image_url: str, plan_id: str, slide_number: int) -> Optional[str]:
+        """
+        웹에서 이미지를 다운로드하여 저장합니다.
+
+        Args:
+            image_url: 이미지 URL
+            plan_id: 기획안 ID
+            slide_number: 슬라이드 번호
+
+        Returns:
+            저장된 이미지 경로 또는 None
+        """
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/*,*/*;q=0.8'
+        }
+
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                async with session.get(image_url, headers=headers, ssl=False) as response:
+                    if response.status != 200:
+                        logger.warning(f"Failed to download image {image_url}: status {response.status}")
+                        return None
+
+                    content_type = response.headers.get('content-type', '')
+                    if not content_type.startswith('image/'):
+                        logger.warning(f"Not an image: {content_type}")
+                        return None
+
+                    image_data = await response.read()
+
+                    # 이미지 검증 및 처리
+                    img = Image.open(io.BytesIO(image_data))
+
+                    # 너무 작은 이미지 필터링
+                    if img.width < 200 or img.height < 200:
+                        logger.warning(f"Image too small: {img.width}x{img.height}")
+                        return None
+
+                    # PNG로 저장
+                    filename = f"{plan_id}_web_{slide_number:02d}.png"
+                    filepath = os.path.join(self.web_images_dir, filename)
+
+                    # RGB로 변환 (RGBA, P 등 처리)
+                    if img.mode in ('RGBA', 'P', 'LA'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                        img = background
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
+
+                    img.save(filepath, 'PNG', quality=95)
+                    logger.info(f"Downloaded web image: {filepath}")
+
+                    return filepath
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout downloading image {image_url}")
+        except Exception as e:
+            logger.warning(f"Error downloading image {image_url}: {e}")
+
+        return None
+
+    async def search_and_download_images_for_slide(
+        self,
+        search_query: str,
+        plan_id: str,
+        slide_number: int,
+        max_attempts: int = 3
+    ) -> Optional[str]:
+        """
+        Google Search로 찾은 URL에서 관련 이미지를 검색하고 다운로드합니다.
+
+        Args:
+            search_query: 검색 쿼리 (슬라이드 관련 키워드)
+            plan_id: 기획안 ID
+            slide_number: 슬라이드 번호
+            max_attempts: 최대 시도 횟수
+
+        Returns:
+            다운로드된 이미지 경로 또는 None
+        """
+        if not self.client:
+            return None
+
+        try:
+            # Google Search로 관련 웹페이지 찾기
+            tools = [types.Tool(google_search=types.GoogleSearch())]
+
+            search_prompt = f"""Find high-quality images related to: {search_query}
+
+Search for web pages that might contain relevant images (news articles, official websites, etc.).
+Return ONLY the top 3 most relevant URLs, one per line, no other text."""
+
+            response = await self.async_client.models.generate_content(
+                model=self.research_model,
+                contents=search_prompt,
+                config=types.GenerateContentConfig(
+                    tools=tools,
+                    temperature=0.1,
+                    max_output_tokens=500
+                )
+            )
+
+            response_text = response.text.strip()
+
+            # URL 추출
+            url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+            urls = re.findall(url_pattern, response_text)
+
+            # 이미지 검색 및 다운로드 시도
+            for url in urls[:max_attempts]:
+                try:
+                    # URL에서 이미지 스크래핑
+                    images = await self.scrape_images_from_url(url, max_images=3)
+
+                    for img_info in images:
+                        downloaded_path = await self.download_web_image(
+                            img_info['url'],
+                            plan_id,
+                            slide_number
+                        )
+                        if downloaded_path:
+                            logger.info(f"Successfully downloaded image for slide {slide_number} from {url}")
+                            return downloaded_path
+
+                except Exception as e:
+                    logger.warning(f"Error processing URL {url}: {e}")
+                    continue
+
+        except Exception as e:
+            logger.warning(f"Error in search_and_download_images: {e}")
+
         return None
 
     async def generate_content_plan(
@@ -156,6 +387,8 @@ class ContentGeneratorService:
       "content": "슬라이드에서 다룰 내용 (2-3문장). 최신 검색 정보를 바탕으로 구체적인 수치나 사례를 포함.",
       "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체)",
       "image_prompt": "이 슬라이드용 이미지 생성 프롬프트 (영어, 구체적이고 시각적인 설명)",
+      "web_image_query": "이 슬라이드에 사용할 실제 사진/이미지를 웹에서 검색할 쿼리 (영어, 구체적인 검색어)",
+      "use_web_image": true/false,
       "duration_seconds": 예상_표시_시간_초
     }},
     ...
@@ -173,6 +406,8 @@ class ContentGeneratorService:
 4. 중간에 시청 유지를 위한 티저/예고 포함
 5. {'한국어' if language == 'ko' else 'English'}로 title, content, narration 작성
 6. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
+7. web_image_query: 실제 사진이 필요한 슬라이드에 대해 웹 검색 쿼리를 작성 (예: 제품 사진, 유명인, 장소, 이벤트 등)
+8. use_web_image: 해당 슬라이드에 AI 생성 이미지 대신 웹에서 다운로드한 실제 이미지를 사용할지 여부 (실제 사진이 더 적합한 경우 true)
 """
 
         try:
@@ -263,7 +498,8 @@ class ContentGeneratorService:
         title: str = '',
         narration: str = '',
         content: str = '',
-        language: str = 'ko'
+        language: str = 'ko',
+        reference_images: List[str] = None
     ) -> Dict[str, Any]:
         """
         슬라이드용 이미지를 생성합니다.
@@ -279,6 +515,7 @@ class ContentGeneratorService:
             narration: 대본 텍스트
             content: 슬라이드 콘텐츠 (핵심 내용)
             language: 텍스트 언어 (ko/en)
+            reference_images: 참조 이미지 파일 경로 리스트 (웹에서 다운로드한 이미지)
 
         Returns:
             Dict containing image path
@@ -286,8 +523,33 @@ class ContentGeneratorService:
         if not self.client:
             raise ValueError("Gemini client not initialized.")
 
-        # 이미지 프롬프트 강화 - 텍스트 제외 요청
-        enhanced_prompt = f"""Generate a high-quality background image for a presentation slide.
+        # 참조 이미지가 있는 경우 프롬프트 수정
+        has_reference = reference_images and len(reference_images) > 0
+
+        if has_reference:
+            enhanced_prompt = f"""Based on the reference images provided, create a high-quality presentation slide background image.
+
+## Visual Description:
+{image_prompt}
+
+## Reference Images:
+Use the provided reference images as inspiration for style, color palette, and visual elements.
+Incorporate relevant visual elements from the references while creating a cohesive slide background.
+
+## Style Requirements:
+- Style: {style}, 16:9 aspect ratio (1920x1080)
+- Minimalist, clean, and professional
+- Composition should allow space for text overlay (top and bottom)
+- High aesthetic quality, detailed textures, cinematic lighting
+- Blend the reference image aesthetics with the slide concept
+
+## IMPORTANT:
+- DO NOT include any text, words, letters, or numbers in the image.
+- This image will be used as a background, so keep the central area relatively clean or balanced.
+- Pure visual representation of the concept inspired by the references.
+"""
+        else:
+            enhanced_prompt = f"""Generate a high-quality background image for a presentation slide.
 
 ## Visual Description:
 {image_prompt}
@@ -305,14 +567,37 @@ class ContentGeneratorService:
 - Pure visual representation of the concept.
 """
 
-        logger.info(f"Generating image for slide {slide_number}: {title[:30] if title else image_prompt[:30]}...")
+        logger.info(f"Generating image for slide {slide_number}: {title[:30] if title else image_prompt[:30]}... (refs: {len(reference_images) if reference_images else 0})")
 
         try:
+            # contents 구성: 참조 이미지가 있으면 이미지와 텍스트 함께 전송
+            if has_reference:
+                contents = []
+                # 참조 이미지 추가 (최대 3개)
+                for ref_path in reference_images[:3]:
+                    try:
+                        if os.path.exists(ref_path):
+                            with open(ref_path, 'rb') as f:
+                                img_bytes = f.read()
+                            # 이미지 파트 추가
+                            contents.append(types.Part.from_bytes(
+                                data=img_bytes,
+                                mime_type='image/png'
+                            ))
+                            logger.info(f"Added reference image: {ref_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to load reference image {ref_path}: {e}")
+
+                # 프롬프트 텍스트 추가
+                contents.append(enhanced_prompt)
+            else:
+                contents = enhanced_prompt
+
             # Gemini 사용 (비동기 클라이언트)
             # 모델ID: gemini-3-pro-image-preview
             response = await self.async_client.models.generate_content(
                 model=self.image_model,
-                contents=enhanced_prompt,
+                contents=contents,
                 config=types.GenerateContentConfig(
                     response_modalities=['IMAGE']
                 )
@@ -365,14 +650,17 @@ class ContentGeneratorService:
     async def generate_all_images(
         self,
         plan_id: str,
-        progress_callback=None
+        progress_callback=None,
+        use_web_images: bool = True
     ) -> Dict[str, Any]:
         """
         기획안의 모든 슬라이드 이미지를 생성합니다.
+        웹 이미지 다운로드를 우선 시도하고, 실패 시 AI 생성 이미지를 사용합니다.
 
         Args:
             plan_id: 기획안 ID
             progress_callback: 진행 상황 콜백 함수
+            use_web_images: 웹 이미지 다운로드 사용 여부
 
         Returns:
             Dict containing all image paths
@@ -389,20 +677,59 @@ class ContentGeneratorService:
         language = plan.get('language', 'ko')
         total_slides = len(slides)
         results = []
+        web_image_count = 0
 
         for i, slide in enumerate(slides):
+            slide_number = slide.get('slide_number', i + 1)
+            title = slide.get('title', '')
+            content = slide.get('content', '')
+
             if progress_callback:
-                progress_callback(i + 1, total_slides, f"Generating image {i + 1}/{total_slides}")
+                progress_callback(i + 1, total_slides, f"Processing image {i + 1}/{total_slides}")
+
+            reference_images = []
+
+            # 웹 이미지 다운로드 시도 (use_web_image가 true인 슬라이드)
+            if use_web_images and slide.get('use_web_image', False):
+                web_query = slide.get('web_image_query', '')
+                if web_query:
+                    logger.info(f"Searching web images for slide {slide_number}: {web_query[:50]}")
+
+                    if progress_callback:
+                        progress_callback(i + 1, total_slides, f"Searching web image {i + 1}/{total_slides}")
+
+                    # 웹 이미지 다운로드 (참조용으로 사용)
+                    web_image_path = await self.search_and_download_images_for_slide(
+                        search_query=web_query,
+                        plan_id=plan_id,
+                        slide_number=slide_number
+                    )
+
+                    if web_image_path:
+                        reference_images.append(web_image_path)
+                        web_image_count += 1
+                        logger.info(f"Web image downloaded for slide {slide_number} as reference")
+
+            # AI 이미지 생성 (웹 이미지가 있으면 참조로 사용)
+            if progress_callback:
+                if reference_images:
+                    progress_callback(i + 1, total_slides, f"Generating AI image with reference {i + 1}/{total_slides}")
+                else:
+                    progress_callback(i + 1, total_slides, f"Generating AI image {i + 1}/{total_slides}")
 
             result = await self.generate_slide_image(
                 image_prompt=slide.get('image_prompt', ''),
-                slide_number=slide.get('slide_number', i + 1),
+                slide_number=slide_number,
                 plan_id=plan_id,
-                title=slide.get('title', ''),
+                title=title,
                 narration=slide.get('narration', ''),
-                content=slide.get('content', ''),
-                language=language
+                content=content,
+                language=language,
+                reference_images=reference_images if reference_images else None
             )
+            result['source'] = 'ai_with_ref' if reference_images else 'ai'
+            result['reference_count'] = len(reference_images)
+
             results.append(result)
 
             # API 레이트 리밋 방지
@@ -411,12 +738,16 @@ class ContentGeneratorService:
 
         # 성공한 이미지 수 계산
         success_count = sum(1 for r in results if r['status'] == 'success')
+        with_ref_count = sum(1 for r in results if r.get('reference_count', 0) > 0 and r['status'] == 'success')
 
         return {
             'status': 'success' if success_count == total_slides else 'partial',
             'plan_id': plan_id,
             'total': total_slides,
             'success': success_count,
+            'web_references_used': web_image_count,
+            'ai_with_reference': with_ref_count,
+            'ai_only': success_count - with_ref_count,
             'results': results
         }
 

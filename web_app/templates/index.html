@@ -7329,12 +7329,12 @@
                     // (x-show가 표시되고 x-for로 option이 렌더링된 후에 x-model 값 설정해야 함)
                     // setTimeout으로 충분한 시간을 확보
                     setTimeout(() => {
-                        // 카테고리 적용 (categories에 해당 값이 있는지 확인)
-                        if (targetCategory && this.categories.includes(targetCategory)) {
+                        // 카테고리 적용 (categories 객체 배열에서 id로 확인)
+                        if (targetCategory && this.categories.some(cat => cat.id === targetCategory)) {
                             this.ytCategory = targetCategory;
                             console.log('Set ytCategory to:', targetCategory);
                         } else {
-                            console.log('Category not found in categories list:', targetCategory, 'Available:', this.categories);
+                            console.log('Category not found in categories list:', targetCategory, 'Available:', this.categories.map(c => c.id));
                         }
 
                         // 언어 적용

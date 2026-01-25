@@ -1,0 +1,146 @@
+{
+  "title": "【충격】 파리 현지 브이로그: 전쟁 같은 시위, 살인적인 물가! 프랑스 시민들의 절규",
+  "description": "뉴스에선 볼 수 없는 프랑스 시민들의 리얼한 삶! 시위 현장의 생생함과 치솟는 물가에 대한 절망을 담았습니다. 마크롱 정부를 향한 분노, 지금 바로 확인하세요!",
+  "category": "lifestyle",
+  "target_audience": "해외 생활에 관심 있는 20-40대, 국제 정세에 관심 있는 시청자",
+  "estimated_duration": "6분",
+  "slides": [
+    {
+      "slide_number": 1,
+      "title": "다보스 포럼으로 도배된 파리의 아침",
+      "content": "2026년, 프랑스 파리는 다보스 포럼 관련 뉴스로 가득합니다. 하지만 거리의 풍경은 사뭇 다르죠. 화려한 행사 뒤에 숨겨진 시민들의 고충을 담아봤습니다. 현지 리포터들의 SNS와 개인 채널 데이터를 통해 생생한 정보를 수집했습니다.",
+      "narration": "오늘 아침 파리는 온통 다보스 포럼 이야기뿐이네요. 하지만 진짜 이야기는 지금부터 시작입니다.",
+      "image_prompt": "Paris street scene, morning, newspapers with Davos forum headlines, subtle contrast with ordinary people",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 2,
+      "title": "1,000대 트랙터, 도로를 점령하다!",
+      "content": "프랑스 의회로 향하는 1,000대가 넘는 트랙터 행렬! 농민들은 EU-Mercosur 자유 무역 협정에 반대하며 시위를 벌이고 있습니다. 이 협정은 남미 농산물 수입을 증가시켜 프랑스 농가에 불리하게 작용할 것이라는 우려가 큽니다. 1월 20일, 농민들은 유럽 의회 앞에서 대규모 시위를 벌였습니다.",
+      "narration": "출근길이 완전히 막혔습니다. 1,000대가 넘는 트랙터가 의회로 향하고 있다는데요. 도대체 무슨 일일까요?",
+      "image_prompt": "Large tractor protest in Paris, blocking streets, angry farmers, French flags",
+      "duration_seconds": 40
+    },
+    {
+      "slide_number": 3,
+      "title": "충격적인 마트 물가! 엥겔지수 급상승?",
+      "content": "수입 중단 위기에 처한 생필품 가격이 얼마나 올랐을까요? 프랑스의 2026년 물가 상승률은 심각한 수준입니다. 2022년 정부 통계에 따르면 프랑스 가구는 연간 평균 28,800유로를 소비하며, 인플레이션을 고려하면 2026년에는 약 2,679유로/월이 될 것으로 예상됩니다. 특히 파리가 속한 Île-de-France 지역은 식료품 물가가 전국 평균보다 7%, 임대료는 40% 더 높습니다.",
+      "narration": "마트에 왔는데, 가격표 보고 깜짝 놀랐습니다. 대체 무슨 물건값이 이렇게 오른 거죠?",
+      "image_prompt": "French supermarket, extremely high prices on basic goods, shocked shopper expression",
+      "duration_seconds": 50
+    },
+    {
+      "slide_number": 4,
+      "title": "시민들의 분노! 마크롱 외교 정책, 과연?",
+      "content": "마크롱 대통령의 외교 정책에 대한 현지인들의 솔직한 생각을 들어봤습니다. 연금 개혁 이후 마크롱 대통령의 지지율은 하락세를 보이고 있으며, 2027년 대선에서 극우 정당의 지지율이 상승할 가능성도 제기되고 있습니다. 2026년 프랑스의 재정 적자는 EU 기준치를 훨씬 웃돌 것으로 예상되며, 공공 부채는 GDP의 약 110%에 육박할 것으로 전망됩니다.",
+      "narration": "마크롱 대통령, 이대로 괜찮을까요? 시민들의 진짜 속마음을 들어봤습니다.",
+      "image_prompt": "Vox pop interview in Paris street, diverse opinions, concerned expressions",
+      "duration_seconds": 60
+    },
+    {
+      "slide_number": 5,
+      "title": "불안한 국제 정세, 평범한 시민의 하루",
+      "content": "우크라이나 전쟁, 시리아 내전, EU-Mercosur 무역 협정 등 불안한 국제 정세 속에서 프랑스 시민들은 어떤 감정을 느끼며 살아가고 있을까요?  최근 프랑스에서는 쿠르드족 시위가 격화되어 마르세유에서 시위 금지령이 내려지기도 했습니다.",
+      "narration": "매일 쏟아지는 뉴스, 불안한 국제 정세 속에서 우리는 어떻게 살아가야 할까요?",
+      "image_prompt": "Pensive person looking out of a window in Paris, reflecting on world events",
+      "duration_seconds": 40
+    },
+    {
+      "slide_number": 6,
+      "title": "프랑스 농민 시위, 왜 이렇게 격렬할까?",
+      "content": "프랑스 농민들은 높은 비용, 과도한 규제, EU内外 국가와의 불공정한 경쟁으로 인해 어려움을 겪고 있다고 주장합니다. 특히 EU-Mercosur 무역 협정은 저렴한 남미산 농산물 수입을 증가시켜 프랑스 농가에 큰 타격을 줄 것이라는 우려를 낳고 있습니다.",
+      "narration": "트랙터 시위, 쇠똥 투척... 프랑스 농민들은 왜 이렇게까지 분노하는 걸까요?",
+      "image_prompt": "French farmers protesting with tractors, manure, and signs",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 7,
+      "title": "치솟는 물가, 시민들의 한숨",
+      "content": "2026년 프랑스의 생활비는 꾸준히 상승하고 있습니다. 4인 가족 기준 월 평균 3,348.7유로(임대료 제외)가 필요하며, 1인 가구는 930.4유로(임대료 제외)가 필요합니다. 파리의 경우, 월세는 평균 1,100유로(도심) 또는 828유로(교외)입니다.",
+      "narration": "월급 빼고 다 오르는 세상! 프랑스 시민들의 얇아지는 지갑...",
+      "image_prompt": "Empty wallet, rising graph of inflation, concerned face",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 8,
+      "title": "마크롱 정부, 해결책은 어디에?",
+      "content": "마크롱 정부는 2026년 예산안을 통해 국방비 지출을 늘리고 사회 복지 프로그램을 삭감하려는 움직임을 보이고 있습니다. 이에 대한 시민들의 반발이 거세지고 있으며, 파리에서는 정부 예산안에 항의하는 시위가 벌어지기도 했습니다.",
+      "narration": "마크롱 정부는 과연 이 위기를 극복할 수 있을까요?",
+      "image_prompt": "Emmanuel Macron addressing the nation, serious expression, protests in the background",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 9,
+      "title": "EU-Mercosur 무역 협정, 득인가 실인가?",
+      "content": "EU-Mercosur 무역 협정은 독일, 스페인, 북유럽 국가들은 미국의 관세 장벽을 피하고 중국 의존도를 줄이기 위해 수출을 늘릴 수 있다고 주장합니다. 하지만 프랑스와 이탈리아는 저렴한 농산물 유입으로 유럽 농가에 피해를 줄 수 있다고 우려합니다.",
+      "narration": "EU-Mercosur 무역 협정, 누구에게 득이 되고 누구에게 실이 될까요?",
+      "image_prompt": "EU flag, Mercosur flag, scales balancing pros and cons",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 10,
+      "title": "2027 프랑스 대선, 극우 정당의 약진?",
+      "content": "마린 르펜의 공직 출마 금지 이후, 극우 정당 RN의 지지율이 상승하고 있습니다. 2027년 대선에서 RN 후보가 결선 투표에 진출할 가능성이 있다는 여론 조사 결과도 나오고 있습니다.",
+      "narration": "2027년 프랑스 대선, 과연 어떤 결과가 나올까요?",
+      "image_prompt": "French election posters, focus on far-right candidates, concerned faces",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 11,
+      "title": "프랑스, 더 이상 EU 수입 관문이 아니다?",
+      "content": "2026년 1월 1일부터 프랑스는 비EU 기업에 대한 Regime 42를 폐지합니다. 이는 프랑스를 통해 EU로 상품을 수입하는 비EU 기업은 프랑스 VAT를 등록하고, VAT 보고서를 제출해야 함을 의미합니다. 이로 인해 프랑스는 더 이상 EU 수입 관문으로서의 매력을 잃을 수 있다는 전망이 나오고 있습니다.",
+      "narration": "프랑스를 통해 유럽으로 수입하는 기업들에게 비상이 걸렸습니다!",
+      "image_prompt": "French customs, stricter regulations, worried business people",
+      "duration_seconds": 40
+    },
+    {
+      "slide_number": 12,
+      "title": "프랑스 이민, 현실적인 비용은?",
+      "content": "2026년 프랑스로 이민을 고려하고 있다면, 현실적인 비용을 알아야 합니다. 주요 도시에서 1년 생활비는 약 27,000~30,000유로, 작은 도시에서는 20,000~23,000유로, 농촌 지역에서는 15,000~17,000유로가 필요합니다.",
+      "narration": "낭만적인 프랑스 이민, 현실은 과연 어떨까요? 꼼꼼하게 따져봐야 합니다.",
+      "image_prompt": "Suitcase with French flag, calculator, concerned face",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 13,
+      "title": "티저: 다음 영상 예고",
+      "content": "다음 영상에서는 프랑스에서 살아남기 위한 꿀팁 대방출! 프랑스어 공부법, 저렴하게 집 구하는 방법, 현지인만 아는 맛집 정보까지! 놓치지 마세요!",
+      "narration": "다음 영상에서는 프랑스 생활 꿀팁을 알려드립니다! 구독하고 알림 설정 잊지 마세요!",
+      "image_prompt": "Excited face, French flag, various tips and icons",
+      "duration_seconds": 20
+    },
+    {
+      "slide_number": 14,
+      "title": "결론: 그럼에도 불구하고, 프랑스는...",
+      "content": "어려운 상황 속에서도 프랑스는 여전히 매력적인 나라입니다. 풍부한 문화, 아름다운 자연, 맛있는 음식은 프랑스 생활의 큰 즐거움입니다.  하지만 현실적인 어려움을 인지하고 준비하는 것이 중요합니다.",
+      "narration": "힘든 현실 속에서도 프랑스는 여전히 아름다운 곳입니다. 하지만 준비된 자만이 살아남을 수 있습니다!",
+      "image_prompt": "Eiffel Tower, beautiful scenery, delicious food, hopeful expression",
+      "duration_seconds": 30
+    },
+    {
+      "slide_number": 15,
+      "title": "아웃트로: 좋아요, 구독, 댓글!",
+      "content": "오늘 영상이 도움이 되셨다면 좋아요와 구독 부탁드립니다! 댓글로 여러분의 프랑스에 대한 생각이나 질문을 남겨주세요. 다음 영상에서 만나요!",
+      "narration": "오늘 영상 재미있게 보셨나요? 좋아요, 구독, 댓글 잊지 마세요! 감사합니다!",
+      "image_prompt": "End screen, subscribe button, like button, comment section",
+      "duration_seconds": 10
+    }
+  ],
+  "hook": "'오늘 출근길은 트랙터 때문에 막혔습니다.' 프랑스 의회를 포위한 농민들의 분노! 지금 바로 확인하세요!",
+  "call_to_action": "현지 소식을 응원하신다면 좋아요 눌러주세요! 여러분이 프랑스 시민이라면 마크롱을 지지하시겠습니까? 댓글로 의견을 남겨주세요!",
+  "tags": [
+    "프랑스",
+    "브이로그",
+    "시위",
+    "물가",
+    "마크롱",
+    "EU",
+    "농민",
+    "생활비",
+    "이민",
+    "파리"
+  ],
+  "plan_id": "81071847",
+  "created_at": "2026-01-25T13:01:10.218719",
+  "language": "ko"
+}

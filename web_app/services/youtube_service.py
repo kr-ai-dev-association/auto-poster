@@ -220,71 +220,102 @@ class YouTubeService:
         """PDF 분석을 통해 유튜브 메타데이터를 생성합니다. YouTube API 인증 없이 Gemini만 사용."""
         from core.summarizer import GeminiSummarizer
         
-        # PDF 내용 확인
-        if not pdf_content or len(pdf_content) == 0:
-            raise Exception("PDF 파일이 비어있거나 전달되지 않았습니다.")
-        
-        print(f"📄 PDF 파일 수신: {len(pdf_content)} bytes")
+        from typing import Optional
+        import os
+        import tempfile
+        from google.genai import types as types_genai # types conflict avoidance
+        import json
+        import re
+        import string
 
-        # 템플릿 읽기
-        desc_path = os.path.join(self.base_v_dir, category, f'desc_{lang}.md')
+        # Input validation
+        if not text_content and (not pdf_content or len(pdf_content) == 0):
+            raise Exception("PDF 파일 또는 텍스트 내용이 비어있거나 전달되지 않았습니다.")
+
+        if pdf_content:
+            print(f"📄 PDF 파일 수신: {len(pdf_content)} bytes")
+
+        # 템플릿 로드 (카테고리 폴더에서)
+        v_dir = os.path.join(self.base_v_dir, category)
+        desc_path = os.path.join(v_dir, f'desc_{lang}.md')
         if not os.path.exists(desc_path):
-            desc_path = os.path.join(self.base_v_dir, category, 'desc.md')
+             desc_path = os.path.join(v_dir, 'desc.md')
         
         desc_template = ""
         if os.path.exists(desc_path):
             with open(desc_path, 'r', encoding='utf-8') as f:
                 desc_template = f.read()
 
-        # GeminiSummarizer 사용 (YouTube API 인증 불필요)
-        summarizer = GeminiSummarizer()
-        if not summarizer.client:
-            raise Exception("GEMINI_API_KEY가 설정되지 않았습니다.")
-        
         lang_str = "Korean" if lang == 'ko' else "English"
         
-        # YouTube 메타데이터 생성 프롬프트
+        # 프롬프트 구성
         prompt = f"""
-        Analyze the attached PDF and generate YouTube-optimized metadata in {lang_str}.
+        Analyze the provided content (PDF or Text) and generate YouTube-optimized metadata in {lang_str}.
         
         [CRITICAL INSTRUCTIONS]
-        1. Title: Create a click-worthy, dramatic title based on the PDF content.
+        1. Title: Create a click-worthy, dramatic title.
         2. Description: Use the provided [TEMPLATE] below as a reference for style, tone, and structure.
            - Keep the dramatic storytelling opening.
-           - Integrate the CORE findings and value propositions from the PDF into the middle section.
+           - Integrate the CORE findings and value propositions from the content into the middle section.
            - Keep the 'Service & Contact' information at the bottom exactly as in the template.
            - Use Emojis and Unicode bold characters for emphasis (YouTube doesn't support markdown bold).
            - Ensure URLs are plain text so they become clickable on YouTube.
-        3. Tags: Generate 20+ highly relevant hashtags and keywords in {lang_str} based on the PDF content.
+        3. Tags: Generate 20+ highly relevant hashtags and keywords in {lang_str}.
         
         [TEMPLATE]
         {desc_template}
         
-        IMPORTANT: You MUST analyze the PDF content thoroughly and extract key information from it. Do not use generic content.
-        
-             Return ONLY a valid JSON object with NO markdown code blocks, NO explanations, NO extra text.
-             The JSON must be valid and parseable. Follow these strict rules:
-             1. All strings must be properly escaped (use \\n for newlines, \\" for quotes)
-             2. All array items and object properties must be separated by commas
-             3. No trailing commas
-             4. All special characters in strings must be escaped
-             
-             Example format:
-             {{
-               "title": "Your title here",
-               "description": "Your description here with \\n for line breaks",
-               "tags": ["tag1", "tag2", "tag3"]
-             }}
-             
-             Return ONLY the JSON object, nothing else.
-             """
+        Return ONLY a valid JSON object:
+        {{
+          "title": "...",
+          "description": "...",
+          "tags": ["tag1", "tag2", ...]
+        }}
+        """
+
+        summarizer = self.poster.summarizer
+        if not summarizer.client:
+            raise Exception("GEMINI_API_KEY가 설정되지 않았습니다.")
         
         try:
-            print(f"🤖 Gemini API 호출 중... (PDF 크기: {len(pdf_content)} bytes)")
-            response = summarizer.client.models.generate_content(
-                model=summarizer.model_id,
-                contents=[prompt, types.Part.from_bytes(data=pdf_content, mime_type='application/pdf')]
-            )
+            if text_content:
+                print(f"🤖 Gemini API 호출 중... (텍스트 기반, 길이: {len(text_content)})")
+                combined_prompt = f"{prompt}\n\n[CONTENT]\n{text_content}"
+                response = summarizer.client.models.generate_content(
+                    model=summarizer.model_id,
+                    contents=combined_prompt
+                )
+            else:
+                # PDF 처리 로직
+                print(f"🤖 Gemini API 호출 중... (PDF 크기: {len(pdf_content)} bytes)")
+                
+                # PDF 용량이 크므로 File API 사용
+                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
+                    tmp_pdf.write(pdf_content)
+                    tmp_pdf_path = tmp_pdf.name
+                
+                try:
+                    print(f"📤 Uploading PDF to Gemini File API...")
+                    pdf_file_ref = summarizer.client.files.upload(
+                        file=tmp_pdf_path,
+                        config={'mime_type': 'application/pdf'}
+                    )
+                    print(f"✅ PDF Uploaded: {pdf_file_ref.name}")
+                    
+                    response = summarizer.client.models.generate_content(
+                        model=summarizer.model_id,
+                        contents=[prompt, pdf_file_ref]
+                    )
+                except Exception as e:
+                    print(f"⚠️ File API failed: {e}. Falling back to inline (likely to fail if >20MB).")
+                    response = summarizer.client.models.generate_content(
+                        model=summarizer.model_id,
+                        contents=[prompt, types_Part.from_bytes(data=pdf_content, mime_type='application/pdf')]
+                    )
+                finally:
+                    if os.path.exists(tmp_pdf_path):
+                        os.unlink(tmp_pdf_path)
+            
             print(f"✅ Gemini API 응답 수신")
             
             # 원본 응답 로깅 (디버깅용)

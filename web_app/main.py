@@ -367,21 +367,54 @@ async def share_linkedin(
 async def generate_youtube_metadata(
     pdf: UploadFile = File(None),
     pdf_id: str = Form(None),
+    plan_id: str = Form(None),  # 기획안 ID 추가
     category: str = Form(...),
     lang: str = Form("ko"),
     user: models.User = Depends(get_current_user)
 ):
-    """PDF 분석을 통해 유튜브 메타데이터를 생성합니다.
-    pdf 파일을 직접 업로드하거나, pdf_id를 통해 Gen Video에서 사용된 PDF를 참조할 수 있습니다.
+    """PDF 분석 또는 기획 대본을 통해 유튜브 메타데이터를 생성합니다.
+    pdf 파일을 직접 업로드하거나, pdf_id 또는 plan_id를 참조할 수 있습니다.
     """
     if not youtube:
         return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
 
     try:
         from web_app.services.youtube_service import YouTubeMetadataValidator
+        
+        content = None
+        text_content = None
 
-        # PDF 내용 가져오기 (업로드 또는 Gen Video에서 선택)
-        if pdf_id and pdf2mp4:
+        # 1. 기획안(plan_id)이 있는 경우: 대본 텍스트 사용 (PDF 업로드 불필요)
+        if plan_id:
+            plan_path = os.path.join(content_generator.output_dir, f"plan_{plan_id}.json")
+            if os.path.exists(plan_path):
+                import json
+                with open(plan_path, 'r', encoding='utf-8') as f:
+                    plan = json.load(f)
+                
+                # 대본 텍스트 구성
+                title = plan.get('title', 'Untitled')
+                text_content = f"Title: {title}\n\n"
+                
+                # 타겟 독자 등 메타 정보 추가
+                if 'target_audience' in plan:
+                     text_content += f"Target Audience: {plan['target_audience']}\n"
+                if 'video_style' in plan:
+                     text_content += f"Style: {plan['video_style']}\n\n"
+
+                # 슬라이드별 나레이션 합치기
+                for slide in plan.get('slides', []):
+                     num = slide.get('slide_number', 0)
+                     narration = slide.get('narration', '')
+                     content_text = slide.get('content', '')
+                     text_content += f"[Slide {num}]\nContent: {content_text}\nNarration: {narration}\n\n"
+                
+                print(f"📝 기획안({plan_id})에서 대본 추출 완료 (길이: {len(text_content)})")
+            else:
+                return JSONResponse(status_code=404, content={"status": "error", "message": "Plan not found"})
+
+        # 2. PDF 내용 가져오기 (기획안이 없는 경우)
+        elif pdf_id and pdf2mp4:
             # Gen Video에서 선택한 PDF 사용
             pdf_path = pdf2mp4.get_pdf_path(pdf_id)
             if not pdf_path or not os.path.exists(pdf_path):
@@ -392,9 +425,10 @@ async def generate_youtube_metadata(
             # 직접 업로드한 PDF 사용
             content = await pdf.read()
         else:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
+            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file, pdf_id, or plan_id is required"})
 
-        metadata = await youtube.generate_metadata(content, category, lang)
+        # 메타데이터 생성 호출 (text_content가 있으면 우선 사용)
+        metadata = await youtube.generate_metadata(content, category, lang, text_content=text_content)
 
         # 검증 결과 포함
         is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)

@@ -127,10 +127,26 @@ class YouTubeAutoPoster:
               "tags": ["tag1", "tag2", ...]
             }}
             """
-            response = self.summarizer.client.models.generate_content(
-                model=self.summarizer.model_id,
-                contents=[prompt, types.Part.from_bytes(data=pdf_data, mime_type='application/pdf')]
-            )
+            # PDF 파일을 Gemini File API로 업로드 (인라인 전송 한계 극복)
+            print(f"📤 Uploading PDF to Gemini File API...")
+            try:
+                pdf_file_ref = self.summarizer.client.files.upload(
+                    file=pdf_path,
+                    config={'mime_type': 'application/pdf'}
+                )
+                print(f"✅ PDF Uploaded: {pdf_file_ref.name}")
+                
+                response = self.summarizer.client.models.generate_content(
+                    model=self.summarizer.model_id,
+                    contents=[prompt, pdf_file_ref]
+                )
+            except Exception as e:
+                print(f"⚠️ File API Upload/Generate failed: {e}. Falling back to inline data.")
+                # Fallback to inline if upload fails (though unlikely for 400 error)
+                response = self.summarizer.client.models.generate_content(
+                    model=self.summarizer.model_id,
+                    contents=[prompt, types.Part.from_bytes(data=pdf_data, mime_type='application/pdf')]
+                )
             # Remove any markdown code block wrappers if present
             clean_text = re.sub(r'```json\s*|\s*```', '', response.text.strip())
             
