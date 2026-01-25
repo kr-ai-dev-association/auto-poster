@@ -2482,7 +2482,8 @@
 
                     <!-- Image Container -->
                     <div class="max-w-[90vw] max-h-[85vh] flex flex-col items-center" @click.stop>
-                        <img :src="'/api/content/image/download/' + contentGenImagePreview?.filename + '?token=' + localStorage.getItem('access_token')"
+                        <img x-show="contentGenImagePreview?.filename"
+                            :src="contentGenImagePreview?.filename ? '/api/content/image/download/' + contentGenImagePreview.filename + '?token=' + localStorage.getItem('access_token') : ''"
                             class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
 
                         <!-- Image Info -->
@@ -6208,6 +6209,7 @@
                     try {
                         // 0. 오디오 목록에서 해당 파일의 메타데이터 가져오기
                         const audioItem = this.audioGenList.find(a => a.filename === filename);
+                        console.log('Audio item metadata:', audioItem);
 
                         // 1. 오디오 파일을 서버에서 가져와서 File 객체로 변환
                         const token = localStorage.getItem('access_token');
@@ -6232,21 +6234,56 @@
                             }
                         }
 
-                        // 5. PDF 파일이 메타데이터에 있으면 자동 로드 시도
+                        // 5. PDF 파일 자동 설정
                         let pdfLoaded = false;
                         if (audioItem?.pdf_filename) {
-                            try {
-                                // 콘텐츠 생성기에서 만든 PDF인지 확인 (generated_pdfs 폴더)
-                                const pdfUrl = `/api/content/pdf/download/${audioItem.pdf_filename}?token=${token}`;
-                                const pdfResponse = await fetch(pdfUrl);
-                                if (pdfResponse.ok) {
-                                    const pdfBlob = await pdfResponse.blob();
-                                    const pdfFile = new File([pdfBlob], audioItem.pdf_filename, { type: 'application/pdf' });
-                                    this.genVideoPdf = pdfFile;
-                                    pdfLoaded = true;
+                            const pdfFilename = audioItem.pdf_filename;
+                            console.log('Looking for PDF:', pdfFilename);
+
+                            // generatedPdfs 목록에서 일치하는 PDF 찾기
+                            const matchingPdf = this.generatedPdfs.find(pdf =>
+                                pdf.original_name === pdfFilename ||
+                                pdf.filename === pdfFilename ||
+                                pdf.original_name?.includes(pdfFilename.replace('.pdf', '')) ||
+                                pdfFilename.includes(pdf.original_name?.replace('.pdf', '') || '')
+                            );
+
+                            if (matchingPdf) {
+                                // generatedPdfs에서 찾은 경우 - 다운로드하여 File 객체로 설정
+                                try {
+                                    const pdfUrl = `/api/genvideo/pdf/download/${matchingPdf.id}?token=${token}`;
+                                    const pdfResponse = await fetch(pdfUrl);
+                                    if (pdfResponse.ok) {
+                                        const pdfBlob = await pdfResponse.blob();
+                                        const pdfFile = new File([pdfBlob], matchingPdf.original_name || pdfFilename, { type: 'application/pdf' });
+                                        this.genVideoPdf = pdfFile;
+                                        pdfLoaded = true;
+                                        console.log('Found and downloaded PDF from generatedPdfs:', matchingPdf);
+                                    }
+                                } catch (e) {
+                                    console.log('Failed to download PDF from generatedPdfs:', e);
                                 }
-                            } catch (e) {
-                                console.log('PDF not found in generated_pdfs, user needs to select manually');
+                            }
+
+                            // generatedPdfs에서 못 찾았거나 다운로드 실패한 경우 - 직접 다운로드 시도
+                            if (!pdfLoaded) {
+                                try {
+                                    // genvideo API 시도 (파일명으로)
+                                    let pdfResponse = await fetch(`/api/genvideo/pdf/download/${pdfFilename}?token=${token}`);
+                                    if (!pdfResponse.ok) {
+                                        // content API 시도
+                                        pdfResponse = await fetch(`/api/content/pdf/download/${pdfFilename}?token=${token}`);
+                                    }
+                                    if (pdfResponse.ok) {
+                                        const pdfBlob = await pdfResponse.blob();
+                                        const pdfFile = new File([pdfBlob], pdfFilename, { type: 'application/pdf' });
+                                        this.genVideoPdf = pdfFile;
+                                        pdfLoaded = true;
+                                        console.log('Downloaded PDF directly by filename');
+                                    }
+                                } catch (e) {
+                                    console.log('PDF download failed:', e);
+                                }
                             }
                         }
 
