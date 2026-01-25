@@ -1715,17 +1715,65 @@
                             </div>
                         </div>
 
-                        <!-- OCR Subtitle Section -->
-                        <div class="w-1/2 p-4 flex flex-col">
-                            <h3 class="flex-shrink-0 text-sm font-bold text-white mb-3">OCR 자막</h3>
-                            <div class="flex-grow bg-gray-800 rounded-lg p-4 overflow-y-auto min-h-0">
-                                <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.ocrText">
-                                    <p class="text-gray-300 text-sm whitespace-pre-wrap"
-                                       x-text="timingEditorSlides[timingEditorCurrentSlide]?.ocrText"></p>
-                                </template>
-                                <template x-if="timingEditorSlides.length === 0 || !timingEditorSlides[timingEditorCurrentSlide]?.ocrText">
-                                    <p class="text-gray-500 text-sm">OCR 텍스트가 없습니다</p>
-                                </template>
+                        <!-- Right Panel: OCR (Top 1/3) + Audio Transcript (Bottom 2/3) -->
+                        <div class="w-1/2 p-4 flex flex-col gap-3">
+                            <!-- OCR 자막 (상단 1/3) -->
+                            <div class="flex flex-col min-h-0" style="flex: 1 1 0;">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        OCR 텍스트
+                                    </h3>
+                                    <span class="text-xs text-gray-500" x-text="'슬라이드 ' + (timingEditorCurrentSlide + 1)"></span>
+                                </div>
+                                <div class="flex-grow bg-gray-800 rounded-lg p-3 overflow-y-auto min-h-0 border border-gray-700">
+                                    <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.ocrText">
+                                        <p class="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed"
+                                           x-text="timingEditorSlides[timingEditorCurrentSlide]?.ocrText"></p>
+                                    </template>
+                                    <template x-if="timingEditorSlides.length === 0 || !timingEditorSlides[timingEditorCurrentSlide]?.ocrText">
+                                        <p class="text-gray-500 text-sm italic">OCR 텍스트가 없습니다</p>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- 오디오 텍스트 (하단 2/3) -->
+                            <div class="flex flex-col min-h-0" style="flex: 2 1 0;">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                                        </svg>
+                                        오디오 (Whisper)
+                                    </h3>
+                                    <span class="text-xs text-gray-500"
+                                          x-text="getCurrentSlideTranscript().length > 0 ? getCurrentSlideTranscript().length + '개 세그먼트' : ''"></span>
+                                </div>
+                                <div class="flex-grow bg-gray-800 rounded-lg p-3 overflow-y-auto min-h-0 border border-gray-700">
+                                    <template x-if="getCurrentSlideTranscript().length > 0">
+                                        <div class="space-y-2">
+                                            <template x-for="(seg, idx) in getCurrentSlideTranscript()" :key="idx">
+                                                <div class="flex gap-2 text-sm">
+                                                    <span class="flex-shrink-0 text-xs text-purple-400 font-mono w-20"
+                                                          x-text="formatTimecode(seg.start) + ' →'"></span>
+                                                    <p class="text-gray-300 leading-relaxed" x-text="seg.text"></p>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="getCurrentSlideTranscript().length === 0">
+                                        <p class="text-gray-500 text-sm italic">
+                                            <template x-if="timingEditorTranscriptSegments.length === 0">
+                                                <span>오디오 텍스트가 없습니다 (Smart 모드로 생성된 영상만 지원)</span>
+                                            </template>
+                                            <template x-if="timingEditorTranscriptSegments.length > 0">
+                                                <span>이 슬라이드 구간에 오디오가 없습니다</span>
+                                            </template>
+                                        </p>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1774,11 +1822,26 @@
                                     <span x-text="timingEditorSaving ? '저장 중...' : '타이밍 저장'"></span>
                                 </button>
 
+                                <!-- 재변환 진행률 표시 -->
+                                <div x-show="timingEditorReencoding" class="flex items-center gap-3 bg-gray-800 rounded-lg px-3 py-2 min-w-[200px]">
+                                    <div class="flex-grow">
+                                        <div class="flex items-center justify-between text-xs mb-1">
+                                            <span class="text-gray-300" x-text="timingEditorReencodeStatus || '준비 중...'"></span>
+                                            <span class="text-purple-400 font-mono" x-text="timingEditorReencodeProgress + '%'"></span>
+                                        </div>
+                                        <div class="w-full bg-gray-700 rounded-full h-2">
+                                            <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
+                                                 :style="'width: ' + timingEditorReencodeProgress + '%'"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- 저장된 상태: 영상 재변환 버튼 -->
                                 <button x-show="timingEditorSaved"
                                     @click="reencodeVideo()"
                                     :disabled="timingEditorTimings.length === 0 || timingEditorReencoding"
-                                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all animate-pulse">
+                                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
+                                    :class="{'animate-pulse': !timingEditorReencoding}">
                                     <template x-if="timingEditorReencoding">
                                         <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -1890,6 +1953,7 @@
                             <table class="w-full text-sm">
                                 <thead class="bg-gray-700">
                                     <tr>
+                                        <th class="px-2 py-2 text-center text-gray-300 w-10">순서</th>
                                         <th class="px-4 py-2 text-left text-gray-300">슬라이드</th>
                                         <th class="px-4 py-2 text-left text-gray-300">시작 시간</th>
                                         <th class="px-4 py-2 text-left text-gray-300">종료 시간</th>
@@ -1897,11 +1961,28 @@
                                         <th class="px-4 py-2 text-center text-gray-300">이동</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <template x-for="(timing, idx) in timingEditorTimings" :key="idx">
-                                        <tr class="border-t border-gray-700 hover:bg-gray-700/50"
-                                            :class="idx === timingEditorCurrentSlide ? 'bg-purple-900/30' : ''">
-                                            <td class="px-4 py-2 text-white cursor-pointer" @click="jumpToSlide(idx)" x-text="'슬라이드 ' + (idx + 1)"></td>
+                                <tbody x-ref="timingTableBody">
+                                    <template x-for="(timing, idx) in timingEditorTimings" :key="'timing-row-' + idx">
+                                        <tr class="border-t border-gray-700 hover:bg-gray-700/50 transition-all"
+                                            :class="{
+                                                'bg-purple-900/30': idx === timingEditorCurrentSlide,
+                                                'opacity-50': timingEditorDragIdx !== null && timingEditorDragIdx === idx,
+                                                'border-t-2 border-t-yellow-500': timingEditorDropIdx === idx && timingEditorDragIdx !== null && timingEditorDragIdx !== idx,
+                                                'border-b-2 border-b-yellow-500': timingEditorDropIdx === idx + 1 && timingEditorDragIdx !== null && idx === timingEditorTimings.length - 1
+                                            }"
+                                            draggable="true"
+                                            @dragstart="startSlideReorder($event, idx)"
+                                            @dragend="endSlideReorder()"
+                                            @dragover.prevent="updateDropTarget($event, idx)"
+                                            @dragleave="clearDropTarget($event)"
+                                            @drop.prevent="dropSlide($event, idx)">
+                                            <!-- 드래그 핸들 -->
+                                            <td class="px-2 py-2 text-center cursor-grab active:cursor-grabbing">
+                                                <svg class="w-4 h-4 mx-auto text-gray-500 hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+                                                </svg>
+                                            </td>
+                                            <td class="px-4 py-2 text-white cursor-pointer" @click="jumpToSlide(idx)" x-text="'슬라이드 ' + (timing.originalPage !== undefined ? timing.originalPage + 1 : idx + 1)"></td>
                                             <td class="px-2 py-1">
                                                 <input type="text"
                                                     :value="formatTimecodeEditable(timing.start)"
@@ -1930,7 +2011,7 @@
                                 </tbody>
                             </table>
                             <div class="px-4 py-2 bg-gray-700/50 text-xs text-gray-400">
-                                💡 시간 형식: 분:초.밀리초 (예: 2:35.5) 또는 초 (예: 155.5)
+                                💡 시간 형식: 분:초.밀리초 (예: 2:35.5) 또는 초 (예: 155.5) | 드래그 핸들(≡)로 슬라이드 순서 변경 가능
                             </div>
                         </div>
                     </div>
@@ -2265,6 +2346,11 @@
                 timingEditorPanX: 0,  // 패닝 X
                 timingEditorPanY: 0,  // 패닝 Y
                 timingEditorIsPanning: false,  // 패닝 중
+                timingEditorDragIdx: null,  // 드래그 중인 슬라이드 인덱스
+                timingEditorDropIdx: null,  // 드롭 대상 인덱스
+                timingEditorTranscriptSegments: [],  // Whisper 오디오 세그먼트
+                timingEditorReencodeProgress: 0,  // 재변환 진행률 (0-100)
+                timingEditorReencodeStatus: '',  // 재변환 상태 메시지
 
                 async init() {
                     const token = localStorage.getItem('access_token');
@@ -2848,6 +2934,105 @@
                     this.timingEditorIsPanning = false;
                 },
 
+                // Slide Drag & Drop Reorder Functions
+                startSlideReorder(e, idx) {
+                    this.timingEditorDragIdx = idx;
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', idx.toString());
+                    // 드래그 이미지를 위한 약간의 투명도
+                    e.target.style.opacity = '0.5';
+                },
+
+                endSlideReorder() {
+                    // 드래그 종료 시 상태 초기화
+                    this.timingEditorDragIdx = null;
+                    this.timingEditorDropIdx = null;
+                },
+
+                updateDropTarget(e, idx) {
+                    if (this.timingEditorDragIdx === null) return;
+                    if (this.timingEditorDragIdx === idx) return;
+
+                    // 마우스 위치에 따라 위/아래 구분
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+
+                    if (e.clientY < midY) {
+                        // 해당 항목 위에 드롭
+                        this.timingEditorDropIdx = idx;
+                    } else {
+                        // 해당 항목 아래에 드롭
+                        this.timingEditorDropIdx = idx + 1;
+                    }
+
+                    e.dataTransfer.dropEffect = 'move';
+                },
+
+                clearDropTarget(e) {
+                    // 실제로 떠난 경우에만 초기화 (자식 요소로 이동은 무시)
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
+                        // 다른 행으로 이동하는 경우에는 초기화하지 않음
+                    }
+                },
+
+                dropSlide(e, idx) {
+                    e.preventDefault();
+
+                    const fromIdx = this.timingEditorDragIdx;
+                    let toIdx = this.timingEditorDropIdx;
+
+                    if (fromIdx === null || toIdx === null) return;
+                    if (fromIdx === toIdx || fromIdx === toIdx - 1) {
+                        // 같은 위치면 아무것도 하지 않음
+                        this.endSlideReorder();
+                        return;
+                    }
+
+                    // 타이밍 배열 순서 변경
+                    const timings = [...this.timingEditorTimings];
+                    const [movedTiming] = timings.splice(fromIdx, 1);
+
+                    // toIdx 조정 (앞에서 제거했으므로)
+                    if (fromIdx < toIdx) {
+                        toIdx--;
+                    }
+
+                    timings.splice(toIdx, 0, movedTiming);
+
+                    // 슬라이드 이미지 배열도 함께 변경
+                    const slides = [...this.timingEditorSlides];
+                    const [movedSlide] = slides.splice(fromIdx, 1);
+                    slides.splice(toIdx, 0, movedSlide);
+
+                    // 타이밍 재계산 (각 슬라이드의 지속시간 유지)
+                    let currentTime = 0;
+                    for (let i = 0; i < timings.length; i++) {
+                        const duration = timings[i].end - timings[i].start;
+                        timings[i].start = currentTime;
+                        timings[i].end = currentTime + duration;
+                        timings[i].subtitle_index = i;  // 인덱스 업데이트
+                        currentTime = timings[i].end;
+                    }
+
+                    // 상태 업데이트
+                    this.timingEditorTimings = timings;
+                    this.timingEditorSlides = slides;
+
+                    // 현재 슬라이드 인덱스 조정
+                    if (this.timingEditorCurrentSlide === fromIdx) {
+                        this.timingEditorCurrentSlide = toIdx;
+                    } else if (fromIdx < this.timingEditorCurrentSlide && toIdx >= this.timingEditorCurrentSlide) {
+                        this.timingEditorCurrentSlide--;
+                    } else if (fromIdx > this.timingEditorCurrentSlide && toIdx <= this.timingEditorCurrentSlide) {
+                        this.timingEditorCurrentSlide++;
+                    }
+
+                    // 드래그 상태 초기화
+                    this.endSlideReorder();
+
+                    console.log(`슬라이드 순서 변경: ${fromIdx} → ${toIdx}`);
+                },
+
                 formatTimecode(seconds) {
                     if (!seconds || isNaN(seconds)) return '0:00';
                     const mins = Math.floor(seconds / 60);
@@ -3005,6 +3190,10 @@
                             // OCR 텍스트가 있으면 미리 저장
                             const pageTexts = data.pageTexts || [];
 
+                            // Whisper 트랜스크립트 세그먼트 로드
+                            this.timingEditorTranscriptSegments = data.transcriptSegments || [];
+                            console.log('Transcript segments loaded:', this.timingEditorTranscriptSegments.length);
+
                             // 슬라이드 플레이스홀더 생성 (이미지는 나중에 개별 로드, OCR 텍스트는 미리 저장)
                             this.timingEditorSlides = Array.from({length: this.timingEditorNumSlides}, (_, i) => ({
                                 index: i,
@@ -3067,9 +3256,29 @@
                     this.timingEditorCurrentSlide = 0;
                     this.timingEditorNumSlides = 0;
                     this.timingEditorFrames = [];
+                    this.timingEditorTranscriptSegments = [];
+                    this.timingEditorReencodeProgress = 0;
+                    this.timingEditorReencodeStatus = '';
                     if (this.$refs.timingEditorVideo) {
                         this.$refs.timingEditorVideo.src = '';
                     }
+                },
+
+                // 현재 슬라이드 시간대에 해당하는 오디오 세그먼트 반환
+                getCurrentSlideTranscript() {
+                    if (this.timingEditorTranscriptSegments.length === 0) return [];
+                    if (this.timingEditorCurrentSlide < 0 || this.timingEditorCurrentSlide >= this.timingEditorTimings.length) return [];
+
+                    const timing = this.timingEditorTimings[this.timingEditorCurrentSlide];
+                    if (!timing) return [];
+
+                    const slideStart = timing.start;
+                    const slideEnd = timing.start + timing.duration;
+
+                    // 현재 슬라이드 시간 범위와 겹치는 세그먼트 필터링
+                    return this.timingEditorTranscriptSegments.filter(seg => {
+                        return seg.end > slideStart && seg.start < slideEnd;
+                    });
                 },
 
                 playPauseTimingEditor() {
@@ -3336,6 +3545,9 @@
                     }
 
                     this.timingEditorReencoding = true;
+                    this.timingEditorReencodeProgress = 0;
+                    this.timingEditorReencodeStatus = '준비 중...';
+
                     const token = localStorage.getItem('access_token');
                     const oldVideoId = this.timingEditorSelectedVideo;
 
@@ -3343,7 +3555,7 @@
                         // 먼저 타이밍 저장
                         await this.saveTimings();
 
-                        // 재변환 요청
+                        // 재변환 요청 (비동기 모드)
                         const response = await fetch(`/api/genvideo/reencode/${oldVideoId}`, {
                             method: 'POST',
                             headers: {
@@ -3351,52 +3563,104 @@
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                timings: this.timingEditorTimings
+                                timings: this.timingEditorTimings,
+                                async: true
                             })
                         });
 
-                        const data = await response.json();
-                        if (data.status === 'success') {
-                            const newVideoId = data.video?.id;
+                        const startData = await response.json();
 
-                            // 기존 영상 삭제
-                            try {
-                                const deleteResponse = await fetch(`/api/genvideo/${oldVideoId}`, {
-                                    method: 'DELETE',
-                                    headers: { 'Authorization': `Bearer ${token}` }
-                                });
-                                const deleteData = await deleteResponse.json();
-                                if (deleteData.status === 'success') {
-                                    console.log(`기존 영상 삭제 완료: ${oldVideoId}`);
-                                } else {
-                                    console.warn(`기존 영상 삭제 실패: ${deleteData.message}`);
+                        if (startData.status === 'started') {
+                            // 진행률 폴링 시작
+                            const reencodeId = startData.reencode_id;
+                            console.log('재변환 시작:', reencodeId);
+
+                            // 진행률 폴링
+                            const result = await this.pollReencodeProgress(reencodeId);
+
+                            if (result && result.status === 'success') {
+                                const newVideoId = result.video?.id;
+
+                                alert(`영상 재변환이 완료되었습니다!\n새 영상: ${result.video?.filename || '새 영상'}`);
+
+                                // 영상 목록 새로고침
+                                await this.refreshGenVideoList();
+
+                                // 새 영상으로 타이밍 에디터 로드
+                                if (newVideoId) {
+                                    this.timingEditorSelectedVideo = newVideoId;
+                                    await this.loadTimingEditorVideo();
                                 }
-                            } catch (deleteError) {
-                                console.warn('기존 영상 삭제 중 오류:', deleteError);
+
+                                // 저장 상태 리셋
+                                this.timingEditorSaved = false;
+                            } else {
+                                alert('재변환 실패: ' + (result?.message || '알 수 없는 오류'));
                             }
-
-                            alert(`영상 재변환이 완료되었습니다!\n새 영상: ${data.video?.filename || '새 영상'}\n기존 영상은 삭제되었습니다.`);
-
-                            // 영상 목록 새로고침
+                        } else if (startData.status === 'success') {
+                            // 동기 모드 응답 (fallback)
+                            const newVideoId = startData.video?.id;
+                            alert(`영상 재변환이 완료되었습니다!\n새 영상: ${startData.video?.filename || '새 영상'}`);
                             await this.refreshGenVideoList();
-
-                            // 새 영상으로 타이밍 에디터 로드
                             if (newVideoId) {
                                 this.timingEditorSelectedVideo = newVideoId;
                                 await this.loadTimingEditorVideo();
                             }
-
-                            // 저장 상태 리셋
                             this.timingEditorSaved = false;
                         } else {
-                            alert('재변환 실패: ' + (data.message || '알 수 없는 오류'));
+                            alert('재변환 실패: ' + (startData.message || '알 수 없는 오류'));
                         }
                     } catch (error) {
                         console.error('Error re-encoding video:', error);
                         alert('재변환 중 오류가 발생했습니다.');
                     } finally {
                         this.timingEditorReencoding = false;
+                        this.timingEditorReencodeProgress = 0;
+                        this.timingEditorReencodeStatus = '';
                     }
+                },
+
+                // 재변환 진행률 폴링
+                async pollReencodeProgress(reencodeId) {
+                    const token = localStorage.getItem('access_token');
+                    const maxPolls = 600;  // 최대 10분 (1초 간격)
+                    let pollCount = 0;
+
+                    while (pollCount < maxPolls) {
+                        try {
+                            const response = await fetch(`/api/genvideo/progress/${reencodeId}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+
+                                if (data.status === 'success') {
+                                    this.timingEditorReencodeProgress = data.progress || 0;
+                                    this.timingEditorReencodeStatus = data.message || '';
+
+                                    // 완료 체크
+                                    if (data.step === 'complete' && data.result) {
+                                        return data.result;
+                                    }
+
+                                    // 에러 체크
+                                    if (data.step === 'error') {
+                                        return { status: 'error', message: data.message };
+                                    }
+                                }
+                            }
+
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            pollCount++;
+                        } catch (error) {
+                            console.error('Progress polling error:', error);
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            pollCount++;
+                        }
+                    }
+
+                    return { status: 'error', message: '재변환 시간 초과' };
                 },
 
                 exportTimingsSRT() {
@@ -4319,9 +4583,25 @@
                     this.mainTab = 'youtube';
                     this.ytVideoSource = 'genvideo';
                     this.selectedGenVideo = video.id;
-                    // PDF도 자동 선택
+
+                    // PDF 자동 선택: pdf_name으로 generatedPdfs에서 찾기
                     this.ytPdfSource = 'genvideo';
-                    this.selectedGenPdf = video.id;
+                    if (video.pdf_name && this.generatedPdfs.length > 0) {
+                        // pdf_name과 일치하는 PDF 찾기 (original_name 또는 파일명 비교)
+                        const matchingPdf = this.generatedPdfs.find(pdf =>
+                            pdf.original_name === video.pdf_name ||
+                            pdf.filename === video.pdf_name ||
+                            pdf.filename.includes(video.pdf_name.replace('.pdf', ''))
+                        );
+                        if (matchingPdf) {
+                            this.selectedGenPdf = matchingPdf.id;
+                        } else {
+                            this.selectedGenPdf = '';
+                            console.log('PDF not found for:', video.pdf_name);
+                        }
+                    } else {
+                        this.selectedGenPdf = '';
+                    }
                 },
 
                 async postToLinkedInFromManage(video) {

@@ -774,6 +774,7 @@ async def list_videos_for_management(
             'category': video.get('category', ''),
             'ocr_lang': video.get('ocr_lang', ''),
             'created_by': video.get('created_by', user.email if user else ''),
+            'pdf_name': video.get('pdf_name', ''),
         }
         enhanced_videos.append(enhanced_video)
 
@@ -958,6 +959,7 @@ async def get_video_timing(
 
     timings = []
     page_texts = []
+    transcript_segments = []
     duration = 0
     num_slides = 0
 
@@ -968,6 +970,7 @@ async def get_video_timing(
                 data = json.load(f)
                 timings = data.get('timings', [])
                 page_texts = data.get('page_texts', [])
+                transcript_segments = data.get('transcript_segments', [])
                 num_slides = len(timings)
                 # 타이밍에서 duration 계산
                 if timings:
@@ -999,6 +1002,7 @@ async def get_video_timing(
         "status": "success",
         "timings": timings,
         "pageTexts": page_texts,
+        "transcriptSegments": transcript_segments,
         "numSlides": num_slides,
         "duration": duration
     })
@@ -1144,8 +1148,9 @@ async def reencode_video(
     background_tasks: BackgroundTasks,
     user: models.User = Depends(get_current_user)
 ):
-    """편집된 타이밍으로 영상을 재변환합니다."""
+    """편집된 타이밍으로 영상을 재변환합니다 (비동기 방식)."""
     import json
+    import uuid
     from pdf2image import convert_from_bytes
 
     if not pdf2mp4:
@@ -1157,6 +1162,7 @@ async def reencode_video(
     try:
         data = await request.json()
         timings = data.get('timings', [])
+        async_mode = data.get('async', True)  # 기본적으로 비동기 모드
 
         if not timings:
             return JSONResponse(
@@ -1183,15 +1189,46 @@ async def reencode_video(
         # 오디오 파일 경로 (영상에서 추출하거나 기존 오디오 사용)
         video_path = video_info.get('file_path')
 
-        # 동기적으로 재변환 수행
-        result = await pdf2mp4.reencode_with_timings(
-            video_id=video_id,
-            pdf_path=pdf_path,
-            video_path=video_path,
-            timings=timings
-        )
+        # 새 reencode_id 생성 (진행률 추적용)
+        reencode_id = str(uuid.uuid4())[:8]
 
-        return JSONResponse(content=result)
+        if async_mode:
+            # 비동기 모드: 즉시 reencode_id 반환하고 백그라운드에서 처리
+            import asyncio
+
+            async def run_reencode():
+                result = await pdf2mp4.reencode_with_timings(
+                    video_id=video_id,
+                    pdf_path=pdf_path,
+                    video_path=video_path,
+                    timings=timings
+                )
+                # 결과를 진행률 저장소에 저장
+                pdf2mp4.update_progress(
+                    result.get('reencode_id', reencode_id),
+                    'complete' if result.get('status') == 'success' else 'error',
+                    100 if result.get('status') == 'success' else 0,
+                    '✅ 재변환 완료!' if result.get('status') == 'success' else f"❌ 오류: {result.get('message', '')}",
+                    result  # 결과 데이터도 저장
+                )
+
+            # 백그라운드에서 실행
+            asyncio.create_task(run_reencode())
+
+            return JSONResponse(content={
+                "status": "started",
+                "message": "재변환이 시작되었습니다",
+                "reencode_id": reencode_id
+            })
+        else:
+            # 동기 모드: 완료까지 대기
+            result = await pdf2mp4.reencode_with_timings(
+                video_id=video_id,
+                pdf_path=pdf_path,
+                video_path=video_path,
+                timings=timings
+            )
+            return JSONResponse(content=result)
 
     except Exception as e:
         print(f"Error re-encoding video: {e}")

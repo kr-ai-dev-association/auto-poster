@@ -122,15 +122,20 @@ class PDF2MP4Service:
         return cls._progress_store.get(video_id)
 
     @classmethod
-    def update_progress(cls, video_id: str, stage: str, progress: int, message: str, eta: Optional[int] = None):
-        cls._progress_store[video_id] = {
+    def update_progress(cls, video_id: str, stage: str, progress: int, message: str, eta_or_result: Optional[Any] = None):
+        progress_data = {
             'video_id': video_id,
-            'stage': stage,
+            'step': stage,
             'progress': progress,
             'message': message,
-            'eta': eta,
             'timestamp': datetime.now().isoformat()
         }
+        # eta_or_result가 dict이면 result로, 숫자면 eta로 처리
+        if isinstance(eta_or_result, dict):
+            progress_data['result'] = eta_or_result
+        else:
+            progress_data['eta'] = eta_or_result
+        cls._progress_store[video_id] = progress_data
 
     @classmethod
     def clear_progress(cls, video_id: str):
@@ -478,6 +483,75 @@ class PDF2MP4Service:
             print(f"[{video_id}]   예시: {sample}")
 
         return enhanced_texts
+
+    def _find_page_mentions_in_transcript(
+        self,
+        segments: List[Dict],
+        num_pages: int,
+        video_id: str = ""
+    ) -> Dict[int, float]:
+        """
+        Whisper 세그먼트에서 'Page X' 언급을 탐지하여 페이지별 시작 시간 추출
+
+        Args:
+            segments: Whisper 세그먼트 목록
+            num_pages: PDF 총 페이지 수
+            video_id: 로깅용 비디오 ID
+
+        Returns:
+            {페이지번호: 언급시간} 딕셔너리 (1-indexed)
+        """
+        # 영어 숫자 단어 -> 숫자 매핑
+        number_words = {
+            'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+            'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+            'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+            'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
+            'first': 1, 'second': 2, 'third': 3, 'fourth': 4, 'fifth': 5,
+            'sixth': 6, 'seventh': 7, 'eighth': 8, 'ninth': 9, 'tenth': 10
+        }
+
+        page_mentions = {}  # {page_num: earliest_mention_time}
+
+        for seg in segments:
+            text = seg.get('text', '').lower()
+            seg_time = seg['start']
+
+            # 패턴 1: "page two", "page three" 등 영어 단어
+            for word, num in number_words.items():
+                # "page two", "page 2" 패턴
+                if f"page {word}" in text and num <= num_pages:
+                    if num not in page_mentions or seg_time < page_mentions[num]:
+                        page_mentions[num] = seg_time
+                # "slide two", "slide 2" 패턴도 지원
+                if f"slide {word}" in text and num <= num_pages:
+                    if num not in page_mentions or seg_time < page_mentions[num]:
+                        page_mentions[num] = seg_time
+
+            # 패턴 2: "page 2", "page 10" 등 숫자
+            import re
+            # "page X" 패턴
+            for match in re.finditer(r'page\s*(\d+)', text):
+                num = int(match.group(1))
+                if 1 <= num <= num_pages:
+                    if num not in page_mentions or seg_time < page_mentions[num]:
+                        page_mentions[num] = seg_time
+
+            # "slide X" 패턴
+            for match in re.finditer(r'slide\s*(\d+)', text):
+                num = int(match.group(1))
+                if 1 <= num <= num_pages:
+                    if num not in page_mentions or seg_time < page_mentions[num]:
+                        page_mentions[num] = seg_time
+
+        if page_mentions:
+            print(f"[{video_id}] 📌 Page 언급 탐지 결과: {len(page_mentions)}개 페이지")
+            for page_num in sorted(page_mentions.keys()):
+                print(f"[{video_id}]   Page {page_num}: {page_mentions[page_num]:.1f}초")
+        else:
+            print(f"[{video_id}] ⚠️ Page 언급을 찾지 못함 (키워드 매칭으로 폴백)")
+
+        return page_mentions
 
     def _extract_keywords_from_page(self, text: str, min_length: int = 4) -> List[str]:
         """페이지 텍스트에서 중요 키워드 추출"""
@@ -1197,6 +1271,7 @@ class PDF2MP4Service:
                 'created_by': created_by,
                 'duration': video_duration,
                 'mode': 'basic',
+                'pdf_name': filename,  # 원본 PDF 파일명
                 'created_at': datetime.utcnow().isoformat()
             }
             with open(meta_file, 'w', encoding='utf-8') as f:
@@ -1441,13 +1516,23 @@ class PDF2MP4Service:
             # 타이밍 정보를 JSON 파일로 저장 (타이밍 편집기용) - OCR 텍스트 포함
             import json
             timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
+            # Whisper 세그먼트를 간소화하여 저장 (타이밍 편집기용)
+            simplified_segments = []
+            for seg in segments:
+                simplified_segments.append({
+                    'start': round(seg.get('start', 0), 2),
+                    'end': round(seg.get('end', 0), 2),
+                    'text': seg.get('text', '').strip()
+                })
+
             timing_data = {
                 'timings': page_timings,
-                'page_texts': page_texts if page_texts else []
+                'page_texts': page_texts if page_texts else [],
+                'transcript_segments': simplified_segments  # Whisper 세그먼트 추가
             }
             with open(timing_file, 'w', encoding='utf-8') as f:
                 json.dump(timing_data, f, ensure_ascii=False, indent=2)
-            print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 포함)")
+            print(f"[{video_id}] 타이밍 정보 저장: {timing_file} (OCR 텍스트 + Whisper 세그먼트 포함)")
 
             # 메타데이터 파일 저장 (영상 관리용)
             meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
@@ -1457,6 +1542,7 @@ class PDF2MP4Service:
                 'created_by': created_by,
                 'duration': video_duration,
                 'mode': 'smart',
+                'pdf_name': filename,  # 원본 PDF 파일명
                 'created_at': datetime.utcnow().isoformat()
             }
             with open(meta_file, 'w', encoding='utf-8') as f:
@@ -1524,10 +1610,10 @@ class PDF2MP4Service:
     ) -> List[Dict[str, float]]:
         """PDF 페이지 키워드와 Whisper 트랜스크립트를 매칭하여 페이지 타이밍 계산
 
-        개선된 알고리즘 v2:
-        1. 전체 남은 시간 범위에서 검색 (제한된 마진 대신)
-        2. 키워드 + 의미적 유사도 + 위치 근접도를 결합
-        3. 최소 페이지 표시 시간 보장하되 짧은 슬라이드도 허용
+        개선된 알고리즘 v3 (하이브리드):
+        1. 우선순위 1: "Page X" 언급 탐지 (신뢰도 95%)
+        2. 우선순위 2: 키워드 + 의미적 유사도 매칭
+        3. 앵커 포인트 기반 구간 분할 및 보간
         4. 순차적 제약 조건 유지 (페이지 순서 보장)
         """
 
@@ -1544,14 +1630,17 @@ class PDF2MP4Service:
             print(f"[{video_id}] 텍스트 없음 - 균등 분배 사용")
             return self._calculate_equal_timings(segments, num_pages, total_duration)
 
-        print(f"[{video_id}] 🔍 키워드 + 의미적 유사도 기반 페이지 매칭 시작 (v2)")
+        print(f"[{video_id}] 🔍 하이브리드 페이지 매칭 시작 (v3: Page언급 + 키워드 + 의미)")
 
         # 디버그: Whisper 세그먼트 샘플
         print(f"[{video_id}] 📝 Whisper 세그먼트 샘플:")
         for seg in segments[:5]:
             print(f"[{video_id}]   [{seg['start']:.1f}s] {seg.get('text', '')[:80]}")
 
-        # 각 페이지별 키워드 추출
+        # ========== 1단계: Page 언급 탐지 (최우선) ==========
+        page_mentions = self._find_page_mentions_in_transcript(segments, num_pages, video_id)
+
+        # ========== 2단계: 키워드 추출 ==========
         page_keywords = []
         print(f"[{video_id}] 📄 페이지별 키워드:")
         for i, pt in enumerate(page_texts):
@@ -1562,76 +1651,75 @@ class PDF2MP4Service:
 
         # 기본 설정
         base_page_duration = total_duration / num_pages
-        min_page_duration = 3.0  # 최소 페이지 표시 시간 (짧은 슬라이드 허용을 위해 5초→3초)
+        min_page_duration = 3.0
 
-        # 첫 페이지는 항상 0초, 신뢰도 1.0
-        page_start_times = [0.0]
-        page_confidences = [1.0]
+        # ========== 3단계: 앵커 포인트 설정 ==========
+        # Page 언급이 있는 페이지를 앵커로 사용
+        # 첫 페이지는 항상 0초 (앵커)
+        anchors = {1: 0.0}  # {page_num: start_time}
+        anchor_confidences = {1: 1.0}
 
-        # Semantic similarity 사용 가능 여부 확인
+        # Page 언급을 앵커에 추가
+        for page_num, mention_time in page_mentions.items():
+            anchors[page_num] = mention_time
+            anchor_confidences[page_num] = 0.95  # 높은 신뢰도
+
+        print(f"[{video_id}] ⚓ 앵커 포인트: {len(anchors)}개 (Page 1 + Page 언급 {len(page_mentions)}개)")
+
+        # ========== 4단계: 나머지 페이지 키워드/의미 매칭 ==========
         use_semantic = SENTENCE_TRANSFORMERS_AVAILABLE and self.sentence_model is not None
         if use_semantic:
-            print(f"[{video_id}] ✅ Semantic similarity 활성화 (키워드 80% + 의미 20%)")
+            print(f"[{video_id}] ✅ Semantic similarity 활성화")
         else:
-            print(f"[{video_id}] ⚠️ Semantic similarity 비활성화 (키워드만 사용)")
+            print(f"[{video_id}] ⚠️ Semantic similarity 비활성화")
 
+        # 앵커가 없는 페이지들에 대해 키워드 매칭 시도
         for page_idx in range(1, num_pages):
+            page_num = page_idx + 1  # 1-indexed
+
+            # 이미 앵커가 있으면 스킵
+            if page_num in anchors:
+                continue
+
             page_text = page_texts[page_idx]
             keywords = page_keywords[page_idx]
 
-            # 예상 시작 시간 (균등 분배 기준)
-            expected_start = page_idx * base_page_duration
+            # 이 페이지 앞뒤의 가장 가까운 앵커 찾기
+            prev_anchor_page = max([p for p in anchors.keys() if p < page_num], default=1)
+            next_anchor_page = min([p for p in anchors.keys() if p > page_num], default=num_pages + 1)
 
-            # 이전 페이지의 실제 시작 시간
-            last_valid_time = page_start_times[-1]
-            if last_valid_time is None:
-                for t in reversed(page_start_times):
-                    if t is not None:
-                        last_valid_time = t
-                        break
-                if last_valid_time is None:
-                    last_valid_time = (page_idx - 1) * base_page_duration
+            prev_anchor_time = anchors[prev_anchor_page]
+            next_anchor_time = anchors.get(next_anchor_page, total_duration)
 
-            # 남은 페이지 수를 고려한 최대 검색 범위 계산
-            remaining_pages = num_pages - page_idx
-            remaining_time = total_duration - last_valid_time
-            max_time_per_page = remaining_time / remaining_pages if remaining_pages > 0 else remaining_time
+            # 검색 범위: 앵커 사이
+            search_start = prev_anchor_time + min_page_duration
+            search_end = next_anchor_time - min_page_duration
 
-            # 검색 범위: 이전 페이지 이후부터 ~ 남은 시간의 60%까지 (다음 페이지들 여유 확보)
-            search_start = last_valid_time + min_page_duration
-            search_end = min(last_valid_time + max_time_per_page * 2, total_duration - (remaining_pages - 1) * min_page_duration)
-
-            # 검색 범위가 유효하지 않으면 보간으로 처리
             if search_start >= search_end:
-                page_start_times.append(None)
-                page_confidences.append(0.0)
-                print(f"[{video_id}]   페이지 {page_idx + 1}: (검색 범위 없음, 보간 예정)")
-                continue
+                continue  # 보간으로 처리
 
             best_time = None
             best_score = 0.0
             match_info = ""
 
+            # 의미적 유사도 + 키워드 매칭 (위치 가중치 제거)
             if use_semantic and page_text.strip():
-                # 의미적 유사도 + 키워드 + 위치 근접도 결합 방식
-                match_time, score, kw_count = self._find_best_segment_with_position(
+                match_time, score, kw_count = self._find_best_segment_semantic_only(
                     page_text,
                     keywords[:20],
                     segments,
                     search_start,
                     search_end,
-                    expected_start,
-                    base_page_duration,
-                    window_seconds=15.0,
+                    window_seconds=20.0,
                     video_id=video_id
                 )
 
-                if match_time is not None and score > 0.10:  # 최소 점수 임계값 낮춤 (0.15→0.10)
+                if match_time is not None and score > 0.15:
                     best_time = match_time
                     best_score = score
-                    match_info = f"semantic+kw+pos (score={score:.2f}, kw={kw_count})"
+                    match_info = f"semantic+kw (score={score:.2f}, kw={kw_count})"
 
-            # Semantic 매칭 실패 시 키워드만 사용
+            # 키워드만 매칭
             if best_time is None and keywords:
                 multi_match_time, matched_kws, match_count = self._find_best_segment_for_keywords(
                     keywords[:20],
@@ -1640,25 +1728,25 @@ class PDF2MP4Service:
                     window_size=5
                 )
 
-                # 매칭 시간이 검색 범위 내에 있는지 확인
                 if multi_match_time is not None and search_start <= multi_match_time <= search_end:
-                    if match_count >= 1:  # 최소 매칭 수 낮춤 (2→1)
+                    if match_count >= 2:
                         best_time = multi_match_time
                         best_score = match_count / len(keywords) if keywords else 0.0
-                        match_info = f"keyword ({match_count}개: {matched_kws[:3]})"
+                        match_info = f"keyword ({match_count}개)"
 
             if best_time is not None:
-                page_start_times.append(best_time)
-                page_confidences.append(best_score)
-                print(f"[{video_id}]   페이지 {page_idx + 1}: {match_info} @ {best_time:.1f}초 (범위: {search_start:.1f}~{search_end:.1f}초)")
-            else:
-                page_start_times.append(None)
-                page_confidences.append(0.0)
-                print(f"[{video_id}]   페이지 {page_idx + 1}: (매칭 실패, 보간 예정) (범위: {search_start:.1f}~{search_end:.1f}초)")
+                anchors[page_num] = best_time
+                anchor_confidences[page_num] = min(best_score, 0.7)  # 최대 70% 신뢰도
+                print(f"[{video_id}]   페이지 {page_num}: {match_info} @ {best_time:.1f}초")
 
-        # 매칭되지 않은 페이지들 보간 처리
-        page_start_times = self._interpolate_missing_times(
-            page_start_times, total_duration, min_page_duration, video_id
+        # ========== 5단계: 앵커 기반 보간 ==========
+        page_start_times = self._interpolate_from_anchors(
+            anchors, num_pages, total_duration, min_page_duration, video_id
+        )
+
+        # ========== 6단계: 순차 정렬 보장 ==========
+        page_start_times = self._ensure_sequential_order(
+            page_start_times, min_page_duration, total_duration, video_id
         )
 
         # 타이밍 생성
@@ -1676,6 +1764,178 @@ class PDF2MP4Service:
             })
 
         return timings
+
+    def _find_best_segment_semantic_only(
+        self,
+        page_text: str,
+        keywords: List[str],
+        segments: List[Dict],
+        search_start: float,
+        search_end: float,
+        window_seconds: float = 20.0,
+        video_id: str = ""
+    ) -> tuple[Optional[float], float, int]:
+        """
+        키워드 + 의미적 유사도만 사용 (위치 가중치 제외)
+        """
+        if not segments:
+            return None, 0.0, 0
+
+        best_time = None
+        best_score = 0.0
+        best_keyword_count = 0
+
+        current_window_start = search_start
+        while current_window_start < search_end:
+            window_end_time = min(current_window_start + window_seconds, search_end)
+
+            window_segments = []
+            window_text_parts = []
+            for seg in segments:
+                seg_start = seg['start']
+                if seg_start >= current_window_start and seg_start < window_end_time:
+                    window_segments.append(seg)
+                    window_text_parts.append(seg.get('text', ''))
+
+            if not window_segments:
+                current_window_start += window_seconds / 2
+                continue
+
+            window_text = ' '.join(window_text_parts).lower()
+            window_text_normalized = re.sub(r'[^\w\s]', ' ', window_text)
+
+            # 키워드 매칭 점수
+            keyword_matches = 0
+            for kw in keywords:
+                kw_lower = kw.lower()
+                if kw_lower in window_text_normalized:
+                    keyword_matches += 1
+                else:
+                    for word in window_text_normalized.split():
+                        if len(word) >= 4:
+                            ratio = SequenceMatcher(None, kw_lower, word).ratio()
+                            if ratio > 0.8:
+                                keyword_matches += 1
+                                break
+
+            keyword_score = min(keyword_matches / max(len(keywords), 1), 1.0)
+
+            # 의미적 유사도 점수
+            semantic_score = self._compute_semantic_similarity(page_text, window_text)
+
+            # 결합 점수 (키워드 70%, 의미 30% - 위치 가중치 제거)
+            combined_score = (keyword_score * 0.70) + (semantic_score * 0.30)
+
+            if combined_score > best_score:
+                best_score = combined_score
+                best_time = window_segments[0]['start']
+                best_keyword_count = keyword_matches
+
+            current_window_start += window_seconds / 2
+
+        return best_time, best_score, best_keyword_count
+
+    def _interpolate_from_anchors(
+        self,
+        anchors: Dict[int, float],
+        num_pages: int,
+        total_duration: float,
+        min_page_duration: float,
+        video_id: str = ""
+    ) -> List[float]:
+        """
+        앵커 포인트를 기반으로 나머지 페이지 시간 보간
+        """
+        page_start_times = [None] * num_pages
+
+        # 앵커 값 설정
+        for page_num, start_time in anchors.items():
+            if 1 <= page_num <= num_pages:
+                page_start_times[page_num - 1] = start_time
+
+        # 첫 페이지 보장
+        if page_start_times[0] is None:
+            page_start_times[0] = 0.0
+
+        # 마지막 페이지 앵커 추가 (총 영상 길이)
+        sorted_anchors = sorted(anchors.keys())
+        if num_pages not in anchors:
+            # 마지막 앵커 이후 남은 시간을 마지막 페이지들에 분배
+            pass
+
+        # 보간 수행
+        print(f"[{video_id}] 📊 앵커 기반 보간:")
+
+        # 각 구간별로 보간
+        i = 0
+        while i < num_pages:
+            if page_start_times[i] is not None:
+                # 앵커 포인트 찾음
+                anchor_start_idx = i
+                anchor_start_time = page_start_times[i]
+
+                # 다음 앵커 찾기
+                j = i + 1
+                while j < num_pages and page_start_times[j] is None:
+                    j += 1
+
+                if j < num_pages:
+                    # 다음 앵커까지 보간
+                    anchor_end_idx = j
+                    anchor_end_time = page_start_times[j]
+                else:
+                    # 마지막까지 보간
+                    anchor_end_idx = num_pages
+                    anchor_end_time = total_duration
+
+                # 구간 내 페이지들 균등 보간
+                pages_in_range = anchor_end_idx - anchor_start_idx
+                time_range = anchor_end_time - anchor_start_time
+
+                for k in range(anchor_start_idx + 1, anchor_end_idx):
+                    ratio = (k - anchor_start_idx) / pages_in_range
+                    page_start_times[k] = anchor_start_time + (time_range * ratio)
+
+                i = j
+            else:
+                i += 1
+
+        # None이 남아있으면 균등 분배
+        for i in range(num_pages):
+            if page_start_times[i] is None:
+                page_start_times[i] = (i / num_pages) * total_duration
+
+        return page_start_times
+
+    def _ensure_sequential_order(
+        self,
+        page_start_times: List[float],
+        min_page_duration: float,
+        total_duration: float,
+        video_id: str = ""
+    ) -> List[float]:
+        """
+        페이지 시작 시간이 순차적으로 증가하도록 보장
+        """
+        result = page_start_times.copy()
+
+        # 순방향 검사: 이전 페이지보다 늦게 시작하도록
+        for i in range(1, len(result)):
+            min_start = result[i - 1] + min_page_duration
+            if result[i] < min_start:
+                result[i] = min_start
+
+        # 역방향 검사: 마지막 페이지가 총 시간을 넘지 않도록
+        if result[-1] > total_duration - min_page_duration:
+            result[-1] = total_duration - min_page_duration
+
+            # 역방향으로 조정
+            for i in range(len(result) - 2, -1, -1):
+                max_start = result[i + 1] - min_page_duration
+                if result[i] > max_start:
+                    result[i] = max(0, max_start)
+
+        return result
 
     def _calculate_equal_timings(
         self,
@@ -1815,8 +2075,16 @@ class PDF2MP4Service:
                                 video_data['ocr_lang'] = meta_data.get('ocr_lang', video_data.get('ocr_lang', ''))
                                 video_data['created_by'] = meta_data.get('created_by', video_data.get('created_by', ''))
                                 video_data['duration'] = meta_data.get('duration', video_data.get('duration', 0))
+                                video_data['pdf_name'] = meta_data.get('pdf_name', '')
                         except Exception as e:
                             print(f"Error loading meta file for {video_id}: {e}")
+
+                    # 메타 파일이 없는 경우 파일명에서 PDF 이름 추출 시도
+                    if not video_data.get('pdf_name'):
+                        # 파일명 형식: "PDF이름_VideoID.mp4"
+                        if len(parts) > 1:
+                            pdf_base_name = parts[0]  # PDF이름 부분
+                            video_data['pdf_name'] = pdf_base_name + '.pdf'
 
                     videos.append(video_data)
 
@@ -1871,6 +2139,65 @@ class PDF2MP4Service:
 
             return True
         return False
+
+    def cleanup_orphan_files(self) -> Dict[str, List[str]]:
+        """
+        고아 파일 정리: 영상 파일이 없는 타이밍/메타 파일, PDF 파일 삭제
+        Returns: {'deleted_timings': [...], 'deleted_metas': [...], 'deleted_pdfs': [...]}
+        """
+        result = {
+            'deleted_timings': [],
+            'deleted_metas': [],
+            'deleted_pdfs': []
+        }
+
+        # 1. 현재 존재하는 영상 ID 목록 수집
+        video_ids = set()
+        if os.path.exists(self.output_dir):
+            for f in os.listdir(self.output_dir):
+                if f.endswith('.mp4'):
+                    parts = f.rsplit('_', 1)
+                    video_id = parts[1].replace('.mp4', '') if len(parts) > 1 else f.replace('.mp4', '')
+                    video_ids.add(video_id)
+
+        # 2. 고아 타이밍 파일 삭제
+        if os.path.exists(self.output_dir):
+            for f in os.listdir(self.output_dir):
+                if f.endswith('_timing.json'):
+                    timing_id = f.replace('_timing.json', '')
+                    if timing_id not in video_ids:
+                        path = os.path.join(self.output_dir, f)
+                        os.remove(path)
+                        result['deleted_timings'].append(f)
+                        print(f"고아 타이밍 파일 삭제: {f}")
+
+        # 3. 고아 메타 파일 삭제
+        if os.path.exists(self.output_dir):
+            for f in os.listdir(self.output_dir):
+                if f.endswith('_meta.json'):
+                    meta_id = f.replace('_meta.json', '')
+                    if meta_id not in video_ids:
+                        path = os.path.join(self.output_dir, f)
+                        os.remove(path)
+                        result['deleted_metas'].append(f)
+                        print(f"고아 메타 파일 삭제: {f}")
+
+        # 4. 고아 PDF 파일 삭제
+        if os.path.exists(self.pdf_dir):
+            for f in os.listdir(self.pdf_dir):
+                if f.endswith('.pdf'):
+                    parts = f.rsplit('_', 1)
+                    pdf_id = parts[1].replace('.pdf', '') if len(parts) > 1 else ''
+                    if pdf_id and pdf_id not in video_ids:
+                        path = os.path.join(self.pdf_dir, f)
+                        os.remove(path)
+                        result['deleted_pdfs'].append(f)
+                        print(f"고아 PDF 파일 삭제: {f}")
+
+        total = len(result['deleted_timings']) + len(result['deleted_metas']) + len(result['deleted_pdfs'])
+        print(f"고아 파일 정리 완료: 총 {total}개 파일 삭제")
+
+        return result
 
     def get_pdf_list(self) -> List[Dict[str, Any]]:
         """저장된 PDF 목록 조회"""
@@ -1941,12 +2268,16 @@ class PDF2MP4Service:
         self.register_temp_dir(new_video_id, temp_dir)
 
         try:
+            # 진행률 초기화 (new_video_id로 추적)
+            self.update_progress(new_video_id, 'init', 0, '🔄 재변환 준비 중...', None)
+
             print(f"[{new_video_id}] 🔄 Re-encoding with custom timings")
             print(f"[{new_video_id}] PDF: {pdf_path}")
             print(f"[{new_video_id}] Original Video: {video_path}")
             print(f"[{new_video_id}] Timings: {len(timings)} slides")
 
             # 1. PDF를 이미지로 변환
+            self.update_progress(new_video_id, 'pdf', 10, '📄 PDF 이미지 변환 중...', None)
             with open(pdf_path, 'rb') as f:
                 pdf_content = f.read()
             images = convert_from_bytes(pdf_content, dpi=dpi)
@@ -1962,12 +2293,14 @@ class PDF2MP4Service:
                     timings = timings[:len(images)]
 
             # 2. 이미지 리사이즈
+            self.update_progress(new_video_id, 'resize', 20, '🖼️ 이미지 리사이즈 중...', None)
             resized_images = []
             for i, img in enumerate(images):
                 resized = self._resize_image(img, width, height)
                 resized_images.append(resized)
 
             # 3. 기존 영상에서 오디오 추출
+            self.update_progress(new_video_id, 'audio', 30, '🎵 오디오 추출 중...', None)
             audio_path = os.path.join(temp_dir, 'audio.aac')
             audio_duration = 0
             try:
@@ -2007,6 +2340,7 @@ class PDF2MP4Service:
                     print(f"[{new_video_id}] 마지막 슬라이드 연장: {video_end:.1f}초 → {target_duration:.1f}초")
 
             # 4. 영상 출력
+            self.update_progress(new_video_id, 'encode', 40, '🎬 영상 인코딩 중...', None)
             original_filename = os.path.basename(video_path)
             base_name = original_filename.rsplit('_', 1)[0]  # video_id 제거
             output_filename = f"{base_name}_edited_{new_video_id}.mp4"
@@ -2023,6 +2357,8 @@ class PDF2MP4Service:
             if not success:
                 raise Exception("Video encoding failed")
 
+            self.update_progress(new_video_id, 'finalize', 90, '📁 파일 정리 중...', None)
+
             # 5. PDF 복사 (새 video_id로)
             new_pdf_path = os.path.join(self.pdf_dir, f"{os.path.basename(pdf_path).rsplit('_', 1)[0]}_{new_video_id}.pdf")
             import shutil
@@ -2033,23 +2369,77 @@ class PDF2MP4Service:
             import json
             timing_file = os.path.join(self.output_dir, f"{new_video_id}_timing.json")
 
-            # 기존 타이밍 파일에서 page_texts 가져오기
+            # 기존 타이밍 파일에서 page_texts, transcript_segments 가져오기
             page_texts = []
+            transcript_segments = []
             old_timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
             if os.path.exists(old_timing_file):
                 try:
                     with open(old_timing_file, 'r', encoding='utf-8') as f:
                         old_data = json.load(f)
                         page_texts = old_data.get('page_texts', [])
+                        transcript_segments = old_data.get('transcript_segments', [])
                 except:
                     pass
 
             timing_data = {
                 'timings': timings,
-                'page_texts': page_texts
+                'page_texts': page_texts,
+                'transcript_segments': transcript_segments,  # Whisper 세그먼트 유지
+                'edited': True  # 편집된 타이밍임을 표시
             }
             with open(timing_file, 'w', encoding='utf-8') as f:
                 json.dump(timing_data, f, ensure_ascii=False, indent=2)
+
+            # 7. 메타데이터 파일 저장 (기존 메타에서 복사 + 업데이트)
+            meta_file = os.path.join(self.output_dir, f"{new_video_id}_meta.json")
+            old_meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
+            meta_data = {
+                'category': '',
+                'ocr_lang': '',
+                'created_by': '',
+                'duration': video_duration,
+                'mode': 'edited',
+                'original_video_id': video_id,
+                'pdf_name': os.path.basename(new_pdf_path),
+                'created_at': datetime.utcnow().isoformat()
+            }
+            # 기존 메타데이터에서 정보 복사
+            if os.path.exists(old_meta_file):
+                try:
+                    with open(old_meta_file, 'r', encoding='utf-8') as f:
+                        old_meta = json.load(f)
+                        meta_data['category'] = old_meta.get('category', '')
+                        meta_data['ocr_lang'] = old_meta.get('ocr_lang', '')
+                        meta_data['created_by'] = old_meta.get('created_by', '')
+                except:
+                    pass
+            with open(meta_file, 'w', encoding='utf-8') as f:
+                json.dump(meta_data, f, ensure_ascii=False, indent=2)
+            print(f"[{new_video_id}] 메타데이터 저장: {meta_file}")
+
+            # 8. 기존 파일 삭제 (원본 영상, PDF, 타이밍, 메타)
+            print(f"[{new_video_id}] 🗑️ 기존 파일 정리 중...")
+
+            # 기존 영상 삭제
+            if os.path.exists(video_path):
+                os.remove(video_path)
+                print(f"[{new_video_id}]   기존 영상 삭제: {video_path}")
+
+            # 기존 PDF 삭제
+            if os.path.exists(pdf_path) and pdf_path != new_pdf_path:
+                os.remove(pdf_path)
+                print(f"[{new_video_id}]   기존 PDF 삭제: {pdf_path}")
+
+            # 기존 타이밍 파일 삭제
+            if os.path.exists(old_timing_file):
+                os.remove(old_timing_file)
+                print(f"[{new_video_id}]   기존 타이밍 삭제: {old_timing_file}")
+
+            # 기존 메타 파일 삭제
+            if os.path.exists(old_meta_file):
+                os.remove(old_meta_file)
+                print(f"[{new_video_id}]   기존 메타 삭제: {old_meta_file}")
 
             video_info = {
                 'id': new_video_id,
@@ -2063,12 +2453,14 @@ class PDF2MP4Service:
                 'file_size': os.path.getsize(output_path)
             }
 
+            self.update_progress(new_video_id, 'complete', 100, '✅ 재변환 완료!', None)
             print(f"[{new_video_id}] ✅ Re-encoding completed successfully")
-            return {'status': 'success', 'video': video_info}
+            return {'status': 'success', 'video': video_info, 'reencode_id': new_video_id}
 
         except Exception as e:
+            self.update_progress(new_video_id, 'error', 0, f'❌ 오류: {str(e)}', None)
             print(f"[{new_video_id}] ❌ Re-encoding failed: {e}")
-            return {'status': 'error', 'message': str(e)}
+            return {'status': 'error', 'message': str(e), 'reencode_id': new_video_id}
         finally:
             self.cleanup_temp_dir(new_video_id)
             self.clear_process_pid(new_video_id)
