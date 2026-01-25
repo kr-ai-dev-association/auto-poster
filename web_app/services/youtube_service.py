@@ -217,36 +217,132 @@ class YouTubeService:
         return None
 
     def _compress_pdf(self, pdf_content: bytes) -> bytes:
-        """PDF 파일을 압축합니다."""
+        """PDF 파일을 압축합니다. 이미지 기반 PDF의 경우 이미지 품질을 낮춰서 압축합니다."""
         try:
             import PyPDF2
             import io
+            import tempfile
             
-            # PDF 읽기
+            # 먼저 PyPDF2로 기본 압축 시도
             pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
-            
-            # 새 PDF 작성기 생성
             pdf_writer = PyPDF2.PdfWriter()
             
-            # 모든 페이지를 새 PDF에 추가 (압축 옵션 적용)
             for page in pdf_reader.pages:
-                # 페이지 압축
                 page.compress_content_streams()
                 pdf_writer.add_page(page)
             
-            # 메타데이터 복사
             if pdf_reader.metadata:
                 pdf_writer.add_metadata(pdf_reader.metadata)
             
-            # 압축된 PDF를 바이트로 변환
             output_buffer = io.BytesIO()
             pdf_writer.write(output_buffer)
             compressed_pdf = output_buffer.getvalue()
             output_buffer.close()
             
+            # 기본 압축으로 충분하지 않으면 (10% 미만 감소) 이미지 압축 시도
+            original_size = len(pdf_content)
+            compressed_size = len(compressed_pdf)
+            compression_ratio = (1 - compressed_size / original_size) * 100
+            
+            if compression_ratio < 10:  # 10% 미만 압축이면 이미지 압축 시도
+                print(f"📦 기본 압축 효과 부족 ({compression_ratio:.1f}%). 이미지 압축을 시도합니다...")
+                try:
+                    # PDF를 이미지로 변환 (낮은 DPI로)
+                    images = convert_from_bytes(pdf_content, dpi=150)  # 원본보다 낮은 DPI
+                    
+                    if not images:
+                        print(f"⚠️ PDF를 이미지로 변환할 수 없습니다. 기본 압축 결과 사용.")
+                        return compressed_pdf
+                    
+                    # img2pdf 사용 시도 (더 나은 압축)
+                    try:
+                        import img2pdf
+                        
+                        # 이미지를 압축된 JPEG로 변환
+                        compressed_images = []
+                        for img in images:
+                            img_buffer = io.BytesIO()
+                            # JPEG 품질 70%로 저장 (품질과 크기 균형)
+                            img.convert('RGB').save(img_buffer, format='JPEG', quality=70, optimize=True)
+                            img_buffer.seek(0)
+                            compressed_images.append(img_buffer.getvalue())
+                        
+                        # img2pdf로 PDF 생성
+                        compressed_pdf = img2pdf.convert(compressed_images)
+                        
+                        new_size_mb = len(compressed_pdf) / (1024 * 1024)
+                        original_size_mb = original_size / (1024 * 1024)
+                        new_ratio = (1 - len(compressed_pdf) / original_size) * 100
+                        print(f"✅ 이미지 압축 완료 (img2pdf): {original_size_mb:.1f}MB → {new_size_mb:.1f}MB ({new_ratio:.1f}% 감소)")
+                        
+                        return compressed_pdf
+                    except ImportError:
+                        # img2pdf가 없으면 reportlab 시도
+                        try:
+                            from reportlab.pdfgen import canvas
+                            from reportlab.lib.pagesizes import letter
+                            from reportlab.lib.utils import ImageReader
+                            
+                            # 임시 파일로 압축된 PDF 생성
+                            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
+                                tmp_pdf_path = tmp_pdf.name
+                            
+                            c = canvas.Canvas(tmp_pdf_path, pagesize=letter)
+                            page_width, page_height = letter
+                            
+                            for img in images:
+                                # 이미지 크기 조정 (페이지 크기에 맞춤)
+                                img_width, img_height = img.size
+                                aspect = img_height / img_width
+                                
+                                if aspect > 1:  # 세로가 더 긴 경우
+                                    display_height = page_height
+                                    display_width = page_height / aspect
+                                else:  # 가로가 더 긴 경우
+                                    display_width = page_width
+                                    display_height = page_width * aspect
+                                
+                                # 중앙 정렬
+                                x = (page_width - display_width) / 2
+                                y = (page_height - display_height) / 2
+                                
+                                # 이미지 품질 낮춰서 추가 (JPEG 품질 70%)
+                                img_buffer = io.BytesIO()
+                                img.save(img_buffer, format='JPEG', quality=70, optimize=True)
+                                img_buffer.seek(0)
+                                
+                                c.drawImage(ImageReader(img_buffer), x, y, width=display_width, height=display_height)
+                                c.showPage()
+                            
+                            c.save()
+                            
+                            # 압축된 PDF 읽기
+                            with open(tmp_pdf_path, 'rb') as f:
+                                compressed_pdf = f.read()
+                            
+                            # 임시 파일 삭제
+                            os.unlink(tmp_pdf_path)
+                            
+                            new_size_mb = len(compressed_pdf) / (1024 * 1024)
+                            original_size_mb = original_size / (1024 * 1024)
+                            new_ratio = (1 - len(compressed_pdf) / original_size) * 100
+                            print(f"✅ 이미지 압축 완료 (reportlab): {original_size_mb:.1f}MB → {new_size_mb:.1f}MB ({new_ratio:.1f}% 감소)")
+                            
+                            return compressed_pdf
+                        except ImportError:
+                            print(f"⚠️ img2pdf와 reportlab이 모두 설치되지 않았습니다. 기본 압축 결과 사용.")
+                            return compressed_pdf
+                except Exception as e:
+                    print(f"⚠️ 이미지 압축 실패: {e}. 기본 압축 결과 사용.")
+                    import traceback
+                    traceback.print_exc()
+                    return compressed_pdf
+            
             return compressed_pdf
         except Exception as e:
             print(f"⚠️ PDF 압축 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
             # 압축 실패 시 원본 반환
             return pdf_content
 

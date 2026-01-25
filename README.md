@@ -160,9 +160,10 @@ FastAPI 기반의 통합 웹 인터페이스로 모든 기능을 제공합니다
 #### 🎬 Youtube Poster
 - PDF 기반 메타데이터 자동 생성 (제목, 설명, 태그)
 - **대용량 PDF 처리**: 
-  - 50MB 이상 PDF 자동 압축 (PyPDF2 기반)
+  - 50MB 이상 PDF 자동 압축 (PyPDF2 + img2pdf 기반)
+  - 기본 압축 효과 부족 시 이미지 품질 낮춰서 재압축 (JPEG 70%, DPI 150)
   - 텍스트 기반 PDF: 텍스트 추출 후 AI 분석 (최대 50페이지)
-  - 이미지 기반 PDF: File API 사용 (압축 후 50MB 이하)
+  - 이미지 기반 PDF: 압축 후 File API 사용 (50MB 이하)
 - **썸네일 자동 생성**: PDF 첫 페이지를 YouTube 썸네일(1280x720)로 자동 변환 및 업로드
 - 로고 합성 및 비디오 편집
 - 카테고리별 리소스 관리 (tech/entertainment/lifestyle/beauty)
