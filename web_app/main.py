@@ -7,6 +7,7 @@ import uvicorn
 import os
 import shutil
 import asyncio
+import uuid
 from datetime import timedelta
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -445,6 +446,7 @@ async def validate_youtube_metadata(
 
 @app.post("/api/youtube/upload")
 async def youtube_upload(
+    background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
     pdf: UploadFile = File(None),
     pdf_id: str = Form(None),
@@ -453,14 +455,13 @@ async def youtube_upload(
     use_thumbnail: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
-    """영상을 처리하고 유튜브에 업로드합니다.
-    pdf 파일을 직접 업로드하거나, pdf_id를 통해 Gen Video에서 사용된 PDF를 참조할 수 있습니다.
-    """
+    """영상을 처리하고 유튜브에 업로드합니다 (비동기)."""
     if not youtube:
         return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
 
     try:
         video_content = await video.read()
+        filename = video.filename
 
         # PDF 내용 가져오기 (업로드 또는 Gen Video에서 선택)
         if pdf_id and pdf2mp4:
@@ -476,12 +477,28 @@ async def youtube_upload(
         else:
             return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
 
-        result = await youtube.process_and_upload(
-            video_content, video.filename, pdf_content, category, lang, use_thumbnail
+        # 업로드 ID 생성 및 초기 상태 설정
+        upload_id = str(uuid.uuid4())
+        YouTubeService.update_upload_progress(upload_id, 'init', 0, '업로드 요청 접수됨')
+        
+        # 백그라운드 작업 시작
+        background_tasks.add_task(
+            youtube.process_and_upload,
+            video_content, filename, pdf_content, category, lang, use_thumbnail, upload_id
         )
-        return JSONResponse(content=result)
+        
+        return JSONResponse(content={"status": "processing", "upload_id": upload_id})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+@app.get("/api/youtube/status/{upload_id}")
+async def get_youtube_upload_status(upload_id: str, user: models.User = Depends(get_current_user)):
+    """유튜브 업로드 상태를 조회합니다."""
+    progress = YouTubeService.get_upload_progress(upload_id)
+    if not progress:
+        return JSONResponse(status_code=404, content={"status": "error", "message": "Upload task not found"})
+    
+    return JSONResponse(content=progress)
 
 @app.post("/api/youtube/share/linkedin")
 async def youtube_share_linkedin(
@@ -1412,6 +1429,7 @@ async def linkedin_post_from_genvideo(
 
 @app.post("/api/youtube/upload-from-genvideo")
 async def youtube_upload_from_genvideo(
+    background_tasks: BackgroundTasks,
     video_id: str = Form(...),
     pdf: UploadFile = File(None),
     pdf_id: str = Form(None),
@@ -1420,9 +1438,7 @@ async def youtube_upload_from_genvideo(
     use_thumbnail: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
-    """Gen Video에서 생성된 영상을 YouTube에 업로드합니다.
-    pdf 파일을 직접 업로드하거나, pdf_id를 통해 Gen Video에서 사용된 PDF를 참조할 수 있습니다.
-    """
+    """Gen Video에서 생성된 영상을 YouTube에 업로드합니다. (비동기)"""
     if not youtube or not pdf2mp4:
         return JSONResponse(
             status_code=503,
@@ -1441,6 +1457,7 @@ async def youtube_upload_from_genvideo(
         # 영상 파일 읽기
         with open(video_path, 'rb') as f:
             video_content = f.read()
+        filename = os.path.basename(video_path)
 
         # PDF 내용 가져오기 (업로드 또는 Gen Video에서 선택)
         if pdf_id:
@@ -1456,16 +1473,17 @@ async def youtube_upload_from_genvideo(
         else:
             return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
 
-        result = await youtube.process_and_upload(
-            video_content,
-            os.path.basename(video_path),
-            pdf_content,
-            category,
-            lang,
-            use_thumbnail
+        # 업로드 ID 생성 및 초기 상태 설정
+        upload_id = str(uuid.uuid4())
+        YouTubeService.update_upload_progress(upload_id, 'init', 0, '업로드 요청 접수됨 (Gen Video)')
+        
+        # 백그라운드 작업 시작
+        background_tasks.add_task(
+            youtube.process_and_upload,
+            video_content, filename, pdf_content, category, lang, use_thumbnail, upload_id
         )
 
-        return JSONResponse(content=result)
+        return JSONResponse(content={"status": "processing", "upload_id": upload_id})
 
     except Exception as e:
         return JSONResponse(

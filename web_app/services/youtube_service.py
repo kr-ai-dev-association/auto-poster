@@ -4,6 +4,7 @@ import json
 import shutil
 import re
 import importlib.util
+from typing import Dict, Any, Optional
 from fastapi.responses import FileResponse
 from google.genai import types
 from pdf2image import convert_from_bytes
@@ -576,8 +577,10 @@ class YouTubeService:
             traceback.print_exc()
             return None
 
-    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True):
+    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, upload_id=None):
         """영상을 처리하고 유튜브에 업로드합니다."""
+        if upload_id:
+            self.update_upload_progress(upload_id, 'init', 5, '업로드 준비 중...')
         v_dir = os.path.join(self.base_v_dir, category)
         if not os.path.exists(v_dir):
             os.makedirs(v_dir, exist_ok=True)
@@ -609,11 +612,16 @@ class YouTubeService:
                     desc_template = f.read()
 
             print(f"📝 메타데이터 생성 시작 (PDF: {pdf_path})")
+            if upload_id:
+                self.update_upload_progress(upload_id, 'metadata', 15, 'YouTube 메타데이터 생성 중 (AI 분석)...')
             # YouTube API 인증 없이 메타데이터 생성 (generate_metadata 메서드 사용)
             with open(pdf_path, 'rb') as f:
                 pdf_content = f.read()
             metadata = await self.generate_metadata(pdf_content, category, lang)
             print(f"✅ 메타데이터 생성 완료: {metadata.get('title', 'N/A')[:50]}...")
+            
+            if upload_id:
+                self.update_upload_progress(upload_id, 'metadata_done', 40, '메타데이터 생성 완료, 검증 중...')
             
             # 업로드 전 최종 검증
             print(f"🔍 업로드 전 메타데이터 최종 검증 중...")
@@ -639,12 +647,26 @@ class YouTubeService:
                     raise Exception(error_msg)
                 else:
                     print(f"✅ 메타데이터 자동 수정 완료")
+                else:
+                    print(f"✅ 메타데이터 자동 수정 완료")
             else:
                 print(f"✅ 메타데이터 최종 검증 통과")
+            
+            if upload_id:
+                self.update_upload_progress(upload_id, 'uploading', 60, 'YouTube에 영상 업로드 중...')
 
             # 3. 로고 합성 제거됨 - Gen Video에서 이미 로고가 합성되므로 바로 업로드
-            print(f"⏭️ 로고 합성 건너뜀 (Gen Video에서 이미 합성됨)")
+            # 3. 로고 합성 제거됨 - Gen Video에서 이미 로고가 합성되므로 바로 업로드
+            print(f"⏭️ [DEBUG] 로고 합성 건너뜀 (Gen Video에서 이미 합성됨)")
+            print(f"   [DEBUG] 원본 비디오 경로: {video_path}")
+            print(f"   [DEBUG] 원본 비디오 크기: {os.path.getsize(video_path)} bytes")
+            
+            # 혹시 모를 로고 파일 존재 여부 확인 (디버깅용)
+            logo_path = self.get_logo_path(category)
+            print(f"   [DEBUG] (참고) 해당 카테고리 로고 파일: {logo_path} (존재 여부: {os.path.exists(logo_path) if logo_path else False})")
+            
             final_video_path = video_path
+            print(f"   [DEBUG] 최종 업로드 파일: {final_video_path}")
 
             # 4. 유튜브 업로드
             print(f"📤 YouTube 업로드 시작...")
@@ -657,6 +679,8 @@ class YouTubeService:
                 print(f"❌ YouTube 업로드 실패: {e}")
                 import traceback
                 traceback.print_exc()
+                if upload_id:
+                    self.update_upload_progress(upload_id, 'error', 0, f'업로드 실패: {str(e)}')
                 raise
 
             if not video_id:
@@ -667,18 +691,26 @@ class YouTubeService:
                 if f and os.path.exists(f):
                     os.remove(f)
 
-            return {
+            result = {
                 "status": "success",
                 "video_id": video_id,
                 "link": f"https://youtu.be/{video_id}",
                 "metadata": metadata
             }
+            
+            if upload_id:
+                self.update_upload_progress(upload_id, 'done', 100, '모든 작업 완료!', result)
+            
+            return result
 
         except Exception as e:
             # 오류 발생 시에도 임시 파일 정리
             for f in [video_path, pdf_path, thumbnail_path]:
                 if f and os.path.exists(f):
                     os.remove(f)
+            
+            if upload_id:
+                self.update_upload_progress(upload_id, 'error', 0, f'처리 중 오류 발생: {str(e)}')
             raise e
 
     async def share_to_linkedin(self, video_id, video_url, lang='ko'):
