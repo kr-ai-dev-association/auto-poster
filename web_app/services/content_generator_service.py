@@ -361,8 +361,67 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
         # Google Search 도구 설정
         tools = [types.Tool(google_search=types.GoogleSearch())]
 
-        prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가입니다.
+        # 언어별 프롬프트 완전 분리
+        if language == 'en':
+            prompt = f"""You are a YouTube video content planning expert.
+Create a content plan with {target_slides} slides based on the following topic.
+
+**CRITICAL: ALL content MUST be written in ENGLISH. This includes title, description, all slide titles, content, narrations, hook, call_to_action, and tags. Do NOT use any Korean or other languages.**
+
+**Important:** If the topic requires real-time information or latest news, you MUST use the provided Google Search tool to search for and include the latest information. Include trends and news from 2024 onwards.
+
+## Topic/Idea:
+{topic}
+
+## Category: {category}
+## Style Guide: {style_guide}
+
+{f"## Additional Instructions: {additional_instructions}" if additional_instructions else ""}
+
+## Output Format (Must output in JSON format):
+```json
+{{
+  "title": "Video title (attractive and click-inducing)",
+  "description": "Video description (2-3 sentences)",
+  "category": "{category}",
+  "target_audience": "Target audience",
+  "estimated_duration": "Estimated video length (minutes)",
+  "slides": [
+    {{
+      "slide_number": 1,
+      "title": "Slide title",
+      "content": "Content to cover in this slide (2-3 sentences). Include specific numbers or examples based on search results.",
+      "narration": "Narration script for this slide (for TTS, natural conversational tone, minimum 150 characters, 20-30 seconds)",
+      "image_prompt": "Image generation prompt for this slide (English, specific and visual description)",
+      "web_image_query": "Web search query for real photos/images (English, specific search terms)",
+      "use_web_image": true/false,
+      "duration_seconds": estimated_display_time_seconds
+    }},
+    ...
+  ],
+  "hook": "Video opening hook (0-30 seconds, grab viewer attention)",
+  "call_to_action": "Like/Subscribe/Comment prompt",
+  "tags": ["relevant", "tag", "list"]
+}}
+```
+
+## Guidelines:
+1. Each slide's narration is a TTS script, so write in natural conversational English
+2. **Important: Each narration must be at least 150 characters (20-30 seconds). Total video should be 5-7+ minutes with sufficient script content**
+3. image_prompt must be in English, with specific descriptions suitable for AI image generation
+4. First slide should be a strong intro, last slide should include CTA outro
+5. Include teasers/previews in the middle to maintain viewer retention
+6. **ALL content must be in English (only image_prompt and web_image_query are always in English)**
+7. Content should be based on the latest facts from search results
+8. web_image_query: Write web search queries for slides that need real photos (e.g., product photos, celebrities, places, events)
+9. use_web_image: Whether to use web-downloaded real images instead of AI-generated images (true if real photos are more appropriate)
+10. **Total narration should be at least 2500 characters (approximately 5 minutes)**
+"""
+        else:
+            prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가입니다.
 다음 주제를 기반으로 {target_slides}개의 슬라이드로 구성된 콘텐츠 기획안을 작성해주세요.
+
+**중요: 모든 콘텐츠는 반드시 한국어로 작성해야 합니다. title, description, 슬라이드의 title, content, narration, hook, call_to_action, tags 모두 한국어로 작성하세요.**
 
 **중요:** 실시간 정보나 최신 뉴스가 필요한 주제라면 반드시 제공된 구글 검색 도구(Google Search)를 사용하여 최신 정보를 검색하고 반영해주세요. 2024년 이후의 최신 트렌드나 뉴스를 적극적으로 포함해야 합니다.
 
@@ -407,7 +466,7 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
 3. image_prompt는 반드시 영어로, AI 이미지 생성에 적합한 구체적인 설명
 4. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
 5. 중간에 시청 유지를 위한 티저/예고 포함
-6. {'한국어' if language == 'ko' else 'English'}로 title, content, narration 작성
+6. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt와 web_image_query만 영어)**
 7. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
 8. web_image_query: 실제 사진이 필요한 슬라이드에 대해 웹 검색 쿼리를 작성 (예: 제품 사진, 유명인, 장소, 이벤트 등)
 9. use_web_image: 해당 슬라이드에 AI 생성 이미지 대신 웹에서 다운로드한 실제 이미지를 사용할지 여부 (실제 사진이 더 적합한 경우 true)
