@@ -2260,7 +2260,8 @@ class PDF2MP4Service:
         width: int = 1920,
         height: int = 1080,
         fps: int = 30,
-        dpi: int = 200
+        dpi: int = 200,
+        logo_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """편집된 타이밍으로 영상을 재변환합니다."""
         new_video_id = str(uuid.uuid4())[:8]
@@ -2292,11 +2293,17 @@ class PDF2MP4Service:
                 else:
                     timings = timings[:len(images)]
 
-            # 2. 이미지 리사이즈
+            # 로고 이미지 로드
+            logo_img = None
+            if logo_path and os.path.exists(logo_path):
+                logo_img = Image.open(logo_path).convert('RGBA')
+                print(f"[{new_video_id}] Logo loaded: {logo_path}")
+
+            # 2. 이미지 리사이즈 (로고 합성 포함)
             self.update_progress(new_video_id, 'resize', 20, '🖼️ 이미지 리사이즈 중...', None)
             resized_images = []
             for i, img in enumerate(images):
-                resized = self._resize_image(img, width, height)
+                resized = self._resize_image(img, width, height, logo_img)
                 resized_images.append(resized)
 
             # 3. 기존 영상에서 오디오 추출

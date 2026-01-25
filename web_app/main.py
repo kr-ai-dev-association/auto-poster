@@ -1189,6 +1189,17 @@ async def reencode_video(
         # 오디오 파일 경로 (영상에서 추출하거나 기존 오디오 사용)
         video_path = video_info.get('file_path')
 
+        # 메타 파일에서 카테고리 가져와서 로고 경로 결정
+        logo_path = None
+        category = video_info.get('category', '')
+        if category:
+            logo_path = youtube.get_logo_path(category)
+        if not logo_path:
+            # 카테고리가 없으면 첫 번째 카테고리의 로고 사용
+            categories = youtube.get_categories()
+            if categories:
+                logo_path = youtube.get_logo_path(categories[0])
+
         # 새 reencode_id 생성 (진행률 추적용)
         reencode_id = str(uuid.uuid4())[:8]
 
@@ -1201,7 +1212,8 @@ async def reencode_video(
                     video_id=video_id,
                     pdf_path=pdf_path,
                     video_path=video_path,
-                    timings=timings
+                    timings=timings,
+                    logo_path=logo_path
                 )
                 # 결과를 진행률 저장소에 저장
                 pdf2mp4.update_progress(
@@ -1226,7 +1238,8 @@ async def reencode_video(
                 video_id=video_id,
                 pdf_path=pdf_path,
                 video_path=video_path,
-                timings=timings
+                timings=timings,
+                logo_path=logo_path
             )
             return JSONResponse(content=result)
 
