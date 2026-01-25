@@ -1462,8 +1462,7 @@ async def youtube_upload_from_genvideo(
             pdf_content,
             category,
             lang,
-            use_thumbnail,
-            skip_logo=True  # Gen Video에서 이미 로고가 합성됨
+            use_thumbnail
         )
 
         return JSONResponse(content=result)

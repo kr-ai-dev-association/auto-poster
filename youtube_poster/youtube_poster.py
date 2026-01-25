@@ -674,29 +674,12 @@ def main():
         json.dump(metadata, f, ensure_ascii=False, indent=2)
     print(f"📄 Metadata saved for backup: {metadata_path}")
     
-    srt_path = poster.generate_subtitles(video_path, lang=lang)
+    # 로고 합성 제거됨 - Gen Video에서 이미 로고가 합성되므로 바로 업로드
+    print(f"⏭️ 로고 합성 건너뜀 (Gen Video에서 이미 합성됨)")
     
-    final_video = os.path.join(v_dir, f"final_youtube_post_{lang}.mp4")
-    if poster.add_logo_and_subs_to_video(video_path, logo_path, srt_path, final_video):
-        print(f"✅ Created: {final_video}")
-        if input("\nUpload? (y/n): ").lower() == 'y':
-            poster.upload_video(final_video, metadata)
-            print("\n🚀 Process completed successfully!")
-        
-        # Cleanup intermediate files
-        print("\n🧹 Cleaning up intermediate files...")
-        temp_srt = os.path.join(v_dir, "sub.srt")
-        files_to_delete = [srt_path, temp_srt, final_video]
-        
-        for f in files_to_delete:
-            if f and os.path.exists(f):
-                try:
-                    os.remove(f)
-                    print(f"   - Deleted: {os.path.basename(f)}")
-                except Exception as e:
-                    print(f"   - Failed to delete {os.path.basename(f)}: {e}")
-    else:
-        print("❌ Video processing failed.")
+    if input("\nUpload? (y/n): ").lower() == 'y':
+        poster.upload_video(video_path, metadata)
+        print("\n🚀 Process completed successfully!")
 
 if __name__ == "__main__":
     main()

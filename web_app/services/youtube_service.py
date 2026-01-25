@@ -146,9 +146,36 @@ class YouTubeMetadataValidator:
         return fixed
 
 class YouTubeService:
+    # 진행률 저장소 (클래스 변수)
+    _upload_progress: Dict[str, Dict] = {}
+    
     def __init__(self):
         self._poster = None  # 지연 초기화
         self.base_v_dir = os.path.join(project_root, 'youtube_poster', 'v_source')
+    
+    @classmethod
+    def get_upload_progress(cls, upload_id: str):
+        """업로드 진행률 조회"""
+        return cls._upload_progress.get(upload_id)
+    
+    @classmethod
+    def update_upload_progress(cls, upload_id: str, step: str, progress: int, message: str, result=None):
+        """업로드 진행률 업데이트"""
+        from datetime import datetime
+        cls._upload_progress[upload_id] = {
+            'upload_id': upload_id,
+            'step': step,
+            'progress': progress,
+            'message': message,
+            'timestamp': datetime.now().isoformat(),
+            'result': result
+        }
+    
+    @classmethod
+    def clear_upload_progress(cls, upload_id: str):
+        """업로드 진행률 삭제"""
+        if upload_id in cls._upload_progress:
+            del cls._upload_progress[upload_id]
     
     @property
     def poster(self):
