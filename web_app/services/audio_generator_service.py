@@ -1,8 +1,11 @@
 import os
 import io
+import json
 import base64
 import tempfile
 import logging
+import asyncio
+import uuid
 from typing import Optional, Dict, Any, List
 from google import genai
 from google.genai import types
@@ -13,6 +16,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+# 백그라운드 태스크 상태 저장소
+_audio_task_store: Dict[str, Dict[str, Any]] = {}
 
 
 class AudioGeneratorService:
@@ -39,6 +46,13 @@ class AudioGeneratorService:
             else:
                 logger.error("GEMINI_API_KEY not found.")
         return self._client
+
+    @property
+    def async_client(self):
+        """Get async client for non-blocking API calls"""
+        if self.client:
+            return self.client.aio
+        return None
 
     def _pdf_to_images(self, pdf_path: str, dpi: int = 150) -> List[Image.Image]:
         """PDF를 이미지 리스트로 변환"""
@@ -150,7 +164,7 @@ class AudioGeneratorService:
         contents = [prompt] + image_parts
 
         try:
-            response = self.client.models.generate_content(
+            response = await self.async_client.models.generate_content(
                 model=self.script_model,
                 contents=contents,
                 config=types.GenerateContentConfig(
@@ -189,7 +203,8 @@ class AudioGeneratorService:
         self,
         script: str,
         output_filename: str = None,
-        voice: str = None
+        voice: str = None,
+        metadata: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
         대본에서 TTS를 사용하여 오디오를 생성합니다.
@@ -198,6 +213,7 @@ class AudioGeneratorService:
             script: 읽을 대본 텍스트
             output_filename: 출력 파일명 (확장자 제외)
             voice: 음성 이름 (기본값: Leda)
+            metadata: 저장할 메타데이터 (language, style, pdf_filename 등)
 
         Returns:
             Dict containing audio file path and metadata
@@ -216,8 +232,8 @@ class AudioGeneratorService:
         logger.info(f"Generating audio with voice '{voice}' for script ({len(script)} chars)")
 
         try:
-            # Gemini TTS 요청
-            response = self.client.models.generate_content(
+            # Gemini TTS 요청 (비동기)
+            response = await self.async_client.models.generate_content(
                 model=self.tts_model,
                 contents=script,
                 config=types.GenerateContentConfig(
@@ -232,8 +248,46 @@ class AudioGeneratorService:
                 )
             )
 
-            # 오디오 데이터 추출 및 저장
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
+            # 오디오 데이터 추출
+            inline_data = response.candidates[0].content.parts[0].inline_data
+            audio_data = inline_data.data
+            mime_type = inline_data.mime_type if hasattr(inline_data, 'mime_type') else 'audio/pcm'
+
+            logger.info(f"TTS response mime_type: {mime_type}, data size: {len(audio_data)} bytes")
+
+            # WAV 헤더가 없는 PCM 데이터인지 확인 (어떤 mime_type이든 RIFF 헤더가 없으면 추가)
+            if audio_data[:4] != b'RIFF':
+                # PCM 데이터에 WAV 헤더 추가 (24kHz, 16-bit, mono - Gemini TTS 기본값)
+                import struct
+                sample_rate = 24000
+                bits_per_sample = 16
+                num_channels = 1
+                byte_rate = sample_rate * num_channels * bits_per_sample // 8
+                block_align = num_channels * bits_per_sample // 8
+                data_size = len(audio_data)
+
+                wav_header = struct.pack(
+                    '<4sI4s4sIHHIIHH4sI',
+                    b'RIFF',
+                    36 + data_size,
+                    b'WAVE',
+                    b'fmt ',
+                    16,  # fmt chunk size
+                    1,   # audio format (PCM)
+                    num_channels,
+                    sample_rate,
+                    byte_rate,
+                    block_align,
+                    bits_per_sample,
+                    b'data',
+                    data_size
+                )
+                audio_data = wav_header + audio_data
+                logger.info(f"Added WAV header to PCM data (original mime_type: {mime_type})")
+
+            # MP3 형식인 경우 확장자 변경
+            if 'mp3' in mime_type:
+                output_path = output_path.replace('.wav', '.mp3')
 
             with open(output_path, 'wb') as f:
                 f.write(audio_data)
@@ -241,19 +295,46 @@ class AudioGeneratorService:
             # 파일 크기 확인
             file_size = os.path.getsize(output_path)
 
-            # WAV 파일에서 재생 시간 계산
-            import wave
-            with wave.open(output_path, 'rb') as wav_file:
-                frames = wav_file.getnframes()
-                rate = wav_file.getframerate()
-                duration = frames / float(rate)
+            # 재생 시간 계산
+            duration = 0
+            if output_path.endswith('.wav'):
+                import wave
+                try:
+                    with wave.open(output_path, 'rb') as wav_file:
+                        frames = wav_file.getnframes()
+                        rate = wav_file.getframerate()
+                        duration = frames / float(rate)
+                except Exception as wav_err:
+                    logger.warning(f"Could not read WAV duration: {wav_err}")
+                    # 파일 크기로 대략적인 재생 시간 추정 (24kHz, 16-bit, mono)
+                    duration = file_size / (24000 * 2)
+            else:
+                # MP3 등 다른 형식의 경우 대략적 추정
+                duration = file_size / 16000  # 대략적 추정
 
             logger.info(f"Audio generated: {output_path} ({duration:.1f}s, {file_size} bytes)")
+
+            # 실제 저장된 파일명 추출
+            actual_filename = os.path.basename(output_path)
+
+            # 메타데이터 JSON 파일 저장
+            meta_path = output_path.rsplit('.', 1)[0] + '.json'
+            meta_data = {
+                'filename': actual_filename,
+                'duration': round(duration, 1),
+                'file_size': file_size,
+                'voice': voice,
+                'script': script,
+                **(metadata or {})
+            }
+            with open(meta_path, 'w', encoding='utf-8') as f:
+                json.dump(meta_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"Metadata saved: {meta_path}")
 
             return {
                 'status': 'success',
                 'audio_path': output_path,
-                'filename': f"{output_filename}.wav",
+                'filename': actual_filename,
                 'duration': round(duration, 1),
                 'file_size': file_size,
                 'voice': voice
@@ -368,12 +449,27 @@ class AudioGeneratorService:
                     except Exception:
                         pass
 
+                # 메타데이터 JSON 파일 로드
+                meta_path = filepath.rsplit('.', 1)[0] + '.json'
+                metadata = {}
+                if os.path.exists(meta_path):
+                    try:
+                        with open(meta_path, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                    except Exception:
+                        pass
+
                 audio_files.append({
                     'filename': filename,
                     'filepath': filepath,
                     'size': stat.st_size,
                     'duration': round(duration, 1),
-                    'created_at': stat.st_mtime
+                    'created_at': stat.st_mtime,
+                    'language': metadata.get('language'),
+                    'style': metadata.get('style'),
+                    'voice': metadata.get('voice'),
+                    'pdf_filename': metadata.get('pdf_filename'),
+                    'script': metadata.get('script')
                 })
 
         # 생성일 기준 정렬 (최신순)
@@ -382,13 +478,155 @@ class AudioGeneratorService:
         return audio_files
 
     def delete_audio(self, filename: str) -> bool:
-        """오디오 파일을 삭제합니다."""
+        """오디오 파일과 메타데이터를 삭제합니다."""
         filepath = os.path.join(self.output_dir, filename)
+        deleted = False
+
         if os.path.exists(filepath):
             os.remove(filepath)
+            deleted = True
             logger.info(f"Deleted audio file: {filename}")
-            return True
-        return False
+
+        # 메타데이터 JSON 파일도 삭제
+        meta_path = filepath.rsplit('.', 1)[0] + '.json'
+        if os.path.exists(meta_path):
+            os.remove(meta_path)
+            logger.info(f"Deleted metadata file: {meta_path}")
+
+        return deleted
+
+    # ========== 백그라운드 태스크 관리 ==========
+
+    @staticmethod
+    def create_task(task_type: str, metadata: Dict[str, Any] = None) -> str:
+        """새 백그라운드 태스크를 생성합니다."""
+        task_id = str(uuid.uuid4())[:8]
+        _audio_task_store[task_id] = {
+            'task_id': task_id,
+            'type': task_type,
+            'status': 'pending',
+            'progress': 0,
+            'message': '대기 중...',
+            'result': None,
+            'error': None,
+            'metadata': metadata or {}
+        }
+        return task_id
+
+    @staticmethod
+    def update_task(task_id: str, status: str = None, progress: int = None,
+                   message: str = None, result: Dict = None, error: str = None):
+        """태스크 상태를 업데이트합니다."""
+        if task_id in _audio_task_store:
+            if status:
+                _audio_task_store[task_id]['status'] = status
+            if progress is not None:
+                _audio_task_store[task_id]['progress'] = progress
+            if message:
+                _audio_task_store[task_id]['message'] = message
+            if result:
+                _audio_task_store[task_id]['result'] = result
+            if error:
+                _audio_task_store[task_id]['error'] = error
+
+    @staticmethod
+    def get_task(task_id: str) -> Optional[Dict[str, Any]]:
+        """태스크 상태를 조회합니다."""
+        return _audio_task_store.get(task_id)
+
+    @staticmethod
+    def delete_task(task_id: str):
+        """완료된 태스크를 삭제합니다."""
+        if task_id in _audio_task_store:
+            del _audio_task_store[task_id]
+
+    async def run_script_generation_task(
+        self,
+        task_id: str,
+        pdf_bytes: bytes,
+        language: str = 'ko',
+        style: str = 'educational'
+    ):
+        """백그라운드에서 대본 생성을 실행합니다."""
+        try:
+            self.update_task(task_id, status='running', progress=10, message='PDF 분석 중...')
+
+            result = await self.generate_script_from_pdf(
+                pdf_bytes=pdf_bytes,
+                language=language,
+                style=style
+            )
+
+            if result.get('status') == 'success':
+                self.update_task(
+                    task_id,
+                    status='completed',
+                    progress=100,
+                    message='대본 생성 완료!',
+                    result=result
+                )
+            else:
+                self.update_task(
+                    task_id,
+                    status='error',
+                    progress=0,
+                    message=f"오류: {result.get('message', 'Unknown error')}",
+                    error=result.get('message')
+                )
+        except Exception as e:
+            logger.error(f"Script generation task failed: {e}")
+            self.update_task(
+                task_id,
+                status='error',
+                progress=0,
+                message=f"오류: {str(e)}",
+                error=str(e)
+            )
+
+    async def run_audio_generation_task(
+        self,
+        task_id: str,
+        script: str,
+        voice: str = 'Leda',
+        filename: str = None,
+        metadata: Dict[str, Any] = None
+    ):
+        """백그라운드에서 오디오 생성을 실행합니다."""
+        try:
+            self.update_task(task_id, status='running', progress=10, message='오디오 생성 중...')
+
+            result = await self.generate_audio_from_script(
+                script=script,
+                output_filename=filename,
+                voice=voice,
+                metadata=metadata
+            )
+
+            if result.get('status') == 'success':
+                self.update_task(
+                    task_id,
+                    status='completed',
+                    progress=100,
+                    message='오디오 생성 완료!',
+                    result=result
+                )
+            else:
+                self.update_task(
+                    task_id,
+                    status='error',
+                    progress=0,
+                    message=f"오류: {result.get('message', 'Unknown error')}",
+                    error=result.get('message')
+                )
+        except Exception as e:
+            logger.error(f"Audio generation task failed: {e}")
+            self.update_task(
+                task_id,
+                status='error',
+                progress=0,
+                message=f"오류: {str(e)}",
+                error=str(e)
+            )
 
 
 # 싱글톤 인스턴스

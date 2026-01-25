@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import uvicorn
 import os
 import shutil
+import asyncio
 from datetime import timedelta
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -16,6 +17,7 @@ from services.youtube_service import YouTubeService
 from services.crypto_service import CryptoService
 from services.pdf2mp4_service import PDF2MP4Service
 from services.audio_generator_service import audio_generator
+from services.content_generator_service import content_generator
 from services import auth_service
 from core import database, models
 
@@ -1488,19 +1490,48 @@ async def generate_script_from_pdf(
     pdf: UploadFile = File(...),
     language: str = Form("ko"),
     style: str = Form("educational"),
+    background: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
-    """PDF에서 YouTube 영상용 대본을 생성합니다."""
+    """PDF에서 YouTube 영상용 대본을 생성합니다.
+
+    background=True인 경우 백그라운드에서 실행되며 task_id를 반환합니다.
+    클라이언트는 /api/audio/task/{task_id}로 진행 상황을 폴링해야 합니다.
+    """
     try:
         pdf_bytes = await pdf.read()
 
-        result = await audio_generator.generate_script_from_pdf(
-            pdf_bytes=pdf_bytes,
-            language=language,
-            style=style
-        )
+        if background:
+            # 백그라운드 태스크로 실행
+            task_id = audio_generator.create_task('script', {
+                'language': language,
+                'style': style,
+                'pdf_filename': pdf.filename
+            })
 
-        return JSONResponse(content=result)
+            # 백그라운드에서 실행
+            asyncio.create_task(
+                audio_generator.run_script_generation_task(
+                    task_id=task_id,
+                    pdf_bytes=pdf_bytes,
+                    language=language,
+                    style=style
+                )
+            )
+
+            return JSONResponse(content={
+                "status": "started",
+                "task_id": task_id,
+                "message": "대본 생성이 시작되었습니다"
+            })
+        else:
+            # 동기 모드 (기존 방식)
+            result = await audio_generator.generate_script_from_pdf(
+                pdf_bytes=pdf_bytes,
+                language=language,
+                style=style
+            )
+            return JSONResponse(content=result)
 
     except Exception as e:
         return JSONResponse(
@@ -1514,17 +1545,59 @@ async def generate_audio_from_script(
     script: str = Form(...),
     voice: str = Form("Leda"),
     filename: str = Form(None),
+    language: str = Form(None),
+    style: str = Form(None),
+    pdf_filename: str = Form(None),
+    background: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
-    """대본에서 TTS 오디오를 생성합니다."""
-    try:
-        result = await audio_generator.generate_audio_from_script(
-            script=script,
-            output_filename=filename,
-            voice=voice
-        )
+    """대본에서 TTS 오디오를 생성합니다.
 
-        return JSONResponse(content=result)
+    background=True인 경우 백그라운드에서 실행되며 task_id를 반환합니다.
+    클라이언트는 /api/audio/task/{task_id}로 진행 상황을 폴링해야 합니다.
+    """
+    try:
+        # 메타데이터 구성
+        metadata = {
+            'language': language,
+            'style': style,
+            'pdf_filename': pdf_filename,
+            'created_by': user.email
+        }
+
+        if background:
+            # 백그라운드 태스크로 실행
+            task_id = audio_generator.create_task('audio', {
+                'voice': voice,
+                'script_length': len(script),
+                **metadata
+            })
+
+            # 백그라운드에서 실행
+            asyncio.create_task(
+                audio_generator.run_audio_generation_task(
+                    task_id=task_id,
+                    script=script,
+                    voice=voice,
+                    filename=filename,
+                    metadata=metadata
+                )
+            )
+
+            return JSONResponse(content={
+                "status": "started",
+                "task_id": task_id,
+                "message": "오디오 생성이 시작되었습니다"
+            })
+        else:
+            # 동기 모드 (기존 방식)
+            result = await audio_generator.generate_audio_from_script(
+                script=script,
+                output_filename=filename,
+                voice=voice,
+                metadata=metadata
+            )
+            return JSONResponse(content=result)
 
     except Exception as e:
         return JSONResponse(
@@ -1603,6 +1676,198 @@ async def delete_audio(filename: str, user: models.User = Depends(get_current_us
     success = audio_generator.delete_audio(filename)
     if success:
         return {"status": "success", "message": "Audio file deleted"}
+    else:
+        raise HTTPException(status_code=404, detail="File not found")
+
+
+@app.get("/api/audio/task/{task_id}")
+async def get_audio_task_status(task_id: str, user: models.User = Depends(get_current_user)):
+    """백그라운드 태스크의 진행 상황을 조회합니다."""
+    task = audio_generator.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return JSONResponse(content=task)
+
+
+@app.delete("/api/audio/task/{task_id}")
+async def delete_audio_task(task_id: str, user: models.User = Depends(get_current_user)):
+    """완료된 태스크를 삭제합니다."""
+    task = audio_generator.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    audio_generator.delete_task(task_id)
+    return {"status": "success", "message": "Task deleted"}
+
+
+# ========== Content Generator API ==========
+
+@app.post("/api/content/generate-plan")
+async def generate_content_plan(
+    topic: str = Form(...),
+    category: str = Form("educational"),
+    target_slides: int = Form(15),
+    language: str = Form("ko"),
+    additional_instructions: str = Form(""),
+    user: models.User = Depends(get_current_user)
+):
+    """콘텐츠 기획안을 생성합니다."""
+    try:
+        result = await content_generator.generate_content_plan(
+            topic=topic,
+            category=category,
+            target_slides=target_slides,
+            language=language,
+            additional_instructions=additional_instructions
+        )
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.post("/api/content/generate-images/{plan_id}")
+async def generate_plan_images(
+    plan_id: str,
+    user: models.User = Depends(get_current_user)
+):
+    """기획안의 모든 슬라이드 이미지를 생성합니다."""
+    try:
+        result = await content_generator.generate_all_images(plan_id=plan_id)
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.post("/api/content/create-pdf/{plan_id}")
+async def create_pdf_from_plan(
+    plan_id: str,
+    title: str = Form(None),
+    user: models.User = Depends(get_current_user)
+):
+    """생성된 이미지들을 PDF로 합칩니다."""
+    try:
+        result = await content_generator.create_pdf_from_plan(
+            plan_id=plan_id,
+            title=title
+        )
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.get("/api/content/plans")
+async def list_content_plans(user: models.User = Depends(get_current_user)):
+    """기획안 목록을 반환합니다."""
+    plans = content_generator.list_plans()
+    return {"status": "success", "plans": plans}
+
+
+@app.get("/api/content/plan/{plan_id}")
+async def get_content_plan(plan_id: str, user: models.User = Depends(get_current_user)):
+    """특정 기획안을 반환합니다."""
+    plan = content_generator.get_plan(plan_id)
+    if plan:
+        return {"status": "success", "plan": plan}
+    else:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+
+@app.delete("/api/content/plan/{plan_id}")
+async def delete_content_plan(plan_id: str, user: models.User = Depends(get_current_user)):
+    """기획안과 관련 파일들을 삭제합니다."""
+    success = content_generator.delete_plan(plan_id)
+    if success:
+        return {"status": "success", "message": "Plan deleted"}
+    else:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+
+@app.get("/api/content/plan/{plan_id}/images")
+async def list_plan_images(plan_id: str, user: models.User = Depends(get_current_user)):
+    """기획안의 생성된 이미지 목록을 반환합니다."""
+    images = content_generator.list_images_for_plan(plan_id)
+    return {"status": "success", "images": images, "plan_id": plan_id}
+
+
+@app.get("/api/content/image/download/{filename}")
+async def download_content_image(filename: str, token: str = None):
+    """생성된 이미지를 다운로드합니다."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        payload = auth_service.jwt.decode(token, auth_service.SECRET_KEY, algorithms=[auth_service.ALGORITHM])
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    filepath = os.path.join(content_generator.output_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        filepath,
+        media_type="image/png",
+        filename=filename
+    )
+
+
+@app.delete("/api/content/image/{filename}")
+async def delete_content_image(filename: str, user: models.User = Depends(get_current_user)):
+    """생성된 이미지를 삭제합니다."""
+    filepath = os.path.join(content_generator.output_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        os.remove(filepath)
+        return {"status": "success", "message": "Image deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/content/pdfs")
+async def list_generated_pdfs(user: models.User = Depends(get_current_user)):
+    """생성된 PDF 목록을 반환합니다."""
+    pdfs = content_generator.list_generated_pdfs()
+    return {"status": "success", "pdfs": pdfs}
+
+
+@app.get("/api/content/pdf/download/{filename}")
+async def download_generated_pdf(filename: str, token: str = None):
+    """생성된 PDF를 다운로드합니다."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        payload = auth_service.jwt.decode(token, auth_service.SECRET_KEY, algorithms=[auth_service.ALGORITHM])
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    filepath = os.path.join(content_generator.pdf_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        filepath,
+        media_type="application/pdf",
+        filename=filename
+    )
+
+
+@app.delete("/api/content/pdf/{filename}")
+async def delete_generated_pdf(filename: str, user: models.User = Depends(get_current_user)):
+    """생성된 PDF를 삭제합니다."""
+    success = content_generator.delete_pdf(filename)
+    if success:
+        return {"status": "success", "message": "PDF deleted"}
     else:
         raise HTTPException(status_code=404, detail="File not found")
 

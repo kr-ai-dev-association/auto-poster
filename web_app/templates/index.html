@@ -37,6 +37,21 @@
             </div>
 
             <nav class="flex-grow space-y-1" :class="sidebarCollapsed ? 'px-2 mt-2' : 'px-3 mt-4'">
+                <!-- Content Generator (콘텐츠 생성) -->
+                <button @click="mainTab = 'content-generator'"
+                    class="w-full flex items-center text-sm font-medium rounded-lg transition-all"
+                    :class="[
+                        mainTab === 'content-generator' ? 'bg-indigo-600/20 text-white border-l-2 border-indigo-500' : 'text-gray-400 hover:bg-gray-800/50 hover:text-white border-l-2 border-transparent',
+                        sidebarCollapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                    ]"
+                    :title="sidebarCollapsed ? '콘텐츠 생성' : ''">
+                    <svg class="w-5 h-5 flex-shrink-0" :class="sidebarCollapsed ? '' : 'mr-3'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed" class="truncate">콘텐츠 생성</span>
+                </button>
+
                 <!-- Audio Generator (오디오 생성) -->
                 <button @click="mainTab = 'audio-generator'"
                     class="w-full flex items-center text-sm font-medium rounded-lg transition-all"
@@ -192,6 +207,7 @@
                         <span x-show="mainTab === 'youtube'" x-text="t('yt.title')"></span>
                         <span x-show="mainTab === 'genvideo'" x-text="t('genvideo.title')"></span>
                         <span x-show="mainTab === 'timing-editor'">슬라이드 타이밍 편집기</span>
+                        <span x-show="mainTab === 'content-generator'">콘텐츠 생성</span>
                         <span x-show="mainTab === 'audio-generator'">오디오 생성</span>
                         <span x-show="mainTab === 'video-manage'">영상 관리</span>
                     </h2>
@@ -203,6 +219,8 @@
                         x-text="t('genvideo.subtitle')"></p>
                     <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'timing-editor'">
                         비디오 시퀀스를 확인하고 슬라이드 타이밍을 수동으로 조절하세요</p>
+                    <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'content-generator'">
+                        AI로 콘텐츠 기획 및 이미지를 생성하고 PDF로 출력하세요</p>
                     <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'audio-generator'">
                         PDF에서 대본을 생성하고 TTS로 오디오를 만드세요</p>
                     <p class="text-indigo-200 text-xs mt-0.5" x-show="mainTab === 'video-manage'">
@@ -1230,8 +1248,416 @@
                 </div>
             </div>
 
+            <!-- Content Generator Section -->
+            <div x-show="mainTab === 'content-generator'" class="flex flex-col h-full animate-fade-in">
+                <!-- Reset Button (Top Right) -->
+                <div class="w-full px-6 pt-4 pb-2 flex justify-end">
+                    <button @click="resetContentGenerator()"
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        초기화
+                    </button>
+                </div>
+                <div class="flex-grow overflow-y-auto px-6 py-4">
+                    <!-- 3단계 워크플로우 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                        <!-- 1단계: 기획 생성 -->
+                        <div class="flex flex-col gap-4">
+                            <div class="glass-card p-6 flex flex-col">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold">1</div>
+                                    <h3 class="text-lg font-semibold text-white">기획 생성</h3>
+                                </div>
+
+                                <div class="space-y-4 flex-1">
+                                    <!-- 주제 입력 -->
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-2">콘텐츠 주제/아이디어</label>
+                                        <textarea x-model="contentGenTopic" rows="3"
+                                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-sm"
+                                            placeholder="예: 2026년 최신 AI 코딩 도구 비교 분석"></textarea>
+                                    </div>
+
+                                    <!-- 설정 옵션 -->
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label class="block text-xs text-gray-400 mb-1">카테고리</label>
+                                            <select x-model="contentGenCategory"
+                                                class="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-xs">
+                                                <option value="educational">교육</option>
+                                                <option value="entertainment">엔터테인먼트</option>
+                                                <option value="tech">기술</option>
+                                                <option value="gaming">게임</option>
+                                                <option value="lifestyle">라이프스타일</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-400 mb-1">슬라이드</label>
+                                            <select x-model="contentGenSlideCount"
+                                                class="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-xs">
+                                                <option value="10">10장</option>
+                                                <option value="12">12장</option>
+                                                <option value="15">15장</option>
+                                                <option value="18">18장</option>
+                                                <option value="20">20장</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-400 mb-1">언어</label>
+                                            <select x-model="contentGenLanguage"
+                                                class="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-xs">
+                                                <option value="ko">한국어</option>
+                                                <option value="en">English</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 기획 생성 버튼 -->
+                                <button @click="generateContentPlan()"
+                                    :disabled="!contentGenTopic || contentGenLoading"
+                                    class="mt-4 w-full py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm">
+                                    <svg x-show="contentGenLoading && contentGenStep === 'plan'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <svg x-show="!contentGenLoading || contentGenStep !== 'plan'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                    </svg>
+                                    <span x-text="contentGenLoading && contentGenStep === 'plan' ? '기획 생성 중...' : '기획 생성'"></span>
+                                </button>
+                            </div>
+
+                            <!-- 기획안 목록 -->
+                            <div class="glass-card p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        기획안 목록
+                                        <span class="text-xs text-gray-400 font-normal" x-text="'(' + contentGenPlanList.length + ')'"></span>
+                                    </h4>
+                                    <button @click="refreshContentPlanList()"
+                                        class="text-xs text-purple-400 hover:text-purple-300">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <div x-show="contentGenPlanList.length === 0" class="text-center py-4 text-gray-500 text-xs">
+                                    생성된 기획안이 없습니다
+                                </div>
+
+                                <div x-show="contentGenPlanList.length > 0" class="space-y-2 max-h-48 overflow-y-auto">
+                                    <template x-for="plan in contentGenPlanList" :key="plan.plan_id">
+                                        <div class="bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors cursor-pointer"
+                                            :class="{'ring-2 ring-purple-500': contentGenPlanId === plan.plan_id}"
+                                            @click="selectPlanForImages(plan)">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="flex-1 min-w-0">
+                                                    <h5 class="text-white text-xs font-medium truncate" x-text="plan.title"></h5>
+                                                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
+                                                        <span x-text="plan.slide_count + '장'"></span>
+                                                        <span x-show="plan.image_count > 0" class="px-1.5 py-0.5 bg-blue-600/30 text-blue-300 rounded text-xs" x-text="'이미지 ' + plan.image_count"></span>
+                                                        <span class="px-1.5 py-0.5 bg-purple-600/30 text-purple-300 rounded text-xs" x-text="plan.language === 'ko' ? '한국어' : '영어'"></span>
+                                                    </div>
+                                                </div>
+                                                <button @click.stop="deletePlanFromList(plan.plan_id)"
+                                                    class="p-1 text-gray-400 hover:text-red-400 transition-colors">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2단계: 이미지 생성 -->
+                        <div class="flex flex-col gap-4">
+                            <div class="glass-card p-6 flex flex-col">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                                        :class="contentGenPlan ? 'bg-blue-600' : 'bg-gray-600'">2</div>
+                                    <h3 class="text-lg font-semibold text-white">이미지 생성</h3>
+                                </div>
+
+                                <div x-show="!contentGenPlan" class="flex-1 flex items-center justify-center text-gray-500 py-6">
+                                    <div class="text-center">
+                                        <svg class="w-10 h-10 mx-auto mb-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        <p class="text-xs">먼저 기획안을 선택하세요</p>
+                                    </div>
+                                </div>
+
+                                <div x-show="contentGenPlan" class="flex-1 flex flex-col min-h-0">
+                                    <!-- 기획안 요약 -->
+                                    <div class="bg-gray-700/50 rounded-lg p-3 mb-3">
+                                        <h4 class="text-white font-medium text-xs truncate" x-text="contentGenPlan?.title"></h4>
+                                        <p class="text-gray-400 text-xs mt-1" x-text="(contentGenPlan?.slides?.length || 0) + '개 슬라이드'"></p>
+                                    </div>
+
+                                    <!-- 슬라이드 목록 (축소) -->
+                                    <div class="overflow-y-auto space-y-1 mb-3 max-h-32">
+                                        <template x-for="(slide, index) in (contentGenPlan?.slides || [])" :key="index">
+                                            <div class="flex items-center gap-2 p-1.5 bg-gray-700/30 rounded text-xs">
+                                                <span class="w-5 h-5 bg-blue-600/50 rounded flex items-center justify-center text-white text-xs" x-text="slide.slide_number"></span>
+                                                <span class="text-gray-300 truncate flex-1 text-xs" x-text="slide.title"></span>
+                                                <span x-show="contentGenImageResults[index]?.status === 'success'" class="text-green-400 text-xs">✓</span>
+                                                <span x-show="contentGenImageResults[index]?.status === 'error'" class="text-red-400 text-xs">✗</span>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <!-- 이미지 생성 진행률 -->
+                                    <div x-show="contentGenLoading && contentGenStep === 'images'" class="mb-3">
+                                        <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                            <span>이미지 생성 중...</span>
+                                            <span x-text="contentGenImageProgress + '/' + (contentGenPlan?.slides?.length || 0)"></span>
+                                        </div>
+                                        <div class="w-full bg-gray-700 rounded-full h-1.5">
+                                            <div class="bg-blue-600 h-1.5 rounded-full transition-all"
+                                                :style="'width: ' + (contentGenImageProgress / (contentGenPlan?.slides?.length || 1) * 100) + '%'"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 이미지 생성 버튼 -->
+                                <button @click="generateContentImages()"
+                                    :disabled="!contentGenPlan || contentGenLoading"
+                                    class="mt-auto w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm">
+                                    <svg x-show="contentGenLoading && contentGenStep === 'images'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <svg x-show="!contentGenLoading || contentGenStep !== 'images'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span x-text="contentGenLoading && contentGenStep === 'images' ? '이미지 생성 중...' : '이미지 생성'"></span>
+                                </button>
+                            </div>
+
+                            <!-- 이미지 목록 -->
+                            <div class="glass-card p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                        생성된 이미지
+                                        <span class="text-xs text-gray-400 font-normal" x-text="'(' + contentGenImageList.length + ')'"></span>
+                                    </h4>
+                                    <div class="flex items-center gap-2">
+                                        <!-- 전체 삭제 버튼 -->
+                                        <button x-show="contentGenImageList.length > 0" @click="deleteAllContentImages()"
+                                            class="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                                            title="이미지 전체 삭제">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                            전체 삭제
+                                        </button>
+                                        <!-- 새로고침 버튼 -->
+                                        <button x-show="contentGenPlanId" @click="refreshContentImageList()"
+                                            class="text-xs text-blue-400 hover:text-blue-300" title="새로고침">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div x-show="contentGenImageList.length === 0" class="text-center py-6 text-gray-500 text-sm">
+                                    <svg class="w-10 h-10 mx-auto mb-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span x-show="!contentGenPlanId">기획안을 선택하세요</span>
+                                    <span x-show="contentGenPlanId">생성된 이미지가 없습니다</span>
+                                </div>
+
+                                <div x-show="contentGenImageList.length > 0" class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
+                                    <template x-for="img in contentGenImageList" :key="img.filename">
+                                        <div class="relative group aspect-video bg-gray-700 rounded-lg overflow-hidden cursor-pointer border border-gray-600 hover:border-blue-500 transition-colors shadow-md"
+                                            @click="previewContentImage(img.filename)">
+                                            <img :src="'/api/content/image/download/' + img.filename + '?token=' + localStorage.getItem('access_token')"
+                                                class="w-full h-full object-cover" loading="lazy">
+                                            <!-- 슬라이드 번호 배지 -->
+                                            <div class="absolute top-2 left-2 px-2 py-0.5 bg-black/70 rounded text-white text-xs font-medium">
+                                                #<span x-text="img.slide_number"></span>
+                                            </div>
+                                            <!-- 호버 오버레이 -->
+                                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <div class="flex items-center gap-1 text-white text-sm">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                                                    </svg>
+                                                    확대
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3단계: PDF 생성 -->
+                        <div class="flex flex-col gap-4">
+                            <div class="glass-card p-6 flex flex-col">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                                        :class="contentGenImagesComplete ? 'bg-green-600' : 'bg-gray-600'">3</div>
+                                    <h3 class="text-lg font-semibold text-white">PDF 생성</h3>
+                                </div>
+
+                                <div x-show="!contentGenImagesComplete" class="flex-1 flex items-center justify-center text-gray-500 py-6">
+                                    <div class="text-center">
+                                        <svg class="w-10 h-10 mx-auto mb-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                        <p class="text-xs">먼저 이미지를 생성하세요</p>
+                                    </div>
+                                </div>
+
+                                <div x-show="contentGenImagesComplete" class="flex-1 flex flex-col">
+                                    <!-- 생성 완료 상태 -->
+                                    <div class="bg-green-600/20 border border-green-500/50 rounded-lg p-3 mb-3">
+                                        <div class="flex items-center gap-2 text-green-400">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <span class="font-medium text-sm">이미지 생성 완료</span>
+                                        </div>
+                                        <p class="text-gray-400 text-xs mt-1" x-text="contentGenImageResults.filter(r => r?.status === 'success').length + '개 이미지 준비됨'"></p>
+                                    </div>
+
+                                    <!-- PDF 결과 -->
+                                    <div x-show="contentGenPdfResult" class="bg-blue-600/20 border border-blue-500/50 rounded-lg p-3 mb-3">
+                                        <div class="flex items-center gap-2 text-blue-400 mb-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            <span class="font-medium text-sm">PDF 생성 완료</span>
+                                        </div>
+                                        <p class="text-white text-xs truncate" x-text="contentGenPdfResult?.filename"></p>
+
+                                        <!-- 다음 단계 버튼들 -->
+                                        <div class="mt-2 flex gap-2">
+                                            <button @click="downloadGeneratedPdf()"
+                                                class="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs flex items-center justify-center gap-1">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                                </svg>
+                                                다운로드
+                                            </button>
+                                            <button @click="goToAudioGeneratorWithPdf()"
+                                                class="flex-1 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs flex items-center justify-center gap-1">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                                                </svg>
+                                                오디오 생성
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PDF 생성 버튼 -->
+                                <button @click="createContentPdf()"
+                                    :disabled="!contentGenImagesComplete || contentGenLoading"
+                                    class="mt-auto w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm">
+                                    <svg x-show="contentGenLoading && contentGenStep === 'pdf'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <svg x-show="!contentGenLoading || contentGenStep !== 'pdf'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <span x-text="contentGenLoading && contentGenStep === 'pdf' ? 'PDF 생성 중...' : 'PDF 생성'"></span>
+                                </button>
+                            </div>
+
+                            <!-- PDF 목록 -->
+                            <div class="glass-card p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        생성된 PDF
+                                        <span class="text-xs text-gray-400 font-normal" x-text="'(' + contentGenPdfList.length + ')'"></span>
+                                    </h4>
+                                    <button @click="refreshContentPdfList()"
+                                        class="text-xs text-green-400 hover:text-green-300">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <div x-show="contentGenPdfList.length === 0" class="text-center py-4 text-gray-500 text-xs">
+                                    생성된 PDF가 없습니다
+                                </div>
+
+                                <div x-show="contentGenPdfList.length > 0" class="space-y-2 max-h-48 overflow-y-auto">
+                                    <template x-for="pdf in contentGenPdfList" :key="pdf.filename">
+                                        <div class="bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="flex-1 min-w-0">
+                                                    <h5 class="text-white text-xs font-medium truncate" x-text="pdf.title"></h5>
+                                                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                                                        <span x-text="pdf.slide_count + '장'"></span>
+                                                        <span class="px-1 py-0.5 bg-blue-600/30 text-blue-300 rounded text-xs" x-text="pdf.language === 'ko' ? 'KO' : 'EN'"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <button @click="downloadPdfFromList(pdf.filename)"
+                                                        class="p-1.5 text-gray-400 hover:text-white transition-colors" title="다운로드">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                                        </svg>
+                                                    </button>
+                                                    <button @click="usePdfForAudioGen(pdf)"
+                                                        class="p-1.5 text-purple-400 hover:text-purple-300 transition-colors" title="오디오 생성">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                                                        </svg>
+                                                    </button>
+                                                    <button @click="deletePdfFromList(pdf.filename)"
+                                                        class="p-1.5 text-gray-400 hover:text-red-400 transition-colors" title="삭제">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Audio Generator Section -->
             <div x-show="mainTab === 'audio-generator'" class="flex flex-col h-full animate-fade-in">
+                <!-- Reset Button (Top Right) -->
+                <div class="w-full px-6 pt-4 pb-2 flex justify-end">
+                    <button @click="resetAudioGenerator()"
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        초기화
+                    </button>
+                </div>
                 <div class="flex-grow overflow-y-auto px-6 py-4">
                     <!-- 2컬럼 레이아웃: 좌측(설정+대본), 우측(오디오 결과+목록) -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
@@ -1483,6 +1909,12 @@
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                                                     </svg>
                                                 </button>
+                                                <button @click="useAudioFromListForGenVideo(audio.filename)"
+                                                    class="p-2 text-gray-400 hover:text-green-400 transition-colors" title="영상 생성에 사용">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                                    </svg>
+                                                </button>
                                                 <button @click="deleteAudioFromList(audio.filename)"
                                                     class="p-2 text-gray-400 hover:text-red-400 transition-colors" title="삭제">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1629,6 +2061,14 @@
                                         class="mt-2 text-xs text-yellow-400">
                                         ⚠️ Smart 모드에서는 오디오 파일이 필수입니다.
                                     </p>
+                                    <!-- 생성된 오디오 목록에서 선택 버튼 -->
+                                    <button @click="showGeneratedAudioPicker = true; loadGeneratedAudioForPicker()"
+                                        class="mt-2 w-full py-2 px-3 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 rounded-lg text-xs text-purple-300 hover:text-purple-200 transition-colors flex items-center justify-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                        </svg>
+                                        생성된 오디오에서 선택
+                                    </button>
                                 </div>
 
                             </div>
@@ -1920,6 +2360,158 @@
                                     </div>
                                 </template>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generated Audio Picker Modal -->
+                <div x-show="showGeneratedAudioPicker"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    @click.self="showGeneratedAudioPicker = false">
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
+                        @click.stop>
+                        <!-- Modal Header -->
+                        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+                            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                                </svg>
+                                생성된 오디오 선택
+                            </h3>
+                            <button @click="showGeneratedAudioPicker = false" class="text-gray-400 hover:text-white">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Modal Body -->
+                        <div class="flex-1 overflow-y-auto p-4">
+                            <div x-show="generatedAudioPickerList.length === 0" class="text-center py-8 text-gray-400">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                                </svg>
+                                <p>생성된 오디오가 없습니다.</p>
+                                <p class="text-sm mt-1">오디오 생성 메뉴에서 먼저 오디오를 생성해주세요.</p>
+                            </div>
+
+                            <div x-show="generatedAudioPickerList.length > 0" class="space-y-2">
+                                <template x-for="audio in generatedAudioPickerList" :key="audio.filename">
+                                    <div @click="selectGeneratedAudio(audio)"
+                                        class="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors border border-transparent hover:border-purple-500/50">
+                                        <div class="flex items-center gap-4">
+                                            <div class="w-10 h-10 bg-purple-600/30 rounded-lg flex items-center justify-center">
+                                                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <div class="text-white font-medium" x-text="audio.filename"></div>
+                                                <div class="text-xs text-gray-400 flex items-center gap-3 mt-1">
+                                                    <span x-text="Math.floor(audio.duration / 60) + '분 ' + Math.round(audio.duration % 60) + '초'"></span>
+                                                    <span x-text="Math.round(audio.size / 1024 / 1024 * 10) / 10 + ' MB'"></span>
+                                                    <span x-show="audio.language" class="px-1.5 py-0.5 bg-blue-600/30 text-blue-300 rounded text-xs" x-text="audio.language === 'ko' ? '한국어' : '영어'"></span>
+                                                    <span x-show="audio.voice" class="px-1.5 py-0.5 bg-purple-600/30 text-purple-300 rounded text-xs" x-text="audio.voice"></span>
+                                                </div>
+                                                <div x-show="audio.pdf_filename" class="text-xs text-gray-500 mt-1">
+                                                    PDF: <span x-text="audio.pdf_filename"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="text-purple-400">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Modal Footer -->
+                        <div class="p-4 border-t border-gray-700 flex justify-end">
+                            <button @click="showGeneratedAudioPicker = false"
+                                class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm">
+                                취소
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Image Preview Modal -->
+                <div x-show="contentGenImagePreview"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    @click.self="contentGenImagePreview = null"
+                    @keydown.escape.window="contentGenImagePreview = null"
+                    @keydown.left.window="navigateContentImage(-1)"
+                    @keydown.right.window="navigateContentImage(1)">
+
+                    <!-- Close Button -->
+                    <button @click="contentGenImagePreview = null"
+                        class="absolute top-4 right-4 z-10 p-2 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Navigation Arrows -->
+                    <button x-show="contentGenImageList.length > 1" @click.stop="navigateContentImage(-1)"
+                        class="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <button x-show="contentGenImageList.length > 1" @click.stop="navigateContentImage(1)"
+                        class="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700 text-white rounded-full">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Image Container -->
+                    <div class="max-w-[90vw] max-h-[85vh] flex flex-col items-center" @click.stop>
+                        <img :src="'/api/content/image/download/' + contentGenImagePreview?.filename + '?token=' + localStorage.getItem('access_token')"
+                            class="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl">
+
+                        <!-- Image Info -->
+                        <div class="mt-4 flex items-center gap-4 text-white">
+                            <span class="px-3 py-1 bg-blue-600/50 rounded-full text-sm font-medium">
+                                슬라이드 #<span x-text="contentGenImagePreview?.slide_number"></span>
+                            </span>
+                            <span class="text-gray-400 text-sm" x-text="contentGenImagePreview?.filename"></span>
+                            <span x-show="contentGenImageList.length > 1" class="text-gray-500 text-sm">
+                                (<span x-text="contentGenImagePreviewIndex + 1"></span> / <span x-text="contentGenImageList.length"></span>)
+                            </span>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="mt-3 flex gap-2">
+                            <button @click="openContentImageInNewTab(contentGenImagePreview?.filename)"
+                                class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                </svg>
+                                새 탭에서 열기
+                            </button>
+                            <button @click="deleteContentImage(contentGenImagePreview?.filename)"
+                                class="px-4 py-2 bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded-lg text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                삭제
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2589,6 +3181,27 @@
                 selectedGenPdf: '',
                 generatedPdfs: [],
 
+                // Content Generator State
+                contentGenTopic: '',
+                contentGenCategory: 'educational',
+                contentGenSlideCount: 15,
+                contentGenLanguage: 'ko',
+                contentGenInstructions: '',
+                contentGenLoading: false,
+                contentGenStep: '', // 'plan', 'images', 'pdf'
+                contentGenPlan: null,
+                contentGenPlanId: null,
+                contentGenImageProgress: 0,
+                contentGenImageResults: [],
+                contentGenImagesComplete: false,
+                contentGenPdfResult: null,
+                contentGenPdfList: [],
+                contentGenPlanList: [],  // 기획안 목록
+                contentGenImageList: [], // 선택된 기획안의 이미지 목록
+                contentGenSelectedPlanForImages: null, // 이미지 목록 표시용 선택된 기획안
+                contentGenImagePreview: null, // 이미지 미리보기 모달용
+                contentGenImagePreviewIndex: 0, // 현재 미리보기 인덱스
+
                 // Audio Generator State
                 audioGenPdfFile: null,
                 audioGenLanguage: 'ko',
@@ -2618,6 +3231,8 @@
                 genVideoPdfDragOver: false,
                 genVideoAudio: null,
                 genVideoAudioDragOver: false,
+                showGeneratedAudioPicker: false,
+                generatedAudioPickerList: [],
                 genVideoPageDuration: 5,
                 genVideoTransition: 'fade',
                 genVideoTransitionDuration: 0.5,
@@ -2703,11 +3318,24 @@
                         if (value === 'audio-generator' && this.audioGenList.length === 0) {
                             this.refreshAudioList();
                         }
+                        if (value === 'content-generator') {
+                            if (this.contentGenPdfList.length === 0) {
+                                this.refreshContentPdfList();
+                            }
+                            if (this.contentGenPlanList.length === 0) {
+                                this.refreshContentPlanList();
+                            }
+                        }
                     });
 
                     // 초기 탭이 audio-generator인 경우 오디오 목록 로드
                     if (this.mainTab === 'audio-generator') {
                         this.refreshAudioList();
+                    }
+                    // 초기 탭이 content-generator인 경우 목록 로드
+                    if (this.mainTab === 'content-generator') {
+                        this.refreshContentPdfList();
+                        this.refreshContentPlanList();
                     }
 
                     // 마크다운 에디터 초기화 (tab이 'text'일 때)
@@ -4503,6 +5131,75 @@
                     }
                 },
 
+                async loadGeneratedAudioForPicker() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch('/api/audio/list', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        this.generatedAudioPickerList = data.audio_files || [];
+                    } catch (error) {
+                        console.error('Failed to load audio list:', error);
+                        this.generatedAudioPickerList = [];
+                    }
+                },
+
+                async selectGeneratedAudio(audio) {
+                    try {
+                        // 1. 오디오 파일을 서버에서 가져와서 File 객체로 변환
+                        const token = localStorage.getItem('access_token');
+                        const audioUrl = `/api/audio/download/${audio.filename}?token=${token}`;
+
+                        const audioResponse = await fetch(audioUrl);
+                        const audioBlob = await audioResponse.blob();
+                        const audioFile = new File([audioBlob], audio.filename, { type: 'audio/wav' });
+
+                        // 2. 오디오 파일 설정
+                        this.genVideoAudio = audioFile;
+
+                        // 3. 메타데이터가 있으면 언어 설정 적용
+                        if (audio.language) {
+                            if (audio.language === 'ko') {
+                                this.genVideoOcrLang = 'korean';
+                            } else {
+                                this.genVideoOcrLang = 'en';
+                            }
+                        }
+
+                        // 4. PDF 파일이 메타데이터에 있으면 자동 로드 시도
+                        let pdfLoaded = false;
+                        if (audio.pdf_filename) {
+                            try {
+                                // 콘텐츠 생성기에서 만든 PDF인지 확인 (generated_pdfs 폴더)
+                                const pdfUrl = `/api/content/pdf/download/${audio.pdf_filename}?token=${token}`;
+                                const pdfResponse = await fetch(pdfUrl);
+                                if (pdfResponse.ok) {
+                                    const pdfBlob = await pdfResponse.blob();
+                                    const pdfFile = new File([pdfBlob], audio.pdf_filename, { type: 'application/pdf' });
+                                    this.genVideoPdf = pdfFile;
+                                    pdfLoaded = true;
+                                }
+                            } catch (e) {
+                                console.log('PDF not found in generated_pdfs');
+                            }
+                        }
+
+                        // 5. 모달 닫기
+                        this.showGeneratedAudioPicker = false;
+
+                        // 6. PDF 로드 결과 안내 (PDF가 없는 경우만)
+                        if (!pdfLoaded && audio.pdf_filename) {
+                            // PDF 파일명이 있었지만 로드 실패한 경우
+                            console.log('PDF file exists in metadata but not found on server:', audio.pdf_filename);
+                        }
+
+                    } catch (error) {
+                        console.error('Failed to load audio file:', error);
+                        alert('오디오 파일을 불러오는데 실패했습니다.');
+                    }
+                },
+
                 async uploadGenVideoLogo(e) {
                     const file = e.target.files[0];
                     if (!file) return;
@@ -4783,6 +5480,7 @@
                     formData.append('pdf', this.audioGenPdfFile);
                     formData.append('language', this.audioGenLanguage);
                     formData.append('style', this.audioGenStyle);
+                    formData.append('background', 'true');
 
                     try {
                         const response = await fetch('/api/audio/generate-script', {
@@ -4792,22 +5490,85 @@
                         });
 
                         const data = await response.json();
-                        if (data.status === 'success') {
+                        if (data.status === 'started') {
+                            // 백그라운드 태스크 시작됨 - 폴링 시작
+                            await this.pollAudioTask(data.task_id, 'script');
+                        } else if (data.status === 'success') {
+                            // 동기 모드로 완료
                             this.audioGenScript = data.script;
                             this.audioGenScriptInfo = {
                                 char_count: data.char_count,
                                 estimated_duration: data.estimated_duration,
                                 page_count: data.page_count
                             };
+                            this.audioGenLoading = false;
+                            this.audioGenStep = '';
                         } else {
                             alert('대본 생성 실패: ' + data.message);
+                            this.audioGenLoading = false;
+                            this.audioGenStep = '';
                         }
                     } catch (error) {
                         alert('대본 생성 중 오류가 발생했습니다: ' + error.message);
-                    } finally {
                         this.audioGenLoading = false;
                         this.audioGenStep = '';
                     }
+                },
+
+                async pollAudioTask(taskId, type) {
+                    const token = localStorage.getItem('access_token');
+                    const poll = async () => {
+                        try {
+                            const response = await fetch(`/api/audio/task/${taskId}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            const task = await response.json();
+
+                            if (task.status === 'completed') {
+                                // 태스크 완료
+                                const result = task.result;
+                                if (type === 'script') {
+                                    this.audioGenScript = result.script;
+                                    this.audioGenScriptInfo = {
+                                        char_count: result.char_count,
+                                        estimated_duration: result.estimated_duration,
+                                        page_count: result.page_count
+                                    };
+                                } else if (type === 'audio') {
+                                    this.audioGenResult = {
+                                        filename: result.filename,
+                                        duration: result.duration,
+                                        file_size: result.file_size,
+                                        voice: result.voice
+                                    };
+                                    await this.refreshAudioList();
+                                }
+                                this.audioGenLoading = false;
+                                this.audioGenStep = '';
+                                // 완료된 태스크 삭제
+                                fetch(`/api/audio/task/${taskId}`, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                            } else if (task.status === 'error') {
+                                alert((type === 'script' ? '대본' : '오디오') + ' 생성 실패: ' + task.message);
+                                this.audioGenLoading = false;
+                                this.audioGenStep = '';
+                                // 에러 태스크 삭제
+                                fetch(`/api/audio/task/${taskId}`, {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                            } else {
+                                // 진행 중 - 계속 폴링
+                                setTimeout(poll, 1000);
+                            }
+                        } catch (error) {
+                            console.error('폴링 오류:', error);
+                            setTimeout(poll, 2000);
+                        }
+                    };
+                    poll();
                 },
 
                 async generateAudioFromPdf() {
@@ -4878,12 +5639,20 @@
                     const formData = new FormData();
                     formData.append('script', this.audioGenScript);
                     formData.append('voice', this.audioGenVoice);
+                    formData.append('background', 'true');
 
                     // 파일명 생성
                     const filename = this.audioGenPdfFile
                         ? this.audioGenPdfFile.name.replace(/\.pdf$/i, '')
                         : `audio_${Date.now()}`;
                     formData.append('filename', filename);
+
+                    // 메타데이터 추가
+                    formData.append('language', this.audioGenLanguage);
+                    formData.append('style', this.audioGenStyle);
+                    if (this.audioGenPdfFile) {
+                        formData.append('pdf_filename', this.audioGenPdfFile.name);
+                    }
 
                     try {
                         const response = await fetch('/api/audio/generate-tts', {
@@ -4893,7 +5662,11 @@
                         });
 
                         const data = await response.json();
-                        if (data.status === 'success') {
+                        if (data.status === 'started') {
+                            // 백그라운드 태스크 시작됨 - 폴링 시작
+                            await this.pollAudioTask(data.task_id, 'audio');
+                        } else if (data.status === 'success') {
+                            // 동기 모드로 완료
                             this.audioGenResult = {
                                 filename: data.filename,
                                 duration: data.duration,
@@ -4901,12 +5674,15 @@
                                 voice: data.voice
                             };
                             await this.refreshAudioList();
+                            this.audioGenLoading = false;
+                            this.audioGenStep = '';
                         } else {
                             alert('오디오 생성 실패: ' + data.message);
+                            this.audioGenLoading = false;
+                            this.audioGenStep = '';
                         }
                     } catch (error) {
                         alert('오디오 생성 중 오류가 발생했습니다: ' + error.message);
-                    } finally {
                         this.audioGenLoading = false;
                         this.audioGenStep = '';
                     }
@@ -4924,6 +5700,428 @@
                         }
                     } catch (error) {
                         console.error('Failed to refresh audio list:', error);
+                    }
+                },
+
+                resetAudioGenerator() {
+                    this.audioGenPdfFile = null;
+                    this.audioGenLanguage = 'ko';
+                    this.audioGenStyle = 'educational';
+                    this.audioGenVoice = 'Leda';
+                    this.audioGenScript = '';
+                    this.audioGenResult = null;
+                    this.audioGenLoading = false;
+                    this.audioGenStep = '';
+                },
+
+                // ========== Content Generator Functions ==========
+                async resetContentGenerator() {
+                    this.contentGenTopic = '';
+                    this.contentGenCategory = 'educational';
+                    this.contentGenSlideCount = 15;
+                    this.contentGenLanguage = 'ko';
+                    this.contentGenInstructions = '';
+                    this.contentGenLoading = false;
+                    this.contentGenStep = '';
+                    this.contentGenPlan = null;
+                    this.contentGenPlanId = null;
+                    this.contentGenImageProgress = 0;
+                    this.contentGenImageResults = [];
+                    this.contentGenImagesComplete = false;
+                    this.contentGenPdfResult = null;
+                    this.contentGenImageList = [];
+                    this.contentGenImagePreview = null;
+                    // 기획안 목록 새로고침 (기존 생성된 기획안들 유지)
+                    await this.refreshContentPlanList();
+                },
+
+                async refreshContentPlanList() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch('/api/content/plans', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.contentGenPlanList = data.plans || [];
+                        }
+                    } catch (error) {
+                        console.error('Failed to refresh plan list:', error);
+                    }
+                },
+
+                async selectPlanForImages(plan) {
+                    // 기획안 상세 정보 로드
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch(`/api/content/plan/${plan.plan_id}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.contentGenPlan = data.plan;
+                            this.contentGenPlanId = plan.plan_id;
+                            this.contentGenLanguage = plan.language || 'ko';
+                            this.contentGenImageResults = new Array(data.plan.slides?.length || 0).fill(null);
+                            this.contentGenImagesComplete = false;
+                            this.contentGenPdfResult = null;
+                            // 이미지 목록 로드
+                            await this.refreshContentImageList();
+                            // 이미지가 있으면 완료 상태로
+                            if (this.contentGenImageList.length > 0) {
+                                this.contentGenImagesComplete = true;
+                                // 이미지 결과도 업데이트
+                                this.contentGenImageResults = this.contentGenImageList.map(img => ({
+                                    status: 'success',
+                                    slide_number: img.slide_number
+                                }));
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to load plan:', error);
+                    }
+                },
+
+                async refreshContentImageList() {
+                    if (!this.contentGenPlanId) {
+                        this.contentGenImageList = [];
+                        return;
+                    }
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch(`/api/content/plan/${this.contentGenPlanId}/images`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.contentGenImageList = data.images || [];
+                        }
+                    } catch (error) {
+                        console.error('Failed to refresh image list:', error);
+                        this.contentGenImageList = [];
+                    }
+                },
+
+                previewContentImage(filename) {
+                    // 이미지를 모달로 미리보기
+                    const img = this.contentGenImageList.find(i => i.filename === filename);
+                    if (img) {
+                        this.contentGenImagePreview = img;
+                        this.contentGenImagePreviewIndex = this.contentGenImageList.indexOf(img);
+                    }
+                },
+
+                openContentImageInNewTab(filename) {
+                    const token = localStorage.getItem('access_token');
+                    window.open(`/api/content/image/download/${filename}?token=${token}`, '_blank');
+                },
+
+                navigateContentImage(direction) {
+                    if (this.contentGenImageList.length <= 1) return;
+                    let newIndex = this.contentGenImagePreviewIndex + direction;
+                    if (newIndex < 0) newIndex = this.contentGenImageList.length - 1;
+                    if (newIndex >= this.contentGenImageList.length) newIndex = 0;
+                    this.contentGenImagePreviewIndex = newIndex;
+                    this.contentGenImagePreview = this.contentGenImageList[newIndex];
+                },
+
+                async deleteContentImage(filename) {
+                    if (!confirm(`이미지 "${filename}"를 삭제하시겠습니까?`)) return;
+
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch(`/api/content/image/${filename}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            // 목록에서 제거
+                            this.contentGenImageList = this.contentGenImageList.filter(i => i.filename !== filename);
+                            // 모달 닫기 또는 다음 이미지로 이동
+                            if (this.contentGenImageList.length === 0) {
+                                this.contentGenImagePreview = null;
+                            } else {
+                                // 다음 이미지로 이동
+                                if (this.contentGenImagePreviewIndex >= this.contentGenImageList.length) {
+                                    this.contentGenImagePreviewIndex = this.contentGenImageList.length - 1;
+                                }
+                                this.contentGenImagePreview = this.contentGenImageList[this.contentGenImagePreviewIndex];
+                            }
+                        } else {
+                            alert('삭제 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('삭제 중 오류가 발생했습니다: ' + error.message);
+                    }
+                },
+
+                async deleteAllContentImages() {
+                    if (!this.contentGenPlanId || this.contentGenImageList.length === 0) return;
+
+                    const count = this.contentGenImageList.length;
+                    if (!confirm(`현재 기획안의 이미지 ${count}개를 모두 삭제하시겠습니까?`)) return;
+
+                    const token = localStorage.getItem('access_token');
+                    let deletedCount = 0;
+                    let failedCount = 0;
+
+                    // 모든 이미지 삭제
+                    for (const img of this.contentGenImageList) {
+                        try {
+                            const response = await fetch(`/api/content/image/${img.filename}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            const data = await response.json();
+                            if (data.status === 'success') {
+                                deletedCount++;
+                            } else {
+                                failedCount++;
+                            }
+                        } catch (error) {
+                            failedCount++;
+                        }
+                    }
+
+                    // 목록 초기화
+                    this.contentGenImageList = [];
+                    this.contentGenImagePreview = null;
+                    this.contentGenImagesComplete = false;
+
+                    // 결과 알림
+                    if (failedCount > 0) {
+                        alert(`${deletedCount}개 삭제됨, ${failedCount}개 실패`);
+                    }
+                },
+
+                async deletePlanFromList(planId) {
+                    if (!confirm('이 기획안과 관련 이미지를 모두 삭제하시겠습니까?')) return;
+
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch(`/api/content/plan/${planId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            await this.refreshContentPlanList();
+                            // 현재 선택된 기획안이 삭제되면 초기화
+                            if (this.contentGenPlanId === planId) {
+                                this.contentGenPlan = null;
+                                this.contentGenPlanId = null;
+                                this.contentGenImageResults = [];
+                                this.contentGenImagesComplete = false;
+                                this.contentGenImageList = [];
+                            }
+                        } else {
+                            alert('삭제 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('삭제 중 오류가 발생했습니다: ' + error.message);
+                    }
+                },
+
+                async generateContentPlan() {
+                    if (!this.contentGenTopic) return;
+
+                    this.contentGenLoading = true;
+                    this.contentGenStep = 'plan';
+                    this.contentGenPlan = null;
+                    this.contentGenPlanId = null;
+                    this.contentGenImageResults = [];
+                    this.contentGenImagesComplete = false;
+                    this.contentGenPdfResult = null;
+
+                    const token = localStorage.getItem('access_token');
+                    const formData = new FormData();
+                    formData.append('topic', this.contentGenTopic);
+                    formData.append('category', this.contentGenCategory);
+                    formData.append('target_slides', this.contentGenSlideCount);
+                    formData.append('language', this.contentGenLanguage);
+                    formData.append('additional_instructions', this.contentGenInstructions);
+
+                    try {
+                        const response = await fetch('/api/content/generate-plan', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.contentGenPlan = data.plan;
+                            this.contentGenPlanId = data.plan_id;
+                            this.contentGenImageResults = new Array(data.plan.slides?.length || 0).fill(null);
+                            // 기획안 목록 새로고침
+                            await this.refreshContentPlanList();
+                        } else {
+                            alert('기획 생성 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('기획 생성 중 오류가 발생했습니다: ' + error.message);
+                    } finally {
+                        this.contentGenLoading = false;
+                        this.contentGenStep = '';
+                    }
+                },
+
+                async generateContentImages() {
+                    if (!this.contentGenPlanId) return;
+
+                    this.contentGenLoading = true;
+                    this.contentGenStep = 'images';
+                    this.contentGenImageProgress = 0;
+
+                    const token = localStorage.getItem('access_token');
+
+                    try {
+                        const response = await fetch(`/api/content/generate-images/${this.contentGenPlanId}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success' || data.status === 'partial') {
+                            this.contentGenImageResults = data.results || [];
+                            this.contentGenImageProgress = data.success || 0;
+                            this.contentGenImagesComplete = data.success > 0;
+                            // 이미지 목록 새로고침
+                            await this.refreshContentImageList();
+                        } else {
+                            alert('이미지 생성 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('이미지 생성 중 오류가 발생했습니다: ' + error.message);
+                    } finally {
+                        this.contentGenLoading = false;
+                        this.contentGenStep = '';
+                    }
+                },
+
+                async createContentPdf() {
+                    if (!this.contentGenPlanId || !this.contentGenImagesComplete) return;
+
+                    this.contentGenLoading = true;
+                    this.contentGenStep = 'pdf';
+
+                    const token = localStorage.getItem('access_token');
+                    const formData = new FormData();
+                    if (this.contentGenPlan?.title) {
+                        formData.append('title', this.contentGenPlan.title);
+                    }
+
+                    try {
+                        const response = await fetch(`/api/content/create-pdf/${this.contentGenPlanId}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.contentGenPdfResult = data;
+                            await this.refreshContentPdfList();
+                        } else {
+                            alert('PDF 생성 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('PDF 생성 중 오류가 발생했습니다: ' + error.message);
+                    } finally {
+                        this.contentGenLoading = false;
+                        this.contentGenStep = '';
+                    }
+                },
+
+                async refreshContentPdfList() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch('/api/content/pdfs', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.contentGenPdfList = data.pdfs || [];
+                        }
+                    } catch (error) {
+                        console.error('Failed to refresh PDF list:', error);
+                    }
+                },
+
+                downloadGeneratedPdf() {
+                    if (this.contentGenPdfResult?.filename) {
+                        const token = localStorage.getItem('access_token');
+                        window.open(`/api/content/pdf/download/${this.contentGenPdfResult.filename}?token=${token}`, '_blank');
+                    }
+                },
+
+                downloadPdfFromList(filename) {
+                    const token = localStorage.getItem('access_token');
+                    window.open(`/api/content/pdf/download/${filename}?token=${token}`, '_blank');
+                },
+
+                async deletePdfFromList(filename) {
+                    if (!confirm('이 PDF를 삭제하시겠습니까?')) return;
+
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch(`/api/content/pdf/${filename}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            await this.refreshContentPdfList();
+                        } else {
+                            alert('삭제 실패: ' + data.message);
+                        }
+                    } catch (error) {
+                        alert('삭제 중 오류가 발생했습니다: ' + error.message);
+                    }
+                },
+
+                async goToAudioGeneratorWithPdf() {
+                    if (!this.contentGenPdfResult?.filename) return;
+
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const pdfUrl = `/api/content/pdf/download/${this.contentGenPdfResult.filename}?token=${token}`;
+
+                        const pdfResponse = await fetch(pdfUrl);
+                        const pdfBlob = await pdfResponse.blob();
+                        const pdfFile = new File([pdfBlob], this.contentGenPdfResult.filename, { type: 'application/pdf' });
+
+                        // 오디오 생성 페이지로 이동하며 PDF 설정
+                        this.audioGenPdfFile = pdfFile;
+                        this.audioGenLanguage = this.contentGenLanguage;
+                        this.mainTab = 'audio-generator';
+
+                    } catch (error) {
+                        console.error('Failed to load PDF file:', error);
+                        alert('PDF 파일을 불러오는데 실패했습니다.');
+                    }
+                },
+
+                async usePdfForAudioGen(pdf) {
+                    try {
+                        const token = localStorage.getItem('access_token');
+                        const pdfUrl = `/api/content/pdf/download/${pdf.filename}?token=${token}`;
+
+                        const pdfResponse = await fetch(pdfUrl);
+                        const pdfBlob = await pdfResponse.blob();
+                        const pdfFile = new File([pdfBlob], pdf.filename, { type: 'application/pdf' });
+
+                        // 오디오 생성 페이지로 이동하며 PDF 설정
+                        this.audioGenPdfFile = pdfFile;
+                        if (pdf.language) {
+                            this.audioGenLanguage = pdf.language;
+                        }
+                        this.mainTab = 'audio-generator';
+
+                    } catch (error) {
+                        console.error('Failed to load PDF file:', error);
+                        alert('PDF 파일을 불러오는데 실패했습니다.');
                     }
                 },
 
@@ -4964,7 +6162,14 @@
                         // 4. Smart 모드로 설정 (오디오 파일이 있으므로)
                         this.genVideoMode = 'smart';
 
-                        // 5. 영상 생성 탭으로 이동
+                        // 5. 대본 언어에 따라 PDF OCR 언어 자동 설정
+                        if (this.audioGenLanguage === 'ko') {
+                            this.genVideoOcrLang = 'korean';  // 한국어
+                        } else {
+                            this.genVideoOcrLang = 'en';      // 영어
+                        }
+
+                        // 6. 영상 생성 탭으로 이동
                         this.mainTab = 'genvideo';
 
                     } catch (error) {
@@ -4994,6 +6199,69 @@
                 downloadAudioFromList(filename) {
                     const token = localStorage.getItem('access_token');
                     window.open(`/api/audio/download/${filename}?token=${token}`, '_blank');
+                },
+
+                async useAudioFromListForGenVideo(filename) {
+                    try {
+                        // 0. 오디오 목록에서 해당 파일의 메타데이터 가져오기
+                        const audioItem = this.audioGenList.find(a => a.filename === filename);
+
+                        // 1. 오디오 파일을 서버에서 가져와서 File 객체로 변환
+                        const token = localStorage.getItem('access_token');
+                        const audioUrl = `/api/audio/download/${filename}?token=${token}`;
+
+                        const audioResponse = await fetch(audioUrl);
+                        const audioBlob = await audioResponse.blob();
+                        const audioFile = new File([audioBlob], filename, { type: 'audio/wav' });
+
+                        // 2. 오디오 파일을 영상 생성 페이지에 설정
+                        this.genVideoAudio = audioFile;
+
+                        // 3. Smart 모드로 설정 (오디오 파일이 있으므로)
+                        this.genVideoMode = 'smart';
+
+                        // 4. 메타데이터가 있으면 언어 설정 적용
+                        if (audioItem?.language) {
+                            if (audioItem.language === 'ko') {
+                                this.genVideoOcrLang = 'korean';
+                            } else {
+                                this.genVideoOcrLang = 'en';
+                            }
+                        }
+
+                        // 5. PDF 파일이 메타데이터에 있으면 자동 로드 시도
+                        let pdfLoaded = false;
+                        if (audioItem?.pdf_filename) {
+                            try {
+                                // 콘텐츠 생성기에서 만든 PDF인지 확인 (generated_pdfs 폴더)
+                                const pdfUrl = `/api/content/pdf/download/${audioItem.pdf_filename}?token=${token}`;
+                                const pdfResponse = await fetch(pdfUrl);
+                                if (pdfResponse.ok) {
+                                    const pdfBlob = await pdfResponse.blob();
+                                    const pdfFile = new File([pdfBlob], audioItem.pdf_filename, { type: 'application/pdf' });
+                                    this.genVideoPdf = pdfFile;
+                                    pdfLoaded = true;
+                                }
+                            } catch (e) {
+                                console.log('PDF not found in generated_pdfs, user needs to select manually');
+                            }
+                        }
+
+                        // 6. 영상 생성 탭으로 이동
+                        this.mainTab = 'genvideo';
+
+                        // 7. 상태 안내
+                        const langInfo = audioItem?.language === 'ko' ? ' (한국어+영어 OCR 설정됨)' : audioItem?.language === 'en' ? ' (영어 OCR 설정됨)' : '';
+                        if (pdfLoaded) {
+                            alert('오디오와 PDF 파일이 모두 설정되었습니다' + langInfo + '.');
+                        } else {
+                            alert('오디오 파일이 설정되었습니다' + langInfo + '. PDF 파일을 선택해주세요.');
+                        }
+
+                    } catch (error) {
+                        console.error('Failed to load audio file:', error);
+                        alert('오디오 파일을 불러오는데 실패했습니다.');
+                    }
                 },
 
                 async deleteAudioFromList(filename) {
