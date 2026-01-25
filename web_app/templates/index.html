@@ -2472,7 +2472,7 @@
                                                     </path>
                                                 </svg>
                                                 <div class="min-w-0">
-                                                    <div class="text-white text-sm truncate" x-text="audio.filename">
+                                                    <div class="text-white text-sm truncate" x-text="audio.title || audio.filename">
                                                     </div>
                                                     <div class="text-xs text-gray-400"
                                                         x-text="audio.duration + '초 / ' + Math.round(audio.size / 1024) + ' KB'">
@@ -3021,7 +3021,7 @@
                                                 </svg>
                                             </div>
                                             <div>
-                                                <div class="text-white font-medium" x-text="audio.filename"></div>
+                                                <div class="text-white font-medium" x-text="audio.title || audio.filename"></div>
                                                 <div class="text-xs text-gray-400 flex items-center gap-3 mt-1">
                                                     <span
                                                         x-text="Math.floor(audio.duration / 60) + '분 ' + Math.round(audio.duration % 60) + '초'"></span>

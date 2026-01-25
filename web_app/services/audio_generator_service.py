@@ -484,17 +484,40 @@ class AudioGeneratorService:
                     except Exception:
                         pass
 
+                # 제목 가져오기: 메타데이터 > 기획안 > 파일명
+                title = metadata.get('title')
+                if not title:
+                    # content_id로 기획안에서 제목 찾기
+                    content_id = metadata.get('content_id')
+                    if content_id:
+                        plan_path = os.path.join(
+                            os.path.dirname(self.output_dir),
+                            'generated_content',
+                            f'plan_{content_id}.json'
+                        )
+                        if os.path.exists(plan_path):
+                            try:
+                                with open(plan_path, 'r', encoding='utf-8') as pf:
+                                    plan_data = json.load(pf)
+                                    title = plan_data.get('title')
+                            except Exception:
+                                pass
+                    if not title:
+                        title = filename.rsplit('.', 1)[0]  # 확장자 제거한 파일명
+
                 audio_files.append({
                     'filename': filename,
                     'filepath': filepath,
                     'size': stat.st_size,
                     'duration': round(duration, 1),
                     'created_at': stat.st_mtime,
+                    'title': title,
                     'language': metadata.get('language'),
                     'style': metadata.get('style'),
                     'voice': metadata.get('voice'),
                     'pdf_filename': metadata.get('pdf_filename'),
-                    'script': metadata.get('script')
+                    'script': metadata.get('script'),
+                    'content_id': metadata.get('content_id')
                 })
 
         # 생성일 기준 정렬 (최신순)
