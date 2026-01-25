@@ -2572,32 +2572,29 @@
                                  @mouseleave="timingEditorEndPan()"
                                  :class="{'cursor-grab': timingEditorZoom > 100, 'cursor-grabbing': timingEditorIsPanning}">
                                 <!-- 슬라이드 이미지 로드됨 -->
-                                <template x-if="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.loaded && timingEditorSlides[timingEditorCurrentSlide]?.imageUrl">
-                                    <img :src="timingEditorSlides[timingEditorCurrentSlide]?.imageUrl"
-                                         class="object-contain select-none transition-transform duration-100"
-                                         :style="'transform: scale(' + (timingEditorZoom / 100) + ') translate(' + (timingEditorPanX / (timingEditorZoom / 100)) + 'px, ' + (timingEditorPanY / (timingEditorZoom / 100)) + 'px); max-height: 100%; max-width: 100%;'"
-                                         draggable="false" alt="Slide">
-                                </template>
+                                <img x-show="timingEditorSlides.length > 0 && timingEditorSlides[timingEditorCurrentSlide]?.loaded && timingEditorSlides[timingEditorCurrentSlide]?.imageUrl"
+                                     :src="timingEditorSlides[timingEditorCurrentSlide]?.imageUrl || ''"
+                                     class="absolute inset-0 w-full h-full object-contain select-none transition-transform duration-100"
+                                     :style="'transform: scale(' + (timingEditorZoom / 100) + ') translate(' + (timingEditorPanX / (timingEditorZoom / 100)) + 'px, ' + (timingEditorPanY / (timingEditorZoom / 100)) + 'px);'"
+                                     draggable="false" alt="Slide">
                                 <!-- 슬라이드 로딩 중 -->
-                                <template x-if="timingEditorSlides.length > 0 && !timingEditorSlides[timingEditorCurrentSlide]?.loaded">
-                                    <div class="text-gray-500 text-center">
-                                        <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <p class="text-sm">슬라이드 로딩 중...</p>
-                                    </div>
-                                </template>
+                                <div x-show="timingEditorSlides.length > 0 && !timingEditorSlides[timingEditorCurrentSlide]?.loaded"
+                                     class="text-gray-500 text-center absolute">
+                                    <svg class="w-8 h-8 mx-auto mb-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <p class="text-sm">슬라이드 로딩 중...</p>
+                                </div>
                                 <!-- 영상 미선택 -->
-                                <template x-if="timingEditorSlides.length === 0">
-                                    <div class="text-gray-500 text-center">
-                                        <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                        </svg>
-                                        <p class="text-sm">영상을 선택하면 슬라이드가 표시됩니다</p>
-                                    </div>
-                                </template>
+                                <div x-show="timingEditorSlides.length === 0"
+                                     class="text-gray-500 text-center absolute">
+                                    <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <p class="text-sm">영상을 선택하면 슬라이드가 표시됩니다</p>
+                                </div>
                             </div>
                         </div>
 
@@ -3271,9 +3268,9 @@
                 timingEditorSaving: false,
                 timingEditorReencoding: false,
                 timingEditorSaved: false,  // 타이밍 저장 완료 상태
-                timingEditorTopHeight: 33,  // 상단 영역 높이 (%)
+                timingEditorTopHeight: 60,  // 상단 영역 높이 (%)
                 timingEditorResizingPanel: false,  // 패널 리사이즈 중
-                timingEditorZoom: 100,  // 슬라이드 줌 레벨 (%)
+                timingEditorZoom: 120,  // 슬라이드 줌 레벨 (%)
                 timingEditorPanX: 0,  // 패닝 X
                 timingEditorPanY: 0,  // 패닝 Y
                 timingEditorIsPanning: false,  // 패닝 중
@@ -4322,8 +4319,7 @@
                         this.$refs.timingEditorVideo.currentTime = startTime;
                     }
                     this.timingEditorCurrentTime = startTime;
-                    // 슬라이드 변경 시 줌/패닝 리셋
-                    this.timingEditorZoom = 100;
+                    // 슬라이드 변경 시 패닝만 리셋 (줌은 유지)
                     this.timingEditorPanX = 0;
                     this.timingEditorPanY = 0;
                     // 슬라이드 이미지 로드

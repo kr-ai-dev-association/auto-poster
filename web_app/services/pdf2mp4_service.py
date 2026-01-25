@@ -706,6 +706,67 @@ class PDF2MP4Service:
             print(f"Semantic similarity error: {e}")
             return 0.0
 
+    def _detect_potential_transitions(
+        self,
+        segments: List[Dict],
+        min_pause_seconds: float = 0.5,
+        video_id: str = ""
+    ) -> List[float]:
+        """
+        음성 세그먼트 간 자연스러운 전환 지점 감지
+        - 긴 휴지(pause) 감지
+        - 주제 전환 힌트 단어 감지
+
+        Returns:
+            잠재적 전환 지점 시간 목록
+        """
+        transition_points = []
+
+        # 전환 힌트 단어 (한국어/영어)
+        transition_hints = {
+            '다음', '그럼', '그래서', '하지만', '그런데', '또한', '먼저', '마지막',
+            '첫째', '둘째', '셋째', '결론', '정리하면', '요약하면', '예를들어',
+            'next', 'then', 'now', 'first', 'second', 'third', 'finally',
+            'however', 'but', 'also', 'let\'s', 'moving'
+        }
+
+        for i in range(1, len(segments)):
+            prev_seg = segments[i - 1]
+            curr_seg = segments[i]
+
+            prev_end = prev_seg.get('end', prev_seg['start'])
+            curr_start = curr_seg['start']
+
+            # 휴지 시간 계산
+            pause_duration = curr_start - prev_end
+
+            # 현재 세그먼트 텍스트
+            curr_text = curr_seg.get('text', '').lower().strip()
+
+            # 전환 점수 계산
+            transition_score = 0.0
+
+            # 1. 긴 휴지
+            if pause_duration >= min_pause_seconds:
+                transition_score += min(pause_duration / 2.0, 0.5)  # 최대 0.5
+
+            # 2. 전환 힌트 단어로 시작
+            for hint in transition_hints:
+                if curr_text.startswith(hint):
+                    transition_score += 0.3
+                    break
+
+            # 3. 이전 세그먼트가 문장 종결로 끝남 (. ? !)
+            prev_text = prev_seg.get('text', '').strip()
+            if prev_text and prev_text[-1] in '.?!다요':
+                transition_score += 0.2
+
+            # 일정 점수 이상이면 전환 지점으로 추가
+            if transition_score >= 0.4:
+                transition_points.append(curr_start)
+
+        return transition_points
+
     def _find_best_segment_with_semantic(
         self,
         page_text: str,
@@ -1610,11 +1671,12 @@ class PDF2MP4Service:
     ) -> List[Dict[str, float]]:
         """PDF 페이지 키워드와 Whisper 트랜스크립트를 매칭하여 페이지 타이밍 계산
 
-        개선된 알고리즘 v3 (하이브리드):
+        개선된 알고리즘 v4 (하이브리드 + 전환점 감지):
         1. 우선순위 1: "Page X" 언급 탐지 (신뢰도 95%)
-        2. 우선순위 2: 키워드 + 의미적 유사도 매칭
-        3. 앵커 포인트 기반 구간 분할 및 보간
-        4. 순차적 제약 조건 유지 (페이지 순서 보장)
+        2. 우선순위 2: 자연스러운 전환점 감지 (휴지, 힌트 단어)
+        3. 우선순위 3: 키워드 + 의미적 유사도 매칭
+        4. 앵커 포인트 기반 구간 분할 및 보간
+        5. 순차적 제약 조건 유지 (페이지 순서 보장)
         """
 
         # 기본 폴백: 균등 분배
@@ -1630,12 +1692,18 @@ class PDF2MP4Service:
             print(f"[{video_id}] 텍스트 없음 - 균등 분배 사용")
             return self._calculate_equal_timings(segments, num_pages, total_duration)
 
-        print(f"[{video_id}] 🔍 하이브리드 페이지 매칭 시작 (v3: Page언급 + 키워드 + 의미)")
+        print(f"[{video_id}] 🔍 하이브리드 페이지 매칭 시작 (v4: Page언급 + 전환점 + 키워드 + 의미)")
 
         # 디버그: Whisper 세그먼트 샘플
         print(f"[{video_id}] 📝 Whisper 세그먼트 샘플:")
         for seg in segments[:5]:
             print(f"[{video_id}]   [{seg['start']:.1f}s] {seg.get('text', '')[:80]}")
+
+        # ========== 0단계: 잠재적 전환점 감지 ==========
+        transition_points = self._detect_potential_transitions(segments, min_pause_seconds=0.4, video_id=video_id)
+        print(f"[{video_id}] 🔄 잠재적 전환점: {len(transition_points)}개 감지")
+        if transition_points[:10]:
+            print(f"[{video_id}]   처음 10개: {[f'{t:.1f}s' for t in transition_points[:10]]}")
 
         # ========== 1단계: Page 언급 탐지 (최우선) ==========
         page_mentions = self._find_page_mentions_in_transcript(segments, num_pages, video_id)
@@ -1735,9 +1803,20 @@ class PDF2MP4Service:
                         match_info = f"keyword ({match_count}개)"
 
             if best_time is not None:
-                anchors[page_num] = best_time
+                # 가장 가까운 전환점으로 스냅 (±3초 이내)
+                snapped_time = best_time
+                for tp in transition_points:
+                    if search_start <= tp <= search_end:
+                        if abs(tp - best_time) <= 3.0:
+                            snapped_time = tp
+                            break
+
+                anchors[page_num] = snapped_time
                 anchor_confidences[page_num] = min(best_score, 0.7)  # 최대 70% 신뢰도
-                print(f"[{video_id}]   페이지 {page_num}: {match_info} @ {best_time:.1f}초")
+                if snapped_time != best_time:
+                    print(f"[{video_id}]   페이지 {page_num}: {match_info} @ {best_time:.1f}초 → 전환점 {snapped_time:.1f}초")
+                else:
+                    print(f"[{video_id}]   페이지 {page_num}: {match_info} @ {best_time:.1f}초")
 
         # ========== 5단계: 앵커 기반 보간 ==========
         page_start_times = self._interpolate_from_anchors(
@@ -2102,13 +2181,26 @@ class PDF2MP4Service:
         path = self.get_video_path(video_id)
         if path and os.path.exists(path):
             filename = os.path.basename(path)
-            return {
+            info = {
                 'id': video_id,
                 'filename': filename,
                 'file_path': path,
                 'file_size': os.path.getsize(path),
                 'created_at': datetime.fromtimestamp(os.path.getctime(path)).isoformat()
             }
+            # 메타데이터 파일에서 카테고리 등 추가 정보 읽기
+            meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
+            if os.path.exists(meta_file):
+                try:
+                    with open(meta_file, 'r', encoding='utf-8') as f:
+                        meta_data = json.load(f)
+                        info['category'] = meta_data.get('category', '')
+                        info['ocr_lang'] = meta_data.get('ocr_lang', '')
+                        info['mode'] = meta_data.get('mode', 'basic')
+                        info['pdf_name'] = meta_data.get('pdf_name', '')
+                except Exception as e:
+                    print(f"[{video_id}] 메타데이터 읽기 오류: {e}")
+            return info
         return None
 
     def delete_video(self, video_id: str) -> bool:
