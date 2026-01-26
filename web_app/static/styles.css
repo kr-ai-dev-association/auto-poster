@@ -125,6 +125,12 @@ body {
     border-radius: 0 0 0.5rem 0.5rem !important;
 }
 
+.EasyMDEContainer .CodeMirror-cursor {
+    border-left: 1px solid #ffffff !important;
+    border-right: none !important;
+    width: 0 !important;
+}
+
 .EasyMDEContainer .editor-toolbar {
     background-color: rgba(30, 41, 59, 0.8) !important;
     border-color: var(--glass-border) !important;
