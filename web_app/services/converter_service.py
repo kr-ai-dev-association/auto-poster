@@ -1,6 +1,7 @@
 import os
 import re
 import io
+import sys
 import shutil
 import datetime
 import logging
@@ -11,6 +12,10 @@ from google import genai
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from .firebase_service import FirebaseService
+
+# deploy_seo.py 모듈 임포트를 위해 경로 추가
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'youtube_poster'))
+from deploy_seo import trigger_workflow as trigger_seo_deploy
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -150,18 +155,35 @@ class ConverterService:
             id_map[map_key] = wiki_id
             self.firebase.save_id_map(id_map, category=category)
 
-        # 7. 정리 (자동 생성 모드일 때만 temp_dir 정리)
+        # 7. SEO 배포 트리거 (GitHub Actions)
+        seo_deploy_result = None
+        if success:
+            try:
+                logger.info(f"🚀 Triggering SEO deployment for wiki_id: {wiki_id}")
+                seo_success = trigger_seo_deploy()
+                if seo_success:
+                    logger.info("✅ SEO deployment triggered successfully")
+                    seo_deploy_result = "triggered"
+                else:
+                    logger.warning("⚠️ SEO deployment trigger failed")
+                    seo_deploy_result = "failed"
+            except Exception as e:
+                logger.error(f"❌ SEO deployment error: {e}")
+                seo_deploy_result = f"error: {str(e)}"
+
+        # 8. 정리 (자동 생성 모드일 때만 temp_dir 정리)
         if image_mode == "auto":
             temp_dir = f"temp_{wiki_id}"
         shutil.rmtree(temp_dir, ignore_errors=True)
 
         if success:
             return {
-                "status": "success", 
-                "wiki_id": wiki_id, 
+                "status": "success",
+                "wiki_id": wiki_id,
                 "link": f"https://tony.banya.ai/report/{wiki_id}",
                 "preview_html_ko": html_ko,
-                "preview_html_en": html_en
+                "preview_html_en": html_en,
+                "seo_deploy": seo_deploy_result
             }
         else:
             return {"status": "error", "message": "Firestore save failed"}
