@@ -17,6 +17,7 @@ import textwrap
 from reportlab.lib.pagesizes import landscape, A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from PyPDF2 import PdfReader, PdfWriter
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
@@ -894,7 +895,16 @@ Incorporate relevant visual elements from the references while creating a cohesi
         page_width = 1920 * 0.75  # 포인트로 변환 (약 1440pt)
         page_height = 1080 * 0.75  # 약 810pt
 
-        c = canvas.Canvas(pdf_path, pagesize=(page_width, page_height))
+        # 나레이션 텍스트 수집 (슬라이드 번호 순서대로)
+        narrations = []
+        for slide_num, _ in image_files:
+            slide_data = next((s for s in slides if s.get('slide_number') == slide_num), None)
+            narrations.append(slide_data.get('narration', '') if slide_data else '')
+
+        # 임시 PDF 파일 경로
+        temp_pdf_path = pdf_path + '.temp'
+
+        c = canvas.Canvas(temp_pdf_path, pagesize=(page_width, page_height))
 
         for slide_num, image_path in image_files:
             img = Image.open(image_path)
@@ -904,7 +914,35 @@ Incorporate relevant visual elements from the references while creating a cohesi
 
         c.save()
 
-        # 메타데이터 저장
+        # PyPDF2로 PDF에 나레이션 메타데이터 임베드
+        reader = PdfReader(temp_pdf_path)
+        writer = PdfWriter()
+
+        # 모든 페이지 복사
+        for page in reader.pages:
+            writer.add_page(page)
+
+        # 나레이션을 JSON으로 직렬화하여 메타데이터에 저장
+        narrations_json = json.dumps(narrations, ensure_ascii=False)
+        writer.add_metadata({
+            '/Title': pdf_title,
+            '/Author': 'Auto-Poster',
+            '/Subject': plan.get('category', 'educational'),
+            '/Keywords': plan.get('language', 'ko'),
+            '/Creator': 'Auto-Poster Content Generator',
+            '/Narrations': narrations_json,  # 커스텀 메타데이터: 슬라이드별 나레이션
+            '/ContentId': plan_id,
+            '/SlideCount': str(len(image_files))
+        })
+
+        # 최종 PDF 저장
+        with open(pdf_path, 'wb') as f:
+            writer.write(f)
+
+        # 임시 파일 삭제
+        os.remove(temp_pdf_path)
+
+        # 메타데이터 JSON도 저장 (하위 호환성)
         meta_path = pdf_path.rsplit('.', 1)[0] + '.json'
         meta_data = {
             'plan_id': plan_id,
@@ -915,7 +953,7 @@ Incorporate relevant visual elements from the references while creating a cohesi
             'created_at': datetime.now().isoformat(),
             'language': plan.get('language', 'ko'),
             'category': plan.get('category', 'educational'),
-            'narrations': [slide.get('narration', '') for slide in slides]
+            'narrations': narrations
         }
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(meta_data, f, ensure_ascii=False, indent=2)

@@ -1325,8 +1325,7 @@ class PDF2MP4Service:
                 'file_size': os.path.getsize(output_path)
             }
 
-            # 타이밍 정보를 JSON 파일로 저장 (타이밍 편집기용) - OCR 텍스트 포함
-            import json
+            # 타이밍 정보를 JSON 파일로 저장 (타이밍 편집기용)
             timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
             timing_data = {
                 'timings': timings,
@@ -1488,18 +1487,68 @@ class PDF2MP4Service:
             self.update_progress(video_id, 'pdf_done', 40, f'✅ PDF 변환 완료 ({num_pages}페이지)', None)
 
             # 3. PDF 텍스트 추출 (키워드 매칭용)
+            # 우선순위: PDF 내장 narrations > JSON 메타데이터 > PyPDF2 텍스트 > OCR
             self.update_progress(video_id, 'text_extract', 42, '📝 PDF 텍스트 추출 중...', None)
             print(f"[{video_id}] Extracting text from PDF pages...")
-            page_texts = self._extract_pdf_page_texts(pdf_content)
+            page_texts = []
+            narrations_source = None
 
-            # PyPDF2가 실패했거나 텍스트가 부족하면 OCR 사용
-            total_text_len = sum(len(t) for t in page_texts)
-            if total_text_len < 50 and PADDLEOCR_AVAILABLE:
-                print(f"[{video_id}] PyPDF2 텍스트 부족 ({total_text_len} 문자), OCR 사용 (lang={ocr_lang})")
-                self.update_progress(video_id, 'ocr', 43, '🔍 OCR로 텍스트 추출 중...', None)
-                page_texts = self._extract_text_with_ocr(images, video_id, ocr_lang)
+            # 3.1. PDF 파일 자체에서 임베드된 narrations 먼저 시도
+            try:
+                from PyPDF2 import PdfReader
+                pdf_reader = PdfReader(io.BytesIO(pdf_content))
+                pdf_metadata = pdf_reader.metadata
+                if pdf_metadata and '/Narrations' in pdf_metadata:
+                    narrations_json = pdf_metadata.get('/Narrations', '')
+                    if narrations_json:
+                        narrations = json.loads(narrations_json)
+                        if narrations and len(narrations) == num_pages:
+                            page_texts = narrations
+                            narrations_source = 'pdf_embedded'
+                            print(f"[{video_id}] ✅ PDF 내장 메타데이터에서 narrations 로드 성공 ({len(narrations)}개 슬라이드)")
+                        elif narrations:
+                            print(f"[{video_id}] ⚠️ PDF 내장 narrations 개수 불일치 (embedded: {len(narrations)}, pages: {num_pages})")
+            except Exception as e:
+                print(f"[{video_id}] ⚠️ PDF 내장 메타데이터 로드 시도: {e}")
 
-            print(f"[{video_id}] Extracted text from {len(page_texts)} pages (총 {sum(len(t) for t in page_texts)} 문자)")
+            # 3.2. PDF 내장 narrations 없으면 JSON 메타데이터 파일 시도
+            if not page_texts:
+                pdf_meta_path = None
+                if actual_content_id:
+                    pdf_meta_path = os.path.join(self.pdf_dir, f"{actual_content_id}.json")
+                if not pdf_meta_path or not os.path.exists(pdf_meta_path):
+                    # content_id로 못 찾으면 filename 기반으로 시도
+                    pdf_base_name = os.path.splitext(filename)[0]
+                    pdf_meta_path = os.path.join(self.pdf_dir, f"{pdf_base_name}.json")
+
+                if pdf_meta_path and os.path.exists(pdf_meta_path):
+                    try:
+                        with open(pdf_meta_path, 'r', encoding='utf-8') as f:
+                            pdf_meta = json.load(f)
+                        narrations = pdf_meta.get('narrations', [])
+                        if narrations and len(narrations) == num_pages:
+                            page_texts = narrations
+                            narrations_source = 'json_metadata'
+                            print(f"[{video_id}] ✅ JSON 메타데이터에서 narrations 로드 성공 ({len(narrations)}개 슬라이드)")
+                        elif narrations:
+                            print(f"[{video_id}] ⚠️ JSON 메타데이터 narrations 개수 불일치 (meta: {len(narrations)}, pages: {num_pages})")
+                    except Exception as e:
+                        print(f"[{video_id}] ⚠️ JSON 메타데이터 로드 실패: {e}")
+
+            # 3.3. 메타데이터가 없으면 기존 방식 사용 (PyPDF2 텍스트 추출 → OCR)
+            if not page_texts:
+                page_texts = self._extract_pdf_page_texts(pdf_content)
+                narrations_source = 'pypdf2'
+
+                # PyPDF2가 실패했거나 텍스트가 부족하면 OCR 사용
+                total_text_len = sum(len(t) for t in page_texts)
+                if total_text_len < 50 and PADDLEOCR_AVAILABLE:
+                    print(f"[{video_id}] PyPDF2 텍스트 부족 ({total_text_len} 문자), OCR 사용 (lang={ocr_lang})")
+                    self.update_progress(video_id, 'ocr', 43, '🔍 OCR로 텍스트 추출 중...', None)
+                    page_texts = self._extract_text_with_ocr(images, video_id, ocr_lang)
+                    narrations_source = 'ocr'
+
+            print(f"[{video_id}] Extracted text from {len(page_texts)} pages (총 {sum(len(t) for t in page_texts)} 문자, source: {narrations_source})")
 
             check_cancelled()
 
@@ -1632,8 +1681,7 @@ class PDF2MP4Service:
                 'file_size': os.path.getsize(output_path)
             }
 
-            # 타이밍 정보를 JSON 파일로 저장 (타이밍 편집기용) - OCR 텍스트 포함
-            import json
+            # 타이밍 정보를 JSON 파일로 저장 (타이밍 편집기용)
             timing_file = os.path.join(self.output_dir, f"{video_id}_timing.json")
             # Whisper 세그먼트를 간소화하여 저장 (타이밍 편집기용)
             simplified_segments = []
