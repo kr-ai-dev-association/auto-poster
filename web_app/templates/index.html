@@ -2638,10 +2638,10 @@
                                                         stroke-width="2"
                                                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                <p class="text-sm font-medium text-white" x-text="genVideoPdf.name"></p>
+                                                <p class="text-sm font-medium text-white" x-text="genVideoPdfTitle || genVideoPdf.name"></p>
                                                 <p class="text-xs text-gray-400" x-text="formatBytes(genVideoPdf.size)">
                                                 </p>
-                                                <button @click.stop="genVideoPdf = null"
+                                                <button @click.stop="genVideoPdf = null; genVideoPdfTitle = null"
                                                     class="text-xs text-red-400 hover:text-red-300">제거</button>
                                             </div>
                                         </template>
@@ -2688,9 +2688,9 @@
                                                         stroke-width="2"
                                                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                <p class="text-xs font-medium text-white" x-text="genVideoAudio.name">
+                                                <p class="text-xs font-medium text-white" x-text="genVideoAudioTitle || genVideoAudio.name">
                                                 </p>
-                                                <button @click.stop="genVideoAudio = null"
+                                                <button @click.stop="genVideoAudio = null; genVideoAudioTitle = null"
                                                     class="text-xs text-red-400 hover:text-red-300">제거</button>
                                             </div>
                                         </template>
@@ -4189,8 +4189,10 @@
                 genVideoMode: 'smart', // 'basic' or 'smart'
                 genVideoOcrLang: 'en', // OCR 언어 설정 (기본: 영어 전용)
                 genVideoPdf: null,
+                genVideoPdfTitle: null, // PDF 표시용 제목
                 genVideoPdfDragOver: false,
                 genVideoAudio: null,
+                genVideoAudioTitle: null, // 오디오 표시용 제목
                 genVideoAudioDragOver: false,
                 showGeneratedAudioPicker: false,
                 generatedAudioPickerList: [],
@@ -4713,8 +4715,10 @@
                 resetGenvideo() {
                     // 파일 초기화
                     this.genVideoPdf = null;
+                    this.genVideoPdfTitle = null;
                     this.genVideoPdfDragOver = false;
                     this.genVideoAudio = null;
+                    this.genVideoAudioTitle = null;
                     this.genVideoAudioDragOver = false;
 
                     // 모드 및 설정 초기화
@@ -6225,6 +6229,7 @@
 
                         // 2. 오디오 파일 설정
                         this.genVideoAudio = audioFile;
+                        this.genVideoAudioTitle = audio.title || audio.filename;
 
                         // 3. 메타데이터가 있으면 언어 설정 적용
                         if (audio.language) {
@@ -6246,6 +6251,7 @@
                                     const pdfBlob = await pdfResponse.blob();
                                     const pdfFile = new File([pdfBlob], audio.pdf_filename, { type: 'application/pdf' });
                                     this.genVideoPdf = pdfFile;
+                                    this.genVideoPdfTitle = audio.title || audio.pdf_filename;
                                     pdfLoaded = true;
                                 }
                             } catch (e) {
@@ -6297,6 +6303,7 @@
 
                         // PDF 파일 설정
                         this.genVideoPdf = pdfFile;
+                        this.genVideoPdfTitle = pdf.title || pdf.original_name || pdf.filename;
 
                         // PDF 소스 정보 저장 (나중에 오디오 생성 시 메타데이터로 사용)
                         this.audioGenPdfSource = {
@@ -7326,10 +7333,12 @@
 
                         // 2. 오디오 파일을 영상 생성 페이지에 설정
                         this.genVideoAudio = audioFile;
+                        this.genVideoAudioTitle = this.audioGenPdfFile?.name || this.audioGenResult.filename;
 
                         // 3. PDF 파일도 함께 설정 (오디오 생성에 사용한 PDF)
                         if (this.audioGenPdfFile) {
                             this.genVideoPdf = this.audioGenPdfFile;
+                            this.genVideoPdfTitle = this.audioGenPdfSource?.original_name || this.audioGenPdfFile.name;
                         }
 
                         // 4. Smart 모드로 설정 (오디오 파일이 있으므로)
@@ -7408,6 +7417,7 @@
 
                         // 2. 오디오 파일을 영상 생성 페이지에 설정
                         this.genVideoAudio = audioFile;
+                        this.genVideoAudioTitle = audioItem?.title || filename;
 
                         // 3. Smart 모드로 설정 (오디오 파일이 있으므로)
                         this.genVideoMode = 'smart';
@@ -7459,6 +7469,7 @@
                                         const pdfBlob = await pdfResponse.blob();
                                         const pdfFile = new File([pdfBlob], pdfSource.original_name || pdfSource.filename, { type: 'application/pdf' });
                                         this.genVideoPdf = pdfFile;
+                                        this.genVideoPdfTitle = audioItem?.title || pdfSource.original_name || pdfSource.filename;
                                         pdfLoaded = true;
                                     }
                                 }
@@ -7478,6 +7489,7 @@
                                     const pdfBlob = await pdfResponse.blob();
                                     const pdfFile = new File([pdfBlob], `${contentId}.pdf`, { type: 'application/pdf' });
                                     this.genVideoPdf = pdfFile;
+                                    this.genVideoPdfTitle = audioItem?.title || `${contentId}.pdf`;
                                     pdfLoaded = true;
                                 }
                             } catch (e) {
@@ -7525,6 +7537,7 @@
                                             const pdfBlob = await pdfResponse.blob();
                                             const pdfFile = new File([pdfBlob], contentMatchingPdf.original_name || pdfFilename, { type: 'application/pdf' });
                                             this.genVideoPdf = pdfFile;
+                                            this.genVideoPdfTitle = contentMatchingPdf.title || audioItem?.title || contentMatchingPdf.original_name || pdfFilename;
                                             pdfLoaded = true;
 
                                             // 카테고리 정보가 있으면 로고 카테고리 자동 설정
@@ -7562,6 +7575,7 @@
                                             const pdfBlob = await pdfResponse.blob();
                                             const pdfFile = new File([pdfBlob], matchingPdf.original_name || pdfFilename, { type: 'application/pdf' });
                                             this.genVideoPdf = pdfFile;
+                                            this.genVideoPdfTitle = matchingPdf.title || audioItem?.title || matchingPdf.original_name || pdfFilename;
                                             pdfLoaded = true;
                                         }
                                     } catch (e) {
@@ -7583,6 +7597,7 @@
                                         const pdfBlob = await pdfResponse.blob();
                                         const pdfFile = new File([pdfBlob], pdfFilename, { type: 'application/pdf' });
                                         this.genVideoPdf = pdfFile;
+                                        this.genVideoPdfTitle = audioItem?.title || pdfFilename;
                                         pdfLoaded = true;
                                     }
                                 } catch (e) {
