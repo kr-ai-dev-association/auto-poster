@@ -169,10 +169,19 @@ class AutoPipelineService:
             if image_result.get('status') == 'error':
                 raise Exception(f"Image generation failed: {image_result.get('message')}")
 
+            # 성공한 슬라이드 번호 추출
+            image_results = image_result.get('results', [])
+            successful_slide_numbers = [
+                r.get('slide_number') for r in image_results
+                if r.get('status') == 'success'
+            ]
+            logger.info(f"[Pipeline {pipeline_id}] Successful slides: {successful_slide_numbers}")
+
             self.pipelines[pipeline_id]['result']['images'] = {
                 'total': image_result.get('total'),
                 'success': image_result.get('success'),
-                'web_references': image_result.get('web_references_used', 0)
+                'web_references': image_result.get('web_references_used', 0),
+                'successful_slides': successful_slide_numbers
             }
             self.pipelines[pipeline_id]['steps_completed'].append('image_generation')
 
@@ -197,27 +206,35 @@ class AutoPipelineService:
             }
             self.pipelines[pipeline_id]['steps_completed'].append('pdf_generation')
 
-            # ===== Step 4: 대본 생성 =====
-            update_status('script_generation', 55, 'AI 대본 생성 중...')
-            logger.info(f"[Pipeline {pipeline_id}] Step 4: Generating script from PDF")
+            # ===== Step 4: 대본 생성 (성공한 슬라이드의 나레이션만 사용) =====
+            update_status('script_generation', 55, '대본 생성 중...')
+            logger.info(f"[Pipeline {pipeline_id}] Step 4: Generating script from successful slides")
 
-            # PDF를 기반으로 AI가 풍부한 대본 생성 (기획안 narration보다 훨씬 상세함)
-            script_result = await audio_generator.generate_script_from_pdf(
-                pdf_path=pdf_path,
-                language=language,
-                style=script_style
-            )
+            # 성공한 슬라이드의 나레이션만 추출하여 TTS 스크립트로 사용
+            slides = plan.get('slides', [])
+            successful_narrations = []
+            for slide in slides:
+                slide_num = slide.get('slide_number')
+                if slide_num in successful_slide_numbers:
+                    narration = slide.get('narration', '')
+                    if narration:
+                        successful_narrations.append(narration)
 
-            if script_result.get('status') != 'success':
-                raise Exception(f"Script generation failed: {script_result.get('message')}")
-
-            full_script = script_result.get('script', '')
-            logger.info(f"[Pipeline {pipeline_id}] Script generated: {len(full_script)} chars")
+            # 나레이션 합치기 (자연스러운 전환을 위해 줄바꿈 추가)
+            full_script = '\n\n'.join(successful_narrations)
+            logger.info(f"[Pipeline {pipeline_id}] Script from {len(successful_narrations)} slides, {len(full_script)} chars")
+            # 예상 읽기 시간 계산 (한국어 평균 분당 300자, 영어 평균 분당 150단어)
+            if language == 'ko':
+                estimated_duration = len(full_script) / 300 * 60  # 초 단위
+            else:
+                word_count = len(full_script.split())
+                estimated_duration = word_count / 150 * 60  # 초 단위
 
             self.pipelines[pipeline_id]['result']['script'] = {
                 'length': len(full_script),
-                'char_count': script_result.get('char_count', 0),
-                'estimated_duration': script_result.get('estimated_duration', 0)
+                'char_count': len(full_script),
+                'estimated_duration': estimated_duration,
+                'slide_count': len(successful_narrations)
             }
             self.pipelines[pipeline_id]['steps_completed'].append('script_generation')
 

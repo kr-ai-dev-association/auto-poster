@@ -1583,11 +1583,25 @@ class PDF2MP4Service:
                 raise Exception("NVENC encoding failed")
 
             # 6. 원본 PDF 저장 (YouTube Poster에서 재사용 가능)
-            pdf_filename = f"{os.path.splitext(filename)[0]}_{video_id}.pdf"
-            pdf_path = os.path.join(self.pdf_dir, pdf_filename)
-            with open(pdf_path, 'wb') as f:
-                f.write(pdf_content)
-            print(f"[{video_id}] 📄 원본 PDF 저장: {pdf_filename}")
+            # content_id가 전달된 경우 (파이프라인), PDF는 이미 저장되어 있으므로 중복 저장 방지
+            if content_id:
+                # 파이프라인에서 이미 생성된 PDF 경로 사용
+                pdf_filename = f"{content_id}.pdf"
+                pdf_path = os.path.join(self.pdf_dir, pdf_filename)
+                if not os.path.exists(pdf_path):
+                    # PDF가 없으면 저장
+                    with open(pdf_path, 'wb') as f:
+                        f.write(pdf_content)
+                    print(f"[{video_id}] 📄 원본 PDF 저장: {pdf_filename}")
+                else:
+                    print(f"[{video_id}] 📄 기존 PDF 사용: {pdf_filename}")
+            else:
+                # 기존 방식: filename에서 추출
+                pdf_filename = f"{os.path.splitext(filename)[0]}_{video_id}.pdf"
+                pdf_path = os.path.join(self.pdf_dir, pdf_filename)
+                with open(pdf_path, 'wb') as f:
+                    f.write(pdf_content)
+                print(f"[{video_id}] 📄 원본 PDF 저장: {pdf_filename}")
 
             self.update_progress(video_id, 'complete', 100, '✅ 변환 완료!', 0)
 

@@ -7,11 +7,16 @@ import datetime
 import logging
 import requests
 import tempfile
+import uuid
+from typing import Dict, Any, Optional
 from PIL import Image
 from google import genai
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from .firebase_service import FirebaseService
+
+# 위키 배포 태스크 저장소 (인메모리)
+_wiki_task_store: Dict[str, Dict[str, Any]] = {}
 
 # deploy_seo.py 모듈 임포트를 위해 경로 추가
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'youtube_poster'))
@@ -187,6 +192,95 @@ class ConverterService:
             }
         else:
             return {"status": "error", "message": "Firestore save failed"}
+
+    # === 백그라운드 태스크 관리 메서드 ===
+
+    @staticmethod
+    def create_task(metadata: Dict[str, Any] = None) -> str:
+        """새 백그라운드 태스크를 생성합니다."""
+        task_id = str(uuid.uuid4())[:8]
+        _wiki_task_store[task_id] = {
+            'task_id': task_id,
+            'status': 'pending',
+            'progress': 0,
+            'message': '대기 중...',
+            'result': None,
+            'error': None,
+            'metadata': metadata or {}
+        }
+        return task_id
+
+    @staticmethod
+    def update_task(task_id: str, status: str = None, progress: int = None,
+                   message: str = None, result: Dict = None, error: str = None):
+        """태스크 상태를 업데이트합니다."""
+        if task_id in _wiki_task_store:
+            if status:
+                _wiki_task_store[task_id]['status'] = status
+            if progress is not None:
+                _wiki_task_store[task_id]['progress'] = progress
+            if message:
+                _wiki_task_store[task_id]['message'] = message
+            if result:
+                _wiki_task_store[task_id]['result'] = result
+            if error:
+                _wiki_task_store[task_id]['error'] = error
+
+    @staticmethod
+    def get_task(task_id: str) -> Optional[Dict[str, Any]]:
+        """태스크 상태를 조회합니다."""
+        return _wiki_task_store.get(task_id)
+
+    @staticmethod
+    def delete_task(task_id: str):
+        """완료된 태스크를 삭제합니다."""
+        if task_id in _wiki_task_store:
+            del _wiki_task_store[task_id]
+
+    async def run_wiki_process_task(
+        self,
+        task_id: str,
+        file_content: str,
+        filename: str,
+        image_mode: str = "auto",
+        category: str = "tech"
+    ):
+        """백그라운드에서 위키 변환 작업을 실행합니다."""
+        try:
+            self.update_task(task_id, status='running', progress=10, message='마크다운 처리 중...')
+
+            result = await self.process_markdown(
+                file_content=file_content,
+                filename=filename,
+                image_mode=image_mode,
+                category=category
+            )
+
+            if result.get('status') == 'success':
+                self.update_task(
+                    task_id,
+                    status='completed',
+                    progress=100,
+                    message='배포 완료!',
+                    result=result
+                )
+            else:
+                self.update_task(
+                    task_id,
+                    status='error',
+                    progress=0,
+                    message=f"오류: {result.get('message', 'Unknown error')}",
+                    error=result.get('message')
+                )
+        except Exception as e:
+            logger.error(f"Wiki process task failed: {e}")
+            self.update_task(
+                task_id,
+                status='error',
+                progress=0,
+                message=f"오류: {str(e)}",
+                error=str(e)
+            )
 
     def _generate_id(self, base_name):
         try:

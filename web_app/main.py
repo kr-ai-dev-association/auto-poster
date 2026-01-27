@@ -301,12 +301,14 @@ async def process_content(
     title: str = Form(None),
     image_mode: str = Form("auto"),
     category: str = Form("tech"),
+    background: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
     """
     파일 업로드 또는 텍스트 직접 입력을 처리합니다.
     image_mode: 'auto' (자동 생성) 또는 'manual' (수동 삽입)
     category: 'tech' (Tech Wiki) 또는 'news' (Banya Official News)
+    background: True면 백그라운드 태스크로 실행하고 task_id를 반환합니다.
     """
     if not file and not content:
         return JSONResponse(status_code=400, content={"message": "No file or content provided"})
@@ -314,7 +316,7 @@ async def process_content(
     # image_mode 검증
     if image_mode not in ['auto', 'manual']:
         image_mode = 'auto'
-    
+
     # category 검증
     if category not in ['tech', 'news']:
         category = 'tech'
@@ -324,7 +326,7 @@ async def process_content(
         filename = file.filename
         content_bytes = await file.read()
         markdown_text = content_bytes.decode("utf-8")
-    
+
     # 2. 텍스트 직접 입력 처리
     else:
         if not title:
@@ -336,12 +338,50 @@ async def process_content(
     # 3. 비동기 변환 작업 시작
     if not converter:
         return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
-    
-    try:
-        result = await converter.process_markdown(markdown_text, filename, image_mode=image_mode, category=category)
-        return JSONResponse(content=result)
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+    if background:
+        # 백그라운드 태스크로 실행
+        task_id = converter.create_task({
+            'filename': filename,
+            'image_mode': image_mode,
+            'category': category
+        })
+
+        # 백그라운드에서 실행
+        asyncio.create_task(
+            converter.run_wiki_process_task(
+                task_id=task_id,
+                file_content=markdown_text,
+                filename=filename,
+                image_mode=image_mode,
+                category=category
+            )
+        )
+
+        return JSONResponse(content={
+            "status": "started",
+            "task_id": task_id,
+            "message": "배포 작업이 시작되었습니다."
+        })
+    else:
+        # 동기 모드로 실행 (기존 동작)
+        try:
+            result = await converter.process_markdown(markdown_text, filename, image_mode=image_mode, category=category)
+            return JSONResponse(content=result)
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@app.get("/api/upload/task/{task_id}")
+async def get_upload_task_status(
+    task_id: str,
+    user: models.User = Depends(get_current_user)
+):
+    """위키 배포 태스크의 상태를 조회합니다."""
+    task = converter.get_task(task_id)
+    if not task:
+        return JSONResponse(status_code=404, content={"status": "error", "message": "Task not found"})
+    return JSONResponse(content=task)
 
 @app.post("/api/share/linkedin")
 async def share_linkedin(
@@ -1549,15 +1589,43 @@ async def generate_script_from_pdf(
     language: str = Form("ko"),
     style: str = Form("educational"),
     background: bool = Form(True),
+    plan_id: str = Form(None),
     user: models.User = Depends(get_current_user)
 ):
     """PDF에서 YouTube 영상용 대본을 생성합니다.
 
     background=True인 경우 백그라운드에서 실행되며 task_id를 반환합니다.
     클라이언트는 /api/audio/task/{task_id}로 진행 상황을 폴링해야 합니다.
+
+    plan_id가 제공되면 기획안의 나레이션을 직접 사용합니다.
     """
     try:
         pdf_bytes = await pdf.read()
+
+        # plan_id가 있으면 기획안의 나레이션을 사용
+        plan_script = None
+        page_count = None
+        if plan_id:
+            plan = content_generator.get_plan(plan_id)
+            if plan and plan.get('slides'):
+                narrations = [slide.get('narration', '') for slide in plan['slides'] if slide.get('narration')]
+                if narrations:
+                    plan_script = '\n\n'.join(narrations)
+                    page_count = len(plan['slides'])
+                    logger.info(f"Using plan narrations for script generation (plan_id: {plan_id})")
+
+        if plan_script:
+            # 기획안 나레이션을 직접 사용
+            char_count = len(plan_script)
+            estimated_duration = len(plan_script) / (4 if language == 'ko' else 15)
+            return JSONResponse(content={
+                "status": "success",
+                "script": plan_script,
+                "char_count": char_count,
+                "estimated_duration": estimated_duration,
+                "page_count": page_count,
+                "source": "plan"
+            })
 
         if background:
             # 백그라운드 태스크로 실행
@@ -1671,15 +1739,46 @@ async def generate_audio_from_pdf(
     style: str = Form("educational"),
     voice: str = Form("Leda"),
     filename: str = Form(None),
+    plan_id: str = Form(None),
     user: models.User = Depends(get_current_user)
 ):
-    """PDF에서 직접 오디오를 생성합니다 (대본 생성 + TTS)."""
+    """PDF에서 직접 오디오를 생성합니다 (대본 생성 + TTS).
+
+    plan_id가 제공되면 기획안의 나레이션을 사용합니다.
+    """
     try:
         pdf_bytes = await pdf.read()
 
         # 파일명이 없으면 PDF 파일명 사용
         if not filename and pdf.filename:
             filename = os.path.splitext(pdf.filename)[0]
+
+        # plan_id가 있으면 기획안의 나레이션을 사용
+        plan_script = None
+        page_count = None
+        if plan_id:
+            plan = content_generator.get_plan(plan_id)
+            if plan and plan.get('slides'):
+                narrations = [slide.get('narration', '') for slide in plan['slides'] if slide.get('narration')]
+                if narrations:
+                    plan_script = '\n\n'.join(narrations)
+                    page_count = len(plan['slides'])
+                    logger.info(f"Using plan narrations for audio generation (plan_id: {plan_id})")
+
+        if plan_script:
+            # 기획안 나레이션을 직접 사용하여 오디오 생성
+            result = await audio_generator.generate_audio_from_script(
+                script=plan_script,
+                output_filename=filename,
+                voice=voice,
+                metadata={'language': language, 'style': style, 'plan_id': plan_id}
+            )
+            if result.get('status') == 'success':
+                result['script'] = plan_script
+                result['page_count'] = page_count
+                result['char_count'] = len(plan_script)
+                result['source'] = 'plan'
+            return JSONResponse(content=result)
 
         result = await audio_generator.generate_audio_from_pdf(
             pdf_bytes=pdf_bytes,
