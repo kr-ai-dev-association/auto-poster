@@ -2214,7 +2214,7 @@
                                     </div>
                                     <!-- 콘텐츠 생성 PDF 선택 버튼 -->
                                     <div>
-                                        <button type="button" @click="console.log('Button clicked'); showAudioGenPdfPicker = true; loadAudioGenPdfList()"
+                                        <button type="button" @click="showAudioGenPdfPicker = true; loadAudioGenPdfList()"
                                             class="w-full py-2.5 px-4 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 rounded-lg text-sm text-purple-300 hover:text-purple-200 transition-colors flex items-center justify-center gap-2">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -3174,96 +3174,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Audio Generator PDF Picker Modal -->
-                <div x-show="showAudioGenPdfPicker" x-cloak
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-                    x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                    @click.self="showAudioGenPdfPicker = false">
-                    <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
-                        @click.stop>
-                        <!-- Modal Header -->
-                        <div class="flex items-center justify-between p-4 border-b border-gray-700">
-                            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-                                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                    </path>
-                                </svg>
-                                콘텐츠 생성 PDF 선택
-                            </h3>
-                            <button @click="showAudioGenPdfPicker = false" class="text-gray-400 hover:text-white">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
-
-                        <!-- Modal Content -->
-                        <div class="flex-1 overflow-y-auto p-4">
-                            <div x-show="audioGenPdfPickerList.length === 0" class="text-center py-8 text-gray-400">
-                                <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                    </path>
-                                </svg>
-                                <p>생성된 PDF가 없습니다.</p>
-                                <p class="text-sm mt-1">콘텐츠 생성 페이지에서 먼저 PDF를 생성해주세요.</p>
-                            </div>
-
-                            <div x-show="audioGenPdfPickerList.length > 0" class="space-y-2">
-                                <template x-for="pdf in audioGenPdfPickerList" :key="pdf.filename">
-                                    <div @click="selectAudioGenPdf(pdf)"
-                                        class="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors border border-transparent hover:border-purple-500/50">
-                                        <div class="flex items-center gap-4">
-                                            <div
-                                                class="w-10 h-10 bg-purple-600/30 rounded-lg flex items-center justify-center">
-                                                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                                    </path>
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <p class="text-white font-medium"
-                                                    x-text="pdf.title || pdf.filename"></p>
-                                                <div class="flex items-center gap-3 text-xs text-gray-400 mt-1">
-                                                    <span x-text="pdf.slide_count + '페이지'"></span>
-                                                    <span x-show="pdf.language"
-                                                        x-text="pdf.language === 'ko' ? '한국어' : pdf.language === 'en' ? '영어' : pdf.language"></span>
-                                                    <span
-                                                        x-text="new Date(pdf.created_at * 1000).toLocaleDateString('ko-KR')"></span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M9 5l7 7-7 7"></path>
-                                            </svg>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-
-                        <!-- Modal Footer -->
-                        <div class="p-4 border-t border-gray-700 flex justify-end">
-                            <button @click="showAudioGenPdfPicker = false"
-                                class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm">
-                                취소
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Content Image Preview Modal -->
                 <div x-show="false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
                     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
@@ -3997,6 +3907,95 @@
                                 포스팅: <span x-text="videoManageList.filter(v => v.stage === 'posted').length"></span>
                             </span>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Generator PDF Picker Modal (Global - outside tabs) -->
+            <div x-show="showAudioGenPdfPicker"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+                x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                @click.self="showAudioGenPdfPicker = false">
+                <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
+                    @click.stop>
+                    <!-- Modal Header -->
+                    <div class="flex items-center justify-between p-4 border-b border-gray-700">
+                        <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            콘텐츠 생성 PDF 선택
+                        </h3>
+                        <button @click="showAudioGenPdfPicker = false" class="text-gray-400 hover:text-white">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Modal Content -->
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <div x-show="audioGenPdfPickerList.length === 0" class="text-center py-8 text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            <p>생성된 PDF가 없습니다.</p>
+                            <p class="text-sm mt-1">콘텐츠 생성 페이지에서 먼저 PDF를 생성해주세요.</p>
+                        </div>
+
+                        <div x-show="audioGenPdfPickerList.length > 0" class="space-y-2">
+                            <template x-for="pdf in audioGenPdfPickerList" :key="pdf.filename">
+                                <div @click="selectAudioGenPdf(pdf)"
+                                    class="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors border border-transparent hover:border-purple-500/50">
+                                    <div class="flex items-center gap-4">
+                                        <div
+                                            class="w-10 h-10 bg-purple-600/30 rounded-lg flex items-center justify-center">
+                                            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                                </path>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-white font-medium"
+                                                x-text="pdf.title || pdf.filename"></p>
+                                            <div class="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                                                <span x-text="pdf.slide_count + '페이지'"></span>
+                                                <span x-show="pdf.language"
+                                                    x-text="pdf.language === 'ko' ? '한국어' : pdf.language === 'en' ? '영어' : pdf.language"></span>
+                                                <span
+                                                    x-text="new Date(pdf.created_at * 1000).toLocaleDateString('ko-KR')"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 5l7 7-7 7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="p-4 border-t border-gray-700 flex justify-end">
+                        <button @click="showAudioGenPdfPicker = false"
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm">
+                            취소
+                        </button>
                     </div>
                 </div>
             </div>
@@ -4948,8 +4947,6 @@
 
                     // 드래그 상태 초기화
                     this.endSlideReorder();
-
-                    console.log(`슬라이드 순서 변경: ${fromIdx} → ${toIdx}`);
                 },
 
                 formatTimecode(seconds) {
@@ -4994,7 +4991,6 @@
                 updateTimingStart(idx, newStartStr) {
                     const newStart = this.parseTimecode(newStartStr);
                     if (newStart === null || newStart < 0) {
-                        console.log('Invalid start time:', newStartStr);
                         return;
                     }
 
@@ -5028,14 +5024,11 @@
                             prevTiming.duration = clampedStart - prevTiming.start;
                         }
                     }
-
-                    console.log(`Slide ${idx + 1} start updated: ${oldStart.toFixed(1)}s -> ${clampedStart.toFixed(1)}s`);
                 },
 
                 updateTimingEnd(idx, newEndStr) {
                     const newEnd = this.parseTimecode(newEndStr);
                     if (newEnd === null || newEnd < 0) {
-                        console.log('Invalid end time:', newEndStr);
                         return;
                     }
 
@@ -5077,8 +5070,6 @@
                             }
                         }
                     }
-
-                    console.log(`Slide ${idx + 1} end updated: ${oldEnd.toFixed(1)}s -> ${clampedEnd.toFixed(1)}s`);
                 },
 
                 async loadTimingEditorVideo() {
@@ -5091,7 +5082,6 @@
                     this.timingEditorSaved = false;
 
                     const token = localStorage.getItem('access_token');
-                    console.log('Loading timing editor for video:', this.timingEditorSelectedVideo);
 
                     try {
                         // Load timing data from API (타이밍 + OCR 텍스트)
@@ -5101,7 +5091,6 @@
 
                         if (response.ok) {
                             const data = await response.json();
-                            console.log('Timing data loaded:', data);
                             this.timingEditorTimings = data.timings || [];
                             this.timingEditorDuration = data.duration || 0;
                             this.timingEditorNumSlides = data.numSlides || this.timingEditorTimings.length;
@@ -5111,7 +5100,6 @@
 
                             // Whisper 트랜스크립트 세그먼트 로드
                             this.timingEditorTranscriptSegments = data.transcriptSegments || [];
-                            console.log('Transcript segments loaded:', this.timingEditorTranscriptSegments.length);
 
                             // 슬라이드 플레이스홀더 생성 (이미지는 나중에 개별 로드, OCR 텍스트는 미리 저장)
                             this.timingEditorSlides = Array.from({ length: this.timingEditorNumSlides }, (_, i) => ({
@@ -5500,7 +5488,6 @@
                         if (startData.status === 'started') {
                             // 진행률 폴링 시작
                             const reencodeId = startData.reencode_id;
-                            console.log('재변환 시작:', reencodeId);
 
                             // 진행률 폴링
                             const result = await this.pollReencodeProgress(reencodeId);
@@ -5561,7 +5548,6 @@
 
                             if (response.ok) {
                                 const data = await response.json();
-                                console.log('Reencode progress:', data);
 
                                 if (data.status === 'success') {
                                     this.timingEditorReencodeProgress = data.progress || 0;
@@ -5578,7 +5564,6 @@
                                     }
                                 } else if (data.status === 'not_found') {
                                     // 아직 진행률이 초기화되지 않음 - 대기
-                                    console.log('Progress not found yet, waiting...');
                                     this.timingEditorReencodeStatus = '준비 중...';
                                 }
                             }
@@ -5831,21 +5816,11 @@
                         // 마크다운 에디터가 있으면 에디터의 내용 확인
                         if (this.markdownEditor) {
                             const editorContent = this.markdownEditor.value();
-                            const hasContent = editorContent && editorContent.trim().length > 0;
-                            // 디버깅 로그 (개발 중에만)
-                            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                                console.log('hasContent (editor):', hasContent, 'length:', editorContent ? editorContent.trim().length : 0);
-                            }
-                            return hasContent;
+                            return editorContent && editorContent.trim().length > 0;
                         }
                         // 에디터가 없으면 content 변수 확인
-                        const hasContent = this.content && this.content.trim().length > 0;
-                        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                            console.log('hasContent (content var):', hasContent, 'length:', this.content ? this.content.trim().length : 0);
-                        }
-                        return hasContent;
+                        return this.content && this.content.trim().length > 0;
                     } catch (e) {
-                        console.error("Error in hasContent:", e);
                         // 에러 발생 시 content 변수로 폴백
                         return this.content && this.content.trim().length > 0;
                     }
@@ -6274,18 +6249,12 @@
                                     pdfLoaded = true;
                                 }
                             } catch (e) {
-                                console.log('PDF not found in generated_pdfs');
+                                // PDF not found - ignore
                             }
                         }
 
                         // 5. 모달 닫기
                         this.showGeneratedAudioPicker = false;
-
-                        // 6. PDF 로드 결과 안내 (PDF가 없는 경우만)
-                        if (!pdfLoaded && audio.pdf_filename) {
-                            // PDF 파일명이 있었지만 로드 실패한 경우
-                            console.log('PDF file exists in metadata but not found on server:', audio.pdf_filename);
-                        }
 
                     } catch (error) {
                         console.error('Failed to load audio file:', error);
@@ -6494,7 +6463,6 @@
                                         method: 'POST',
                                         headers: { 'Authorization': `Bearer ${token}` }
                                     });
-                                    console.log(`Cancelled conversion: ${conversion.video_id}`);
                                 }
                             }
                         }
@@ -6605,7 +6573,6 @@
                     // 콘텐츠 생성에서 온 PDF면 plan_id 전달 (기획안 나레이션 사용)
                     if (this.audioGenPdfSource?.plan_id) {
                         formData.append('plan_id', this.audioGenPdfSource.plan_id);
-                        console.log('Using plan_id for script generation:', this.audioGenPdfSource.plan_id);
                     }
 
                     try {
@@ -6628,9 +6595,6 @@
                                 page_count: data.page_count,
                                 source: data.source || 'generated'
                             };
-                            if (data.source === 'plan') {
-                                console.log('Script loaded from plan narrations');
-                            }
                             this.audioGenLoading = false;
                             this.audioGenStep = '';
                         } else {
@@ -6724,7 +6688,6 @@
                     // 콘텐츠 생성에서 온 PDF면 plan_id 전달 (기획안 나레이션 사용)
                     if (this.audioGenPdfSource?.plan_id) {
                         formData.append('plan_id', this.audioGenPdfSource.plan_id);
-                        console.log('Using plan_id for audio generation:', this.audioGenPdfSource.plan_id);
                     }
 
                     try {
@@ -6859,19 +6822,15 @@
 
                 async loadAudioGenPdfList() {
                     const token = localStorage.getItem('access_token');
-                    console.log('Loading audio gen PDF list...');
                     try {
                         const response = await fetch('/api/content/pdfs', {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
                         const data = await response.json();
-                        console.log('PDF list response:', data);
                         if (data.status === 'success') {
                             // Sort by created_at descending (newest first)
                             this.audioGenPdfPickerList = (data.pdfs || []).sort((a, b) => b.created_at - a.created_at);
-                            console.log('Loaded PDFs:', this.audioGenPdfPickerList.length);
                         } else {
-                            console.error('Failed to load PDFs:', data);
                             this.audioGenPdfPickerList = [];
                         }
                     } catch (error) {
@@ -7395,11 +7354,10 @@
                                     if (matchedPdf?.category && this.categories.some(cat => cat.id === matchedPdf.category)) {
                                         this.genVideoCategory = matchedPdf.category;
                                         this.genVideoLogoTimestamp = Date.now();
-                                        console.log('Set category from PDF metadata:', matchedPdf.category);
                                     }
                                 }
                             } catch (e) {
-                                console.log('Failed to get PDF category:', e);
+                                // PDF 카테고리 조회 실패 - 무시
                             }
                         }
 
@@ -7439,7 +7397,6 @@
                     try {
                         // 0. 오디오 목록에서 해당 파일의 메타데이터 가져오기
                         const audioItem = this.audioGenList.find(a => a.filename === filename);
-                        console.log('Audio item metadata:', audioItem);
 
                         // 1. 오디오 파일을 서버에서 가져와서 File 객체로 변환
                         const token = localStorage.getItem('access_token');
@@ -7470,7 +7427,6 @@
                         // pdf_source 정보가 있으면 직접 사용 (가장 정확한 방법)
                         if (audioItem?.pdf_source) {
                             const pdfSource = audioItem.pdf_source;
-                            console.log('Using pdf_source metadata:', pdfSource);
 
                             try {
                                 let pdfUrl;
@@ -7488,11 +7444,10 @@
                                             if (matchedPdf?.category && this.categories.some(cat => cat.id === matchedPdf.category)) {
                                                 this.genVideoCategory = matchedPdf.category;
                                                 this.genVideoLogoTimestamp = Date.now();
-                                                console.log('Set category from PDF metadata:', matchedPdf.category);
                                             }
                                         }
                                     } catch (e) {
-                                        console.log('Failed to get PDF category:', e);
+                                        // PDF 카테고리 조회 실패 - 무시
                                     }
                                 } else if (pdfSource.type === 'genvideo') {
                                     pdfUrl = `/api/genvideo/pdf/download/${pdfSource.id || pdfSource.filename}?token=${token}`;
@@ -7505,18 +7460,16 @@
                                         const pdfFile = new File([pdfBlob], pdfSource.original_name || pdfSource.filename, { type: 'application/pdf' });
                                         this.genVideoPdf = pdfFile;
                                         pdfLoaded = true;
-                                        console.log('Loaded PDF from pdf_source:', pdfSource);
                                     }
                                 }
                             } catch (e) {
-                                console.log('Failed to load PDF from pdf_source:', e);
+                                // PDF 로드 실패 - fallback 사용
                             }
                         }
 
                         // pdf_source가 없거나 로드 실패한 경우 fallback
                         if (!pdfLoaded && audioItem?.pdf_filename) {
                             const pdfFilename = audioItem.pdf_filename;
-                            console.log('Fallback: Looking for PDF by filename:', pdfFilename);
 
                             // 파일명 정규화 함수 (특수문자 제거하고 소문자로 변환)
                             const normalizeFilename = (name) => {
@@ -7529,7 +7482,6 @@
                             };
 
                             const normalizedAudioPdf = normalizeFilename(pdfFilename);
-                            console.log('Normalized audio PDF name:', normalizedAudioPdf);
 
                             // 1. content API에서 PDF 목록 가져오기 (우선)
                             try {
@@ -7538,8 +7490,6 @@
                                 });
                                 const contentPdfsData = await contentPdfsResponse.json();
                                 if (contentPdfsData.status === 'success' && contentPdfsData.pdfs) {
-                                    console.log('Content PDFs available:', contentPdfsData.pdfs.map(p => p.original_name || p.filename));
-
                                     const contentMatchingPdf = contentPdfsData.pdfs.find(pdf => {
                                         const normalizedPdfName = normalizeFilename(pdf.original_name || pdf.filename);
                                         // 정규화된 이름으로 비교 (포함 관계 또는 유사도 체크)
@@ -7558,19 +7508,17 @@
                                             const pdfFile = new File([pdfBlob], contentMatchingPdf.original_name || pdfFilename, { type: 'application/pdf' });
                                             this.genVideoPdf = pdfFile;
                                             pdfLoaded = true;
-                                            console.log('Found and downloaded PDF from content pdfs:', contentMatchingPdf);
 
                                             // 카테고리 정보가 있으면 로고 카테고리 자동 설정
                                             if (contentMatchingPdf.category && this.categories.some(cat => cat.id === contentMatchingPdf.category)) {
                                                 this.genVideoCategory = contentMatchingPdf.category;
                                                 this.genVideoLogoTimestamp = Date.now();
-                                                console.log('Set category from matched PDF:', contentMatchingPdf.category);
                                             }
                                         }
                                     }
                                 }
                             } catch (e) {
-                                console.log('Failed to fetch content PDFs:', e);
+                                // content PDFs 조회 실패 - 무시
                             }
 
                             // 2. content에서 못 찾은 경우 - generatedPdfs 목록에서 찾기
@@ -7597,10 +7545,9 @@
                                             const pdfFile = new File([pdfBlob], matchingPdf.original_name || pdfFilename, { type: 'application/pdf' });
                                             this.genVideoPdf = pdfFile;
                                             pdfLoaded = true;
-                                            console.log('Found and downloaded PDF from generatedPdfs:', matchingPdf);
                                         }
                                     } catch (e) {
-                                        console.log('Failed to download PDF from generatedPdfs:', e);
+                                        // PDF 다운로드 실패 - 무시
                                     }
                                 }
                             }
@@ -7619,10 +7566,9 @@
                                         const pdfFile = new File([pdfBlob], pdfFilename, { type: 'application/pdf' });
                                         this.genVideoPdf = pdfFile;
                                         pdfLoaded = true;
-                                        console.log('Downloaded PDF directly by filename');
                                     }
                                 } catch (e) {
-                                    console.log('PDF download failed:', e);
+                                    // PDF 다운로드 실패 - 무시
                                 }
                             }
                         }
@@ -7738,7 +7684,6 @@
                                 // ytCategory: 값이 비어있거나 유효하지 않으면 기본 카테고리
                                 if (!this.ytCategory || !categoryIds.includes(this.ytCategory)) {
                                     this.ytCategory = this.defaultCategory;
-                                    console.log('Set default ytCategory:', this.ytCategory);
                                 }
                                 // genVideoCategory: 기본값 설정
                                 if (!this.genVideoCategory || !categoryIds.includes(this.genVideoCategory)) {
@@ -7874,10 +7819,6 @@
                 },
 
                 async goToYoutubeWithVideo(video) {
-                    console.log('goToYoutubeWithVideo called with video:', video);
-                    console.log('video.category:', video.category);
-                    console.log('video.ocr_lang:', video.ocr_lang);
-
                     // 1. 카테고리 먼저 로드 (categories 배열이 필요함)
                     if (this.categories.length === 0) {
                         await this.loadCategories();
@@ -7928,19 +7869,12 @@
                         // 카테고리 적용 (categories 객체 배열에서 id로 확인)
                         if (targetCategory && this.categories.some(cat => cat.id === targetCategory)) {
                             this.ytCategory = targetCategory;
-                            console.log('Set ytCategory to:', targetCategory);
-                        } else {
-                            console.log('Category not found in categories list:', targetCategory, 'Available:', this.categories.map(c => c.id));
                         }
 
                         // 언어 적용
                         if (targetLang) {
                             this.ytLang = targetLang;
-                            console.log('Set ytLang to:', targetLang);
                         }
-
-                        console.log('Final ytCategory:', this.ytCategory);
-                        console.log('Final ytLang:', this.ytLang);
                     }, 100);
                 },
 

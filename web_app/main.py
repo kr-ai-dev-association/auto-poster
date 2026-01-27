@@ -8,9 +8,12 @@ import os
 import shutil
 import asyncio
 import uuid
+import logging
 from datetime import timedelta
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from services.converter_service import ConverterService
 from services.linkedin_service import LinkedinService
