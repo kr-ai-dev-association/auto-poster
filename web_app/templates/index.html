@@ -6259,7 +6259,28 @@
                             }
                         }
 
-                        // 5. 모달 닫기
+                        // 5. content_id가 있으면 플랜에서 카테고리 가져오기
+                        if (audio.content_id) {
+                            try {
+                                const planResponse = await fetch(`/api/content/plan/${audio.content_id}`, {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (planResponse.ok) {
+                                    const planData = await planResponse.json();
+                                    if (planData.status === 'success' && planData.plan?.category) {
+                                        const planCategory = planData.plan.category;
+                                        if (this.categories.some(cat => cat.id === planCategory)) {
+                                            this.genVideoCategory = planCategory;
+                                            this.genVideoLogoTimestamp = Date.now();
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                // 플랜 카테고리 조회 실패 - 무시
+                            }
+                        }
+
+                        // 6. 모달 닫기
                         this.showGeneratedAudioPicker = false;
 
                     } catch (error) {
@@ -7478,7 +7499,7 @@
                             }
                         }
 
-                        // content_id가 있으면 해당 ID로 PDF 찾기 (파이프라인 생성 콘텐츠)
+                        // content_id가 있으면 해당 ID로 PDF 찾기 및 플랜에서 카테고리 가져오기 (파이프라인 생성 콘텐츠)
                         if (!pdfLoaded && audioItem?.content_id) {
                             const contentId = audioItem.content_id;
                             try {
@@ -7494,6 +7515,25 @@
                                 }
                             } catch (e) {
                                 // content_id로 PDF 로드 실패 - fallback 사용
+                            }
+
+                            // 플랜에서 카테고리 정보 가져오기
+                            try {
+                                const planResponse = await fetch(`/api/content/plan/${contentId}`, {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (planResponse.ok) {
+                                    const planData = await planResponse.json();
+                                    if (planData.status === 'success' && planData.plan?.category) {
+                                        const planCategory = planData.plan.category;
+                                        if (this.categories.some(cat => cat.id === planCategory)) {
+                                            this.genVideoCategory = planCategory;
+                                            this.genVideoLogoTimestamp = Date.now();
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                // 플랜 카테고리 조회 실패 - 무시
                             }
                         }
 
