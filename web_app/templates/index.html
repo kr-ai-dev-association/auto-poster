@@ -2966,14 +2966,14 @@
                             <div x-show="generatedPdfs.length > 0" class="space-y-3">
                                 <template x-for="pdf in generatedPdfs" :key="pdf.id">
                                     <div class="bg-gray-700 p-4 rounded-lg flex justify-between items-center">
-                                        <div>
-                                            <p class="font-medium text-white" x-text="pdf.original_name"></p>
+                                        <div class="min-w-0 flex-1 mr-4">
+                                            <p class="font-medium text-white truncate" x-text="pdf.title || pdf.original_name"></p>
                                             <p class="text-sm text-gray-400">
                                                 <span x-text="formatBytes(pdf.file_size)"></span> •
                                                 <span x-text="new Date(pdf.created_at).toLocaleString('ko-KR')"></span>
                                             </p>
                                         </div>
-                                        <div class="flex gap-2">
+                                        <div class="flex gap-2 flex-shrink-0">
                                             <button @click="downloadGenPdf(pdf.id)"
                                                 class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">다운로드</button>
                                             <button @click="deleteGenPdf(pdf.id)"
