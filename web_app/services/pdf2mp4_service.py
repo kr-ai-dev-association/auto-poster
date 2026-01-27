@@ -1440,8 +1440,17 @@ class PDF2MP4Service:
                 'message': 'Smart mode requires an audio file.'
             }
 
-        # content_id가 있으면 사용, 없으면 기존 방식으로 생성
-        video_id = content_id if content_id else str(uuid.uuid4())[:8]
+        # content_id가 있으면 사용, 없으면 PDF 파일명에서 추출 시도
+        actual_content_id = content_id
+        if not actual_content_id:
+            # PDF 파일명에서 pipe_ 패턴 추출 시도
+            import re
+            pipe_match = re.match(r'^(pipe_\d{8}_[a-f0-9]{8})(?:\.pdf)?', filename)
+            if pipe_match:
+                actual_content_id = pipe_match.group(1)
+
+        # video_id는 항상 고유하게 생성 (timestamp 기반)
+        video_id = str(int(datetime.utcnow().timestamp() * 100) % 100000000)
         temp_dir = tempfile.mkdtemp(prefix=f'pdf2mp4_smart_{video_id}_')
         self.register_temp_dir(video_id, temp_dir)
 
@@ -1607,7 +1616,7 @@ class PDF2MP4Service:
 
             video_info = {
                 'id': video_id,
-                'content_id': video_id,  # 통합 ID
+                'content_id': actual_content_id or video_id,  # 파이프라인 콘텐츠 ID
                 'filename': output_filename,
                 'original_pdf': filename,
                 'pdf_path': pdf_path,
@@ -1636,7 +1645,8 @@ class PDF2MP4Service:
                 })
 
             timing_data = {
-                'content_id': video_id,  # 통합 ID
+                'content_id': actual_content_id or video_id,  # 파이프라인 콘텐츠 ID
+                'video_id': video_id,  # 고유 영상 ID
                 'timings': page_timings,
                 'page_texts': page_texts if page_texts else [],
                 'transcript_segments': simplified_segments  # Whisper 세그먼트 추가
@@ -1648,7 +1658,7 @@ class PDF2MP4Service:
             # 메타데이터 파일 저장 (영상 관리용)
             meta_file = os.path.join(self.output_dir, f"{video_id}_meta.json")
             meta_data = {
-                'content_id': video_id,  # 통합 ID (video_id가 content_id와 동일)
+                'content_id': actual_content_id or video_id,  # 파이프라인 콘텐츠 ID (제목/플랜 연결용)
                 'category': category,
                 'ocr_lang': ocr_lang,
                 'language': language,  # 콘텐츠 언어
@@ -2170,16 +2180,21 @@ class PDF2MP4Service:
                     path = os.path.join(self.output_dir, f)
 
                     # video_id 추출 로직 개선
-                    # 1. 파이프라인 형식 (파일명 중간에 pipe_가 있는 경우): 【제목】_pipe_YYYYMMDD_xxxxxxxx.mp4
-                    # 2. 파이프라인 형식 (파일명 시작이 pipe_인 경우): pipe_YYYYMMDD_xxxxxxxx_....mp4
-                    # 3. 일반 형식: filename_xxxxxxxx.mp4
+                    # 1. Smart 모드 형식: pipe_YYYYMMDD_xxxxxxxx_smart_XXXXXXXX.mp4 -> XXXXXXXX
+                    # 2. 파이프라인 형식 (파일명 중간에 pipe_가 있는 경우): 【제목】_pipe_YYYYMMDD_xxxxxxxx.mp4
+                    # 3. 파이프라인 형식 (파일명 시작이 pipe_인 경우): pipe_YYYYMMDD_xxxxxxxx.mp4
+                    # 4. 일반 형식: filename_xxxxxxxx.mp4
 
+                    # Smart 모드 형식 확인: pipe_로 시작하고 _smart_가 포함된 경우
+                    smart_mode_match = re.match(r'^pipe_\d{8}_[a-f0-9]{8}_smart_(\d+)\.mp4$', f)
                     # 파일명 중간에 _pipe_ 패턴이 있는지 확인 (제목_pipe_날짜_ID 형식)
                     pipe_middle_match = re.search(r'_(pipe_\d{8}_[a-f0-9]{8})(?:\.mp4|_)', f)
-                    # 파일명 시작이 pipe_인 경우
-                    pipe_start_match = re.match(r'^(pipe_\d{8}_[a-f0-9]{8})(?:_|\.mp4)', f)
+                    # 파일명 시작이 pipe_인 경우 (smart가 아닌 경우만)
+                    pipe_start_match = re.match(r'^(pipe_\d{8}_[a-f0-9]{8})(?:\.mp4)$', f)
 
-                    if pipe_middle_match:
+                    if smart_mode_match:
+                        video_id = smart_mode_match.group(1)
+                    elif pipe_middle_match:
                         video_id = pipe_middle_match.group(1)
                     elif pipe_start_match:
                         video_id = pipe_start_match.group(1)
