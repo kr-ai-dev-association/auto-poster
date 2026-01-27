@@ -271,7 +271,8 @@ class AutoPipelineService:
                 category=category,
                 created_by=user_email or '',
                 content_id=content_id,  # 통합 ID 전달
-                title=title  # 기획안 제목을 파일명으로 사용
+                title=title,  # 기획안 제목을 파일명으로 사용
+                language=language  # 콘텐츠 언어
             )
 
             if video_result.get('status') != 'success':

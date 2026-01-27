@@ -398,7 +398,7 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
     {{
       "slide_number": 1,
       "title": "Slide title",
-      "content": "Content to cover in this slide (2-3 sentences). Include specific numbers or examples based on search results.",
+      "content": "ONE SHORT sentence (max 15 words) - key message displayed at bottom of slide",
       "narration": "Narration script for this slide (for TTS, natural conversational tone, minimum 150 characters, 20-30 seconds)",
       "image_prompt": "Detailed image prompt based on THIS slide's specific content (English, cinematic, visual metaphor of the slide theme)",
       "web_image_query": "Web search query for real photos/images (English, specific search terms)",
@@ -416,14 +416,15 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 ## Guidelines:
 1. Each slide's narration is a TTS script, so write in natural conversational English
 2. **Important: Each narration must be at least 150 characters (20-30 seconds). Total video should be 5-7+ minutes with sufficient script content**
-3. **image_prompt MUST be specific to each slide's content** - describe visual elements, metaphors, and scenes that represent the slide's theme
-4. First slide should be a strong intro, last slide should include CTA outro
-5. Include teasers/previews in the middle to maintain viewer retention
-6. **ALL content must be in English (only image_prompt and web_image_query are always in English)**
-7. Content should be based on the latest facts from search results
-8. web_image_query: Write web search queries for slides that need real photos (e.g., product photos, celebrities, places, events)
-9. use_web_image: Whether to use web-downloaded real images instead of AI-generated images (true if real photos are more appropriate)
-10. **Total narration should be at least 2500 characters (approximately 5 minutes)**
+3. **CRITICAL: "content" field is displayed on screen - must be ONE SHORT sentence (max 15 words). Put all details in "narration" instead.**
+4. **image_prompt MUST be specific to each slide's content** - describe visual elements, metaphors, and scenes that represent the slide's theme
+5. First slide should be a strong intro, last slide should include CTA outro
+6. Include teasers/previews in the middle to maintain viewer retention
+7. **ALL content must be in English (only image_prompt and web_image_query are always in English)**
+8. Content should be based on the latest facts from search results
+9. web_image_query: Write web search queries for slides that need real photos (e.g., product photos, celebrities, places, events)
+10. use_web_image: Whether to use web-downloaded real images instead of AI-generated images (true if real photos are more appropriate)
+11. **Total narration should be at least 2500 characters (approximately 5 minutes)**
 """
         else:
             prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가입니다.
@@ -461,7 +462,7 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
     {{
       "slide_number": 1,
       "title": "슬라이드 제목",
-      "content": "슬라이드에서 다룰 내용 (2-3문장). 최신 검색 정보를 바탕으로 구체적인 수치나 사례를 포함.",
+      "content": "화면 하단에 표시될 핵심 메시지 한 문장 (최대 15단어)",
       "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체, 최소 150자 이상, 20-30초 분량)",
       "image_prompt": "이 슬라이드의 구체적인 내용에 맞는 상세한 이미지 프롬프트 (영어, 시네마틱, 슬라이드 주제의 시각적 메타포)",
       "web_image_query": "이 슬라이드에 사용할 실제 사진/이미지를 웹에서 검색할 쿼리 (영어, 구체적인 검색어)",
@@ -479,14 +480,15 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 ## 주의사항:
 1. 각 슬라이드의 narration은 TTS로 읽을 대본이므로 자연스러운 구어체로 작성
 2. **중요: 각 narration은 반드시 150자 이상으로 작성 (20-30초 분량). 전체 영상이 5-7분 이상이 되도록 충분한 분량의 대본 작성 필수**
-3. **image_prompt는 각 슬라이드의 내용에 특화되어야 합니다** - 슬라이드 주제를 나타내는 시각적 요소, 메타포, 장면을 구체적으로 설명하세요
-4. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
-5. 중간에 시청 유지를 위한 티저/예고 포함
-6. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt와 web_image_query만 영어)**
-7. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
-8. web_image_query: 실제 사진이 필요한 슬라이드에 대해 웹 검색 쿼리를 작성 (예: 제품 사진, 유명인, 장소, 이벤트 등)
-9. use_web_image: 해당 슬라이드에 AI 생성 이미지 대신 웹에서 다운로드한 실제 이미지를 사용할지 여부 (실제 사진이 더 적합한 경우 true)
-10. **전체 narration 합계가 최소 2500자 이상이 되도록 작성 (약 5분 분량)**
+3. **핵심: "content" 필드는 화면에 표시됩니다 - 반드시 한 문장(최대 15단어)으로 작성. 상세 내용은 모두 "narration"에 작성하세요.**
+4. **image_prompt는 각 슬라이드의 내용에 특화되어야 합니다** - 슬라이드 주제를 나타내는 시각적 요소, 메타포, 장면을 구체적으로 설명하세요
+5. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
+6. 중간에 시청 유지를 위한 티저/예고 포함
+7. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt와 web_image_query만 영어)**
+8. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
+9. web_image_query: 실제 사진이 필요한 슬라이드에 대해 웹 검색 쿼리를 작성 (예: 제품 사진, 유명인, 장소, 이벤트 등)
+10. use_web_image: 해당 슬라이드에 AI 생성 이미지 대신 웹에서 다운로드한 실제 이미지를 사용할지 여부 (실제 사진이 더 적합한 경우 true)
+11. **전체 narration 합계가 최소 2500자 이상이 되도록 작성 (약 5분 분량)**
 """
 
         try:
@@ -1132,26 +1134,29 @@ Incorporate relevant visual elements from the references while creating a cohesi
             fill=(0, 0, 0, 100) # 전체 상단 어둡게
         )
         
-        # 3. 내용 영역 (하단)
+        # 3. 내용 영역 (하단) - 한 문장만 표시
         if content:
-            # 리스트인 경우 텍스트로 변환
+            # 리스트인 경우 첫 번째 항목만 사용
             if isinstance(content, list):
-                content_text = "\n".join([f"• {item}" for item in content])
+                content_text = content[0] if content else ""
             else:
                 content_text = content
-                
-            wrapped_content = ""
-            for line in content_text.split('\n'):
-                wrapped_content += textwrap.fill(line, width=50) + "\n"
-            
-            # 하단 오버레이 (그라데이션 효과를 위해 여러 겹 또는 단순히 박스)
-            # 여기서는 심플하게 하단 박스
-            content_bbox = draw.multiline_textbbox((0, 0), wrapped_content, font=font_regular, spacing=15)
-            content_h = content_bbox[3] - content_bbox[1] + 80
-            
+
+            # 한 문장으로 제한 (최대 80자)
+            content_text = content_text.strip()
+            if len(content_text) > 80:
+                content_text = content_text[:77] + "..."
+
+            # 줄바꿈 없이 한 줄로 표시
+            wrapped_content = content_text
+
+            # 하단 오버레이 - 간결하게
+            content_bbox = draw.textbbox((0, 0), wrapped_content, font=font_regular)
+            content_h = content_bbox[3] - content_bbox[1] + 40
+
             draw_overlay.rectangle(
-                [(0, height - content_h - 50), (width, height)],
-                fill=(0, 0, 0, 140)
+                [(0, height - content_h - 30), (width, height)],
+                fill=(0, 0, 0, 160)
             )
 
         # 오버레이 합성
@@ -1175,16 +1180,14 @@ Incorporate relevant visual elements from the references while creating a cohesi
             spacing=10
         )
         
-        # 내용 텍스트 (하단 중앙)
+        # 내용 텍스트 (하단 중앙) - 한 줄로 표시
         if content:
-            draw.multiline_text(
-                (width/2, height - 100),
+            draw.text(
+                (width/2, height - 50),
                 wrapped_content,
                 font=font_regular,
                 fill="white",
-                anchor="md", # middle-down (하단 기준)
-                align="center",
-                spacing=15
+                anchor="mm"  # middle-middle (중앙 기준)
             )
             
         return img.convert('RGB')

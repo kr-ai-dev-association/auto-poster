@@ -1413,7 +1413,8 @@ class PDF2MP4Service:
         category: str = '',
         created_by: str = '',
         content_id: str = None,
-        title: str = None
+        title: str = None,
+        language: str = ''
     ) -> Dict[str, Any]:
         """Smart 모드: Whisper로 오디오 분석, 자동 페이지 타이밍 결정
 
@@ -1425,6 +1426,7 @@ class PDF2MP4Service:
         created_by: 생성자 이메일
         content_id: 통합 콘텐츠 ID (파이프라인에서 전달, 없으면 자동 생성)
         title: 영상 제목 (파일명으로 사용, 없으면 기존 방식 사용)
+        language: 콘텐츠 언어 (ko, en)
         """
         if not WHISPER_AVAILABLE:
             return {
@@ -1635,6 +1637,7 @@ class PDF2MP4Service:
                 'content_id': video_id,  # 통합 ID (video_id가 content_id와 동일)
                 'category': category,
                 'ocr_lang': ocr_lang,
+                'language': language,  # 콘텐츠 언어
                 'created_by': created_by,
                 'duration': video_duration,
                 'mode': 'smart',
@@ -2153,11 +2156,19 @@ class PDF2MP4Service:
                     path = os.path.join(self.output_dir, f)
 
                     # video_id 추출 로직 개선
-                    # 1. 파이프라인 형식: pipe_YYYYMMDD_xxxxxxxx_smart_pipe_YYYYMMDD_xxxxxxxx.mp4
-                    # 2. 일반 형식: filename_xxxxxxxx.mp4
-                    pipe_match = re.match(r'^(pipe_\d{8}_[a-f0-9]{8})_', f)
-                    if pipe_match:
-                        video_id = pipe_match.group(1)
+                    # 1. 파이프라인 형식 (파일명 중간에 pipe_가 있는 경우): 【제목】_pipe_YYYYMMDD_xxxxxxxx.mp4
+                    # 2. 파이프라인 형식 (파일명 시작이 pipe_인 경우): pipe_YYYYMMDD_xxxxxxxx_....mp4
+                    # 3. 일반 형식: filename_xxxxxxxx.mp4
+
+                    # 파일명 중간에 _pipe_ 패턴이 있는지 확인 (제목_pipe_날짜_ID 형식)
+                    pipe_middle_match = re.search(r'_(pipe_\d{8}_[a-f0-9]{8})(?:\.mp4|_)', f)
+                    # 파일명 시작이 pipe_인 경우
+                    pipe_start_match = re.match(r'^(pipe_\d{8}_[a-f0-9]{8})(?:_|\.mp4)', f)
+
+                    if pipe_middle_match:
+                        video_id = pipe_middle_match.group(1)
+                    elif pipe_start_match:
+                        video_id = pipe_start_match.group(1)
                     else:
                         parts = f.rsplit('_', 1)
                         video_id = parts[1].replace('.mp4', '') if len(parts) > 1 else f.replace('.mp4', '')
@@ -2197,6 +2208,7 @@ class PDF2MP4Service:
                                 meta_data = json.load(mf)
                                 video_data['category'] = meta_data.get('category', video_data.get('category', ''))
                                 video_data['ocr_lang'] = meta_data.get('ocr_lang', video_data.get('ocr_lang', ''))
+                                video_data['language'] = meta_data.get('language', video_data.get('language', ''))
                                 video_data['created_by'] = meta_data.get('created_by', video_data.get('created_by', ''))
                                 video_data['duration'] = meta_data.get('duration', video_data.get('duration', 0))
                                 video_data['pdf_name'] = meta_data.get('pdf_name', '')
@@ -2217,18 +2229,22 @@ class PDF2MP4Service:
                         except Exception as e:
                             print(f"Error loading PDF meta for {content_id}: {e}")
 
-                    # 기획안에서 title 가져오기 (PDF 메타에 없는 경우)
-                    if not video_data.get('title'):
-                        plan_file = os.path.join(os.path.dirname(self.output_dir), 'generated_content', f"plan_{content_id}.json")
-                        if os.path.exists(plan_file):
-                            try:
-                                with open(plan_file, 'r', encoding='utf-8') as plf:
-                                    plan_data = json.load(plf)
+                    # 기획안에서 추가 정보 가져오기 (메타 파일에 없는 경우)
+                    plan_file = os.path.join(os.path.dirname(self.output_dir), 'generated_content', f"plan_{content_id}.json")
+                    if os.path.exists(plan_file):
+                        try:
+                            with open(plan_file, 'r', encoding='utf-8') as plf:
+                                plan_data = json.load(plf)
+                                if not video_data.get('title'):
                                     video_data['title'] = plan_data.get('title', '')
-                                    if not video_data.get('language'):
-                                        video_data['language'] = plan_data.get('language', '')
-                            except Exception as e:
-                                print(f"Error loading plan for {content_id}: {e}")
+                                if not video_data.get('language'):
+                                    video_data['language'] = plan_data.get('language', '')
+                                if not video_data.get('category'):
+                                    video_data['category'] = plan_data.get('category', '')
+                                if not video_data.get('created_by'):
+                                    video_data['created_by'] = plan_data.get('created_by', '')
+                        except Exception as e:
+                            print(f"Error loading plan for {content_id}: {e}")
 
                     # 메타 파일이 없는 경우 파일명에서 PDF 이름 추출 시도
                     if not video_data.get('pdf_name'):

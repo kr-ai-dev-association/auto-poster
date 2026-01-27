@@ -147,6 +147,89 @@ body {
     border-color: transparent !important;
 }
 
+/* EasyMDE Preview Dark Theme */
+.EasyMDEContainer .editor-preview,
+.EasyMDEContainer .editor-preview-side {
+    background-color: rgba(15, 23, 42, 0.95) !important;
+    color: #e2e8f0 !important;
+    border-color: var(--glass-border) !important;
+}
+
+.EasyMDEContainer .editor-preview h1,
+.EasyMDEContainer .editor-preview h2,
+.EasyMDEContainer .editor-preview h3,
+.EasyMDEContainer .editor-preview h4,
+.EasyMDEContainer .editor-preview h5,
+.EasyMDEContainer .editor-preview h6,
+.EasyMDEContainer .editor-preview-side h1,
+.EasyMDEContainer .editor-preview-side h2,
+.EasyMDEContainer .editor-preview-side h3,
+.EasyMDEContainer .editor-preview-side h4,
+.EasyMDEContainer .editor-preview-side h5,
+.EasyMDEContainer .editor-preview-side h6 {
+    color: #f1f5f9 !important;
+}
+
+.EasyMDEContainer .editor-preview a,
+.EasyMDEContainer .editor-preview-side a {
+    color: #818cf8 !important;
+}
+
+.EasyMDEContainer .editor-preview code,
+.EasyMDEContainer .editor-preview-side code {
+    background-color: rgba(30, 41, 59, 0.8) !important;
+    color: #f472b6 !important;
+    padding: 0.125rem 0.375rem !important;
+    border-radius: 0.25rem !important;
+}
+
+.EasyMDEContainer .editor-preview pre,
+.EasyMDEContainer .editor-preview-side pre {
+    background-color: rgba(15, 23, 42, 0.8) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 0.5rem !important;
+    padding: 1rem !important;
+}
+
+.EasyMDEContainer .editor-preview pre code,
+.EasyMDEContainer .editor-preview-side pre code {
+    background-color: transparent !important;
+    color: #e2e8f0 !important;
+    padding: 0 !important;
+}
+
+.EasyMDEContainer .editor-preview blockquote,
+.EasyMDEContainer .editor-preview-side blockquote {
+    border-left: 4px solid #6366f1 !important;
+    background-color: rgba(30, 41, 59, 0.5) !important;
+    color: #cbd5e1 !important;
+    padding: 0.5rem 1rem !important;
+    margin: 1rem 0 !important;
+}
+
+.EasyMDEContainer .editor-preview table,
+.EasyMDEContainer .editor-preview-side table {
+    border-collapse: collapse !important;
+}
+
+.EasyMDEContainer .editor-preview th,
+.EasyMDEContainer .editor-preview td,
+.EasyMDEContainer .editor-preview-side th,
+.EasyMDEContainer .editor-preview-side td {
+    border: 1px solid var(--glass-border) !important;
+    padding: 0.5rem !important;
+}
+
+.EasyMDEContainer .editor-preview th,
+.EasyMDEContainer .editor-preview-side th {
+    background-color: rgba(30, 41, 59, 0.8) !important;
+}
+
+.EasyMDEContainer .editor-preview hr,
+.EasyMDEContainer .editor-preview-side hr {
+    border-color: var(--glass-border) !important;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;

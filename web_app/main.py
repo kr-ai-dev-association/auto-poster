@@ -330,7 +330,8 @@ async def process_content(
         if not title:
             return JSONResponse(status_code=400, content={"message": "Title is required for text input"})
         filename = f"{title}.md"
-        markdown_text = content
+        # 파일 업로드와 동일한 프로세스: 제목을 마크다운 내용 앞에 추가
+        markdown_text = f"# {title}\n\n{content}"
 
     # 3. 비동기 변환 작업 시작
     if not converter:
