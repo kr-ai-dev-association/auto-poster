@@ -1073,23 +1073,82 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
 
         return plans
 
-    def delete_plan(self, plan_id: str) -> bool:
-        """기획안과 관련 파일들을 삭제합니다."""
-        deleted = False
+    def delete_plan(self, plan_id: str, force: bool = False) -> dict:
+        """기획안과 관련 파일들을 삭제합니다.
+
+        Args:
+            plan_id: 삭제할 기획안 ID
+            force: True면 사용 중이어도 강제 삭제
+
+        Returns:
+            dict: {'success': bool, 'message': str, 'deleted_files': list}
+        """
+        deleted_files = []
+        errors = []
+
+        # 실행 중인 파이프라인에서 사용 중인지 확인
+        if not force:
+            from .auto_pipeline_service import auto_pipeline
+            for pipeline in auto_pipeline.pipelines.values():
+                if pipeline.get('status') in ['starting', 'running']:
+                    result = pipeline.get('result', {})
+                    if result.get('plan_id') == plan_id or pipeline.get('id') == plan_id:
+                        return {
+                            'success': False,
+                            'message': f'기획안이 실행 중인 파이프라인 ({pipeline.get("id")})에서 사용 중입니다.',
+                            'deleted_files': []
+                        }
 
         # 기획안 JSON 삭제
         plan_path = os.path.join(self.output_dir, f"plan_{plan_id}.json")
         if os.path.exists(plan_path):
-            os.remove(plan_path)
-            deleted = True
+            try:
+                os.remove(plan_path)
+                deleted_files.append(plan_path)
+            except Exception as e:
+                errors.append(f"기획안 파일 삭제 실패: {e}")
 
         # 관련 이미지 삭제
-        for filename in os.listdir(self.output_dir):
-            if filename.startswith(f"{plan_id}_slide_"):
-                os.remove(os.path.join(self.output_dir, filename))
-                deleted = True
+        if os.path.exists(self.output_dir):
+            try:
+                for filename in os.listdir(self.output_dir):
+                    if filename.startswith(f"{plan_id}_slide_"):
+                        filepath = os.path.join(self.output_dir, filename)
+                        try:
+                            os.remove(filepath)
+                            deleted_files.append(filepath)
+                        except Exception as e:
+                            errors.append(f"이미지 삭제 실패 ({filename}): {e}")
+            except Exception as e:
+                errors.append(f"디렉토리 읽기 실패: {e}")
 
-        return deleted
+        # 웹 이미지 삭제
+        web_images_dir = os.path.join(self.output_dir, 'web_images')
+        if os.path.exists(web_images_dir):
+            try:
+                for filename in os.listdir(web_images_dir):
+                    if filename.startswith(f"{plan_id}_web_"):
+                        filepath = os.path.join(web_images_dir, filename)
+                        try:
+                            os.remove(filepath)
+                            deleted_files.append(filepath)
+                        except Exception as e:
+                            errors.append(f"웹 이미지 삭제 실패 ({filename}): {e}")
+            except Exception as e:
+                errors.append(f"웹 이미지 디렉토리 읽기 실패: {e}")
+
+        if errors:
+            return {
+                'success': len(deleted_files) > 0,
+                'message': f'일부 파일 삭제 실패: {"; ".join(errors)}',
+                'deleted_files': deleted_files
+            }
+
+        return {
+            'success': len(deleted_files) > 0,
+            'message': f'{len(deleted_files)}개 파일 삭제됨' if deleted_files else '삭제할 파일 없음',
+            'deleted_files': deleted_files
+        }
 
     def delete_pdf(self, filename: str) -> bool:
         """PDF와 메타데이터를 삭제합니다."""

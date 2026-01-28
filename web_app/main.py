@@ -1988,13 +1988,18 @@ async def get_content_plan(plan_id: str, user: models.User = Depends(get_current
 
 
 @app.delete("/api/content/plan/{plan_id}")
-async def delete_content_plan(plan_id: str, user: models.User = Depends(get_current_user)):
-    """기획안과 관련 파일들을 삭제합니다."""
-    success = content_generator.delete_plan(plan_id)
-    if success:
-        return {"status": "success", "message": "Plan deleted"}
+async def delete_content_plan(plan_id: str, force: bool = False, user: models.User = Depends(get_current_user)):
+    """기획안과 관련 파일들을 삭제합니다.
+
+    Args:
+        plan_id: 삭제할 기획안 ID
+        force: True면 사용 중이어도 강제 삭제 (query param)
+    """
+    result = content_generator.delete_plan(plan_id, force=force)
+    if result['success']:
+        return {"status": "success", "message": result['message'], "deleted_files": len(result['deleted_files'])}
     else:
-        raise HTTPException(status_code=404, detail="Plan not found")
+        raise HTTPException(status_code=400, detail=result['message'])
 
 
 @app.get("/api/content/plan/{plan_id}/images")
