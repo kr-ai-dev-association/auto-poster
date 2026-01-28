@@ -474,6 +474,9 @@ async def generate_youtube_metadata(
         # 메타데이터 생성 호출 (text_content가 있으면 우선 사용)
         metadata = await youtube.generate_metadata(content, category, lang, text_content=text_content)
 
+        # 메타데이터 정제 (태그 특수문자 제거 등)
+        metadata = YouTubeMetadataValidator.fix(metadata)
+
         # 검증 결과 포함
         is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
 
