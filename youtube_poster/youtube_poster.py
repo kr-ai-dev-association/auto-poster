@@ -167,14 +167,23 @@ class YouTubeAutoPoster:
         print(f"🚀 Uploading video to YouTube: {video_path}")
 
         # 태그 정제 - YouTube에서 허용하지 않는 문자 제거
+        import re
         sanitized_tags = []
         for tag in metadata.get('tags', []):
-            tag_str = str(tag).strip().replace('<', '').replace('>', '')
-            tag_str = ' '.join(tag_str.split())  # 연속 공백 정리
+            tag_str = str(tag).strip()
+            # < > 문자 제거
+            tag_str = tag_str.replace('<', '').replace('>', '')
+            # 이모지 및 특수 유니코드 문자 제거 (ASCII + 기본 다국어 문자만 허용)
+            tag_str = re.sub(r'[^\w\s\-\'\"\.\,\!\?\&\#\@\(\)\[\]\:\;\+\=\/\\]', '', tag_str, flags=re.UNICODE)
+            # 연속 공백 정리
+            tag_str = ' '.join(tag_str.split())
             if tag_str and len(tag_str) <= 30:
                 sanitized_tags.append(tag_str)
             elif tag_str:
                 sanitized_tags.append(tag_str[:30].strip())
+
+        # 빈 태그 제거 및 중복 제거
+        sanitized_tags = list(dict.fromkeys([t for t in sanitized_tags if t.strip()]))
 
         body = {
             'snippet': {

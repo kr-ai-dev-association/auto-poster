@@ -127,12 +127,15 @@ class YouTubeMetadataValidator:
         
         # 태그 정리
         if 'tags' in fixed and isinstance(fixed['tags'], list):
+            import re
             fixed_tags = []
             for tag in fixed['tags']:
                 tag_str = str(tag).strip()
                 if tag_str:
                     # YouTube에서 허용하지 않는 문자 제거 (<, > 등)
                     tag_str = tag_str.replace('<', '').replace('>', '')
+                    # 이모지 및 특수 유니코드 문자 제거 (알파벳, 숫자, 기본 문장부호만 허용)
+                    tag_str = re.sub(r'[^\w\s\-\'\"\.\,\!\?\&\#\@\(\)\[\]\:\;\+\=\/\\]', '', tag_str, flags=re.UNICODE)
                     # 연속된 공백 정리
                     tag_str = ' '.join(tag_str.split())
 
@@ -144,12 +147,15 @@ class YouTubeMetadataValidator:
                         tag_str = tag_str[:YouTubeMetadataValidator.MAX_TAG_LENGTH].strip()
                         print(f"⚠️ 태그 '{tag_str}'가 자동으로 자름")
                     fixed_tags.append(tag_str)
-            
+
+            # 빈 태그 제거 및 중복 제거
+            fixed_tags = list(dict.fromkeys([t for t in fixed_tags if t.strip()]))
+
             # 태그 개수 제한
             if len(fixed_tags) > YouTubeMetadataValidator.MAX_TAGS_COUNT:
                 fixed_tags = fixed_tags[:YouTubeMetadataValidator.MAX_TAGS_COUNT]
                 print(f"⚠️ 태그가 {len(fixed_tags)}개로 자동 제한")
-            
+
             fixed['tags'] = fixed_tags
         
         return fixed
