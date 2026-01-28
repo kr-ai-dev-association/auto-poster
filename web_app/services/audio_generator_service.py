@@ -447,7 +447,7 @@ class AudioGeneratorService:
             {'name': 'Fenrir', 'gender': 'male', 'description': '젊고 역동적인 남성 음성'},
             {'name': 'Kore', 'gender': 'female', 'description': '부드럽고 세련된 여성 음성'},
             {'name': 'Puck', 'gender': 'male', 'description': '캐주얼하고 친근한 남성 음성'},
-            {'name': 'Orbit', 'gender': 'female', 'description': '전문적이고 명확한 여성 음성'}
+            {'name': 'Schedar', 'gender': 'female', 'description': '전문적이고 명확한 여성 음성'}
         ]
 
     def list_generated_audio(self) -> List[Dict[str, Any]]:

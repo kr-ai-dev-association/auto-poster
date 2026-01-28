@@ -1677,6 +1677,8 @@ async def generate_audio_from_script(
     language: str = Form(None),
     style: str = Form(None),
     pdf_filename: str = Form(None),
+    plan_id: str = Form(None),
+    title: str = Form(None),
     background: bool = Form(True),
     user: models.User = Depends(get_current_user)
 ):
@@ -1686,11 +1688,20 @@ async def generate_audio_from_script(
     클라이언트는 /api/audio/task/{task_id}로 진행 상황을 폴링해야 합니다.
     """
     try:
+        # plan_id가 있으면 기획안에서 title 조회
+        if plan_id and not title:
+            plan = content_generator.get_plan(plan_id)
+            if plan:
+                title = plan.get('title')
+
         # 메타데이터 구성
         metadata = {
             'language': language,
             'style': style,
             'pdf_filename': pdf_filename,
+            'plan_id': plan_id,
+            'content_id': plan_id,
+            'title': title,
             'created_by': user.email
         }
 
@@ -1770,11 +1781,18 @@ async def generate_audio_from_pdf(
 
         if plan_script:
             # 기획안 나레이션을 직접 사용하여 오디오 생성
+            plan_title = plan.get('title') if plan else None
             result = await audio_generator.generate_audio_from_script(
                 script=plan_script,
                 output_filename=filename,
                 voice=voice,
-                metadata={'language': language, 'style': style, 'plan_id': plan_id}
+                metadata={
+                    'language': language,
+                    'style': style,
+                    'plan_id': plan_id,
+                    'content_id': plan_id,
+                    'title': plan_title
+                }
             )
             if result.get('status') == 'success':
                 result['script'] = plan_script

@@ -1378,7 +1378,7 @@
                                                 class="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 text-white rounded-lg text-sm">
                                                 <template x-for="voice in audioGenVoices" :key="voice.name">
                                                     <option :value="voice.name"
-                                                        x-text="voice.name + ' (' + voice.gender + ')'"></option>
+                                                        x-text="voice.name + ' (' + voice.gender + ') - ' + voice.description"></option>
                                                 </template>
                                             </select>
                         </div>
@@ -1602,7 +1602,7 @@
                                     <!-- 주제 입력 -->
                                     <div>
                                         <label class="block text-sm text-gray-400 mb-2">콘텐츠 주제/아이디어</label>
-                                        <textarea x-model="contentGenTopic" rows="3"
+                                        <textarea x-model="contentGenTopic" rows="18"
                                             class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-sm"
                                             placeholder="예: 2026년 최신 AI 코딩 도구 비교 분석"></textarea>
                                     </div>
@@ -1761,18 +1761,39 @@
                                     </div>
 
                                     <!-- 슬라이드 목록 (축소) -->
-                                    <div class="overflow-y-auto space-y-1 mb-3 max-h-32">
+                                    <div class="overflow-y-auto space-y-1 mb-3 max-h-96">
                                         <template x-for="(slide, index) in (contentGenPlan?.slides || [])" :key="index">
-                                            <div class="flex items-center gap-2 p-1.5 bg-gray-700/30 rounded text-xs">
-                                                <span
-                                                    class="w-5 h-5 bg-blue-600/50 rounded flex items-center justify-center text-white text-xs"
-                                                    x-text="slide.slide_number"></span>
-                                                <span class="text-gray-300 truncate flex-1 text-xs"
-                                                    x-text="slide.title"></span>
-                                                <span x-show="contentGenImageResults[index]?.status === 'success'"
-                                                    class="text-green-400 text-xs">✓</span>
-                                                <span x-show="contentGenImageResults[index]?.status === 'error'"
-                                                    class="text-red-400 text-xs">✗</span>
+                                            <div class="bg-gray-700/30 rounded text-xs">
+                                                <div @click="contentGenExpandedSlide = (contentGenExpandedSlide === index ? null : index)"
+                                                    class="flex items-center gap-2 p-1.5 cursor-pointer hover:bg-gray-700/50 transition-colors">
+                                                    <span
+                                                        class="w-5 h-5 bg-blue-600/50 rounded flex items-center justify-center text-white text-xs flex-shrink-0"
+                                                        x-text="slide.slide_number"></span>
+                                                    <span class="text-gray-300 truncate flex-1 text-xs"
+                                                        x-text="slide.title"></span>
+                                                    <span x-show="contentGenImageResults[index]?.status === 'success'"
+                                                        class="text-green-400 text-xs flex-shrink-0">✓</span>
+                                                    <span x-show="contentGenImageResults[index]?.status === 'error'"
+                                                        class="text-red-400 text-xs flex-shrink-0">✗</span>
+                                                    <svg class="w-3 h-3 text-gray-400 flex-shrink-0 transition-transform"
+                                                        :class="{'rotate-180': contentGenExpandedSlide === index}"
+                                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                                    </svg>
+                                                </div>
+                                                <!-- 이미지 프롬프트 표시 (확장 시) -->
+                                                <div x-show="contentGenExpandedSlide === index" x-collapse
+                                                    class="px-2 pb-2 pt-1 border-t border-gray-600/50">
+                                                    <p class="text-[10px] text-purple-400 font-medium mb-1">🎨 Image Prompt:</p>
+                                                    <p class="text-[10px] text-gray-400 leading-relaxed whitespace-pre-wrap"
+                                                        x-text="slide.image_prompt || '(프롬프트 없음)'"></p>
+                                                    <template x-if="slide.web_image_query">
+                                                        <div class="mt-2">
+                                                            <p class="text-[10px] text-green-400 font-medium mb-1">🔍 Web Image Query:</p>
+                                                            <p class="text-[10px] text-gray-400" x-text="slide.web_image_query"></p>
+                                                        </div>
+                                                    </template>
+                                                </div>
                                             </div>
                                         </template>
                                     </div>
@@ -2256,7 +2277,7 @@
                                                 class="w-full px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
                                                 <template x-for="voice in audioGenVoices" :key="voice.name">
                                                     <option :value="voice.name"
-                                                        x-text="voice.name + ' (' + voice.gender + ')'"></option>
+                                                        x-text="voice.name + ' (' + voice.gender + ') - ' + voice.description"></option>
                                                 </template>
                                             </select>
                                         </div>
@@ -4121,6 +4142,7 @@
                 contentGenPlanId: null,
                 contentGenImageProgress: 0,
                 contentGenImageResults: [],
+                contentGenExpandedSlide: null,  // 확장된 슬라이드 인덱스 (이미지 프롬프트 표시용)
                 contentGenImagesComplete: false,
                 contentGenPdfResult: null,
                 contentGenPdfList: [],
@@ -4173,7 +4195,7 @@
                     { name: 'Fenrir', gender: 'male', description: '젊고 역동적인 남성 음성' },
                     { name: 'Kore', gender: 'female', description: '부드럽고 세련된 여성 음성' },
                     { name: 'Puck', gender: 'male', description: '캐주얼하고 친근한 남성 음성' },
-                    { name: 'Orbit', gender: 'female', description: '전문적이고 명확한 여성 음성' }
+                    { name: 'Schedar', gender: 'female', description: '전문적이고 명확한 여성 음성' }
                 ],
                 audioGenLoading: false,
                 audioGenStep: '', // 'script' or 'tts'
@@ -6330,7 +6352,9 @@
                         this.audioGenPdfSource = {
                             type: 'content',
                             filename: pdf.filename,
-                            original_name: pdf.original_name || pdf.filename
+                            original_name: pdf.original_name || pdf.filename,
+                            plan_id: pdf.plan_id,
+                            title: pdf.title
                         };
 
                         // PDF의 카테고리가 있으면 로고 선택에 자동 반영
@@ -6780,9 +6804,12 @@
                     if (this.audioGenPdfFile) {
                         formData.append('pdf_filename', this.audioGenPdfFile.name);
                     }
-                    // PDF 소스 정보 추가 (콘텐츠 생성기에서 온 경우)
-                    if (this.audioGenPdfSource) {
-                        formData.append('pdf_source', JSON.stringify(this.audioGenPdfSource));
+                    // 콘텐츠 생성에서 온 PDF면 plan_id와 title 전달
+                    if (this.audioGenPdfSource?.plan_id) {
+                        formData.append('plan_id', this.audioGenPdfSource.plan_id);
+                    }
+                    if (this.audioGenPdfSource?.title) {
+                        formData.append('title', this.audioGenPdfSource.title);
                     }
 
                     try {
@@ -6888,7 +6915,8 @@
                             type: 'content',
                             filename: pdf.filename,
                             original_name: pdf.original_name || pdf.filename,
-                            plan_id: pdf.plan_id
+                            plan_id: pdf.plan_id,
+                            title: pdf.title
                         };
 
                         // Auto-select language if available
@@ -6918,6 +6946,7 @@
                     this.contentGenPlanId = null;
                     this.contentGenImageProgress = 0;
                     this.contentGenImageResults = [];
+                    this.contentGenExpandedSlide = null;
                     this.contentGenImagesComplete = false;
                     this.contentGenPdfResult = null;
                     this.contentGenImageList = [];
@@ -7288,7 +7317,9 @@
                         this.audioGenPdfSource = {
                             type: 'content',
                             filename: this.contentGenPdfResult.filename,
-                            original_name: this.contentGenPdfResult.filename
+                            original_name: this.contentGenPdfResult.filename,
+                            plan_id: this.contentGenPdfResult.plan_id,
+                            title: this.contentGenPdfResult.title
                         };
                         this.audioGenLanguage = this.contentGenLanguage;
                         this.mainTab = 'audio-generator';
@@ -7313,7 +7344,9 @@
                         this.audioGenPdfSource = {
                             type: 'content',
                             filename: pdf.filename,
-                            original_name: pdf.original_name || pdf.filename
+                            original_name: pdf.original_name || pdf.filename,
+                            plan_id: pdf.plan_id,
+                            title: pdf.title
                         };
                         if (pdf.language) {
                             this.audioGenLanguage = pdf.language;
