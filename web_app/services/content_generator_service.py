@@ -401,7 +401,8 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
       "title": "Slide title",
       "content": "ONE SHORT sentence (max 15 words) - key message displayed at bottom of slide",
       "narration": "Narration script for this slide (for TTS, natural conversational tone, minimum 150 characters, 20-30 seconds)",
-      "image_prompt": "Detailed image prompt based on THIS slide's specific content (English, cinematic, visual metaphor of the slide theme)",
+      "image_prompt": "Detailed image prompt based on THIS slide's specific content (English, cinematic, visual metaphor of the slide theme). If web_image_keyword is specified, MUST include instruction to prominently feature that element.",
+      "web_image_keyword": "Specific image/element to search and MUST appear in the final image (e.g., 'Tesla Model 3 car', 'Elon Musk portrait', 'iPhone 16 product photo'). Leave empty string if not needed.",
       "web_image_query": "Web search query for real photos/images (English, specific search terms)",
       "use_web_image": true/false,
       "duration_seconds": estimated_display_time_seconds
@@ -421,11 +422,12 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 4. **image_prompt MUST be specific to each slide's content** - describe visual elements, metaphors, and scenes that represent the slide's theme
 5. First slide should be a strong intro, last slide should include CTA outro
 6. Include teasers/previews in the middle to maintain viewer retention
-7. **ALL content must be in English (only image_prompt and web_image_query are always in English)**
+7. **ALL content must be in English (only image_prompt, web_image_keyword, and web_image_query are always in English)**
 8. Content should be based on the latest facts from search results
-9. web_image_query: Write web search queries for slides that need real photos (e.g., product photos, celebrities, places, events)
-10. use_web_image: Whether to use web-downloaded real images instead of AI-generated images (true if real photos are more appropriate)
-11. **Total narration should be at least 2500 characters (approximately 5 minutes)**
+9. **web_image_keyword**: The SPECIFIC image element that MUST appear in the generated image. Examples: 'OpenAI logo', 'Samsung Galaxy S25 phone', 'Taylor Swift photo'. This image will be searched, downloaded, and Gemini will be instructed to prominently feature it in the generated slide.
+10. web_image_query: The search query to find the web_image_keyword (e.g., "OpenAI logo high resolution", "Samsung Galaxy S25 official product photo")
+11. use_web_image: Set to true if web_image_keyword is specified and a real image reference is needed
+12. **Total narration should be at least 2500 characters (approximately 5 minutes)**
 """
         else:
             prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가입니다.
@@ -465,7 +467,8 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
       "title": "슬라이드 제목",
       "content": "화면 하단에 표시될 핵심 메시지 한 문장 (최대 15단어)",
       "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체, 최소 150자 이상, 20-30초 분량)",
-      "image_prompt": "이 슬라이드의 구체적인 내용에 맞는 상세한 이미지 프롬프트 (영어, 시네마틱, 슬라이드 주제의 시각적 메타포)",
+      "image_prompt": "이 슬라이드의 구체적인 내용에 맞는 상세한 이미지 프롬프트 (영어, 시네마틱, 슬라이드 주제의 시각적 메타포). web_image_keyword가 지정된 경우 해당 요소를 반드시 눈에 띄게 포함하라는 지시 필수.",
+      "web_image_keyword": "검색하여 최종 이미지에 반드시 나타나야 할 구체적인 이미지/요소 (예: 'Tesla Model 3 car', 'Elon Musk portrait', 'iPhone 16 product photo'). 필요 없으면 빈 문자열.",
       "web_image_query": "이 슬라이드에 사용할 실제 사진/이미지를 웹에서 검색할 쿼리 (영어, 구체적인 검색어)",
       "use_web_image": true/false,
       "duration_seconds": 예상_표시_시간_초
@@ -485,11 +488,12 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 4. **image_prompt는 각 슬라이드의 내용에 특화되어야 합니다** - 슬라이드 주제를 나타내는 시각적 요소, 메타포, 장면을 구체적으로 설명하세요
 5. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
 6. 중간에 시청 유지를 위한 티저/예고 포함
-7. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt와 web_image_query만 영어)**
+7. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt, web_image_keyword, web_image_query만 영어)**
 8. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
-9. web_image_query: 실제 사진이 필요한 슬라이드에 대해 웹 검색 쿼리를 작성 (예: 제품 사진, 유명인, 장소, 이벤트 등)
-10. use_web_image: 해당 슬라이드에 AI 생성 이미지 대신 웹에서 다운로드한 실제 이미지를 사용할지 여부 (실제 사진이 더 적합한 경우 true)
-11. **전체 narration 합계가 최소 2500자 이상이 되도록 작성 (약 5분 분량)**
+9. **web_image_keyword**: 생성된 이미지에 **반드시 나타나야 할** 구체적인 이미지 요소. 예: 'OpenAI logo', 'Samsung Galaxy S25 phone', 'Taylor Swift photo'. 이 이미지는 웹에서 검색/다운로드되어 Gemini가 생성하는 슬라이드에 눈에 띄게 포함됩니다.
+10. web_image_query: web_image_keyword를 찾기 위한 검색 쿼리 (예: "OpenAI logo high resolution", "Samsung Galaxy S25 official product photo")
+11. use_web_image: web_image_keyword가 지정되어 실제 이미지 참조가 필요한 경우 true로 설정
+12. **전체 narration 합계가 최소 2500자 이상이 되도록 작성 (약 5분 분량)**
 """
 
         try:
@@ -587,7 +591,8 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
         narration: str = '',
         content: str = '',
         language: str = 'ko',
-        reference_images: List[str] = None
+        reference_images: List[str] = None,
+        web_image_keyword: str = ''
     ) -> Dict[str, Any]:
         """
         슬라이드용 이미지를 생성합니다.
@@ -603,6 +608,7 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
             narration: 대본 텍스트
             content: 슬라이드 콘텐츠 (핵심 내용)
             language: 텍스트 언어 (ko/en)
+            web_image_keyword: 반드시 이미지에 포함되어야 할 웹 이미지 키워드
             reference_images: 참조 이미지 파일 경로 리스트 (웹에서 다운로드한 이미지)
 
         Returns:
@@ -615,26 +621,38 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
         has_reference = reference_images and len(reference_images) > 0
 
         if has_reference:
-            enhanced_prompt = f"""Based on the reference images provided, create a high-quality presentation slide background image.
+            # web_image_keyword가 있으면 해당 요소를 반드시 포함하도록 강조
+            keyword_instruction = ""
+            if web_image_keyword:
+                keyword_instruction = f"""
+## CRITICAL - MUST INCLUDE THIS ELEMENT:
+The reference image shows "{web_image_keyword}". You MUST prominently feature this element in the generated image.
+- The "{web_image_keyword}" from the reference image should be clearly visible and recognizable
+- Place it in a visually prominent position (center or key focal point)
+- Maintain the authentic appearance of the "{web_image_keyword}" as shown in the reference
+"""
 
+            enhanced_prompt = f"""Based on the reference images provided, create a high-quality presentation slide background image.
+{keyword_instruction}
 ## Visual Description:
 {image_prompt}
 
-## Reference Images:
-Use the provided reference images as inspiration for style, color palette, and visual elements.
-Incorporate relevant visual elements from the references while creating a cohesive slide background.
+## Reference Images Integration:
+- The reference image contains "{web_image_keyword or 'visual elements'}" that MUST appear in the final image
+- Incorporate the key subject from the reference image prominently, not just as inspiration
+- The reference subject should be clearly recognizable in the generated image
 
 ## Style Requirements:
 - Style: {style}, 16:9 aspect ratio (1920x1080)
-- Minimalist, clean, and professional
+- Minimalist, clean, and professional background
 - Composition should allow space for text overlay (top and bottom)
 - High aesthetic quality, detailed textures, cinematic lighting
-- Blend the reference image aesthetics with the slide concept
+- Feature the reference image subject prominently while maintaining slide aesthetics
 
 ## IMPORTANT:
 - DO NOT include any text, words, letters, or numbers in the image.
-- This image will be used as a background, so keep the central area relatively clean or balanced.
-- Pure visual representation of the concept inspired by the references.
+- This image will be used as a background, so keep areas for text overlay clean.
+- The key subject from the reference MUST be visible and recognizable.
 """
         else:
             enhanced_prompt = f"""Generate a high-quality background image for a presentation slide.
@@ -813,7 +831,8 @@ Incorporate relevant visual elements from the references while creating a cohesi
                 narration=slide.get('narration', ''),
                 content=content,
                 language=language,
-                reference_images=reference_images if reference_images else None
+                reference_images=reference_images if reference_images else None,
+                web_image_keyword=slide.get('web_image_keyword', '')
             )
             result['source'] = 'ai_with_ref' if reference_images else 'ai'
             result['reference_count'] = len(reference_images)
