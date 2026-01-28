@@ -1330,7 +1330,7 @@
                                     <!-- 주제 입력 -->
                                     <div>
                                         <label class="block text-sm text-gray-300 mb-2 font-medium">콘텐츠 주제/아이디어 *</label>
-                                        <textarea x-model="autoPipelineTopic" rows="4"
+                                        <textarea x-model="autoPipelineTopic" rows="24"
                                             class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
                                             placeholder="예: 2026년 최신 AI 코딩 도구 비교 분석&#10;&#10;최신 트렌드, 주요 기능, 장단점 비교 등을 포함해주세요"></textarea>
                                     </div>
@@ -7935,13 +7935,22 @@
                         await this.refreshGenPdfList();
                     }
 
+                    // 1.6 비디오 목록 로드 (드롭다운에 선택한 비디오가 표시되도록)
+                    if (this.generatedVideos.length === 0) {
+                        await this.refreshGenVideoList();
+                    }
+
                     // 2. 영상에서 설정할 카테고리와 언어 값
                     const targetCategory = video.category || null;
+
+                    // 언어 결정: language 필드 우선, 없으면 ocr_lang 확인
                     let targetLang = null;
-                    if (video.ocr_lang) {
-                        if (video.ocr_lang === 'korean' || video.ocr_lang === 'ko') {
+                    const langSource = video.language || video.ocr_lang;
+                    if (langSource) {
+                        const langLower = langSource.toLowerCase();
+                        if (langLower === 'ko' || langLower === 'korean' || langLower === 'kor') {
                             targetLang = 'ko';
-                        } else if (video.ocr_lang === 'en' || video.ocr_lang === 'english') {
+                        } else if (langLower === 'en' || langLower === 'english' || langLower === 'eng') {
                             targetLang = 'en';
                         }
                     }
@@ -7951,22 +7960,29 @@
                     this.ytVideoSource = 'genvideo';
                     this.selectedGenVideo = video.id;
 
-                    // 4. PDF 자동 선택: pdf_name으로 generatedPdfs에서 찾기
+                    // 4. PDF 자동 선택: content_id 또는 pdf_name으로 generatedPdfs에서 찾기
                     this.ytPdfSource = 'genvideo';
-                    if (video.pdf_name && this.generatedPdfs.length > 0) {
-                        const matchingPdf = this.generatedPdfs.find(pdf =>
-                            pdf.original_name === video.pdf_name ||
-                            pdf.filename === video.pdf_name ||
-                            pdf.filename.includes(video.pdf_name.replace('.pdf', ''))
+                    const contentId = video.content_id || video.id;
+                    let matchingPdf = null;
+
+                    if (this.generatedPdfs.length > 0) {
+                        // content_id로 먼저 찾기
+                        matchingPdf = this.generatedPdfs.find(pdf =>
+                            pdf.id === contentId ||
+                            pdf.filename === contentId + '.pdf'
                         );
-                        if (matchingPdf) {
-                            this.selectedGenPdf = matchingPdf.id;
-                        } else {
-                            this.selectedGenPdf = '';
+
+                        // 못 찾으면 pdf_name으로 찾기
+                        if (!matchingPdf && video.pdf_name) {
+                            matchingPdf = this.generatedPdfs.find(pdf =>
+                                pdf.original_name === video.pdf_name ||
+                                pdf.filename === video.pdf_name ||
+                                pdf.filename.includes(video.pdf_name.replace('.pdf', ''))
+                            );
                         }
-                    } else {
-                        this.selectedGenPdf = '';
                     }
+
+                    this.selectedGenPdf = matchingPdf ? matchingPdf.id : '';
 
                     // 5. 탭 전환 후 DOM이 업데이트된 다음에 카테고리/언어 설정
                     // (x-show가 표시되고 x-for로 option이 렌더링된 후에 x-model 값 설정해야 함)

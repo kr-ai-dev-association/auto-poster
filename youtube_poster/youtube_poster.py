@@ -165,11 +165,22 @@ class YouTubeAutoPoster:
 
     def upload_video(self, video_path, metadata, thumbnail_path=None):
         print(f"🚀 Uploading video to YouTube: {video_path}")
+
+        # 태그 정제 - YouTube에서 허용하지 않는 문자 제거
+        sanitized_tags = []
+        for tag in metadata.get('tags', []):
+            tag_str = str(tag).strip().replace('<', '').replace('>', '')
+            tag_str = ' '.join(tag_str.split())  # 연속 공백 정리
+            if tag_str and len(tag_str) <= 30:
+                sanitized_tags.append(tag_str)
+            elif tag_str:
+                sanitized_tags.append(tag_str[:30].strip())
+
         body = {
             'snippet': {
                 'title': metadata['title'],
                 'description': metadata['description'],
-                'tags': metadata['tags'],
+                'tags': sanitized_tags,
                 'categoryId': '28'  # Science & Technology
             },
             'status': {

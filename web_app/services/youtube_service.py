@@ -131,6 +131,14 @@ class YouTubeMetadataValidator:
             for tag in fixed['tags']:
                 tag_str = str(tag).strip()
                 if tag_str:
+                    # YouTube에서 허용하지 않는 문자 제거 (<, > 등)
+                    tag_str = tag_str.replace('<', '').replace('>', '')
+                    # 연속된 공백 정리
+                    tag_str = ' '.join(tag_str.split())
+
+                    if not tag_str:
+                        continue
+
                     # 태그 길이 제한
                     if len(tag_str) > YouTubeMetadataValidator.MAX_TAG_LENGTH:
                         tag_str = tag_str[:YouTubeMetadataValidator.MAX_TAG_LENGTH].strip()
@@ -918,30 +926,23 @@ class YouTubeService:
             if upload_id:
                 self.update_upload_progress(upload_id, 'metadata_done', 40, '메타데이터 생성 완료, 검증 중...')
             
-            # 업로드 전 최종 검증
+            # 업로드 전 태그 정제 및 검증
+            print(f"🔧 메타데이터 정제 중 (태그 특수문자 제거 등)...")
+            metadata = YouTubeMetadataValidator.fix(metadata)
+
             print(f"🔍 업로드 전 메타데이터 최종 검증 중...")
             is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
-            
+
             if warnings:
                 for warning in warnings:
                     print(f"⚠️ 경고: {warning}")
-            
+
             if not is_valid:
                 print(f"❌ 메타데이터 검증 실패:")
                 for error in errors:
                     print(f"   - {error}")
-                
-                # 자동 수정 시도
-                print(f"🔧 메타데이터 자동 수정 시도 중...")
-                metadata = YouTubeMetadataValidator.fix(metadata)
-                
-                # 재검증
-                is_valid, errors, warnings = YouTubeMetadataValidator.validate(metadata)
-                if not is_valid:
-                    error_msg = "업로드 전 메타데이터 검증 실패:\n" + "\n".join(f"  - {e}" for e in errors)
-                    raise Exception(error_msg)
-                else:
-                    print(f"✅ 메타데이터 자동 수정 완료")
+                error_msg = "업로드 전 메타데이터 검증 실패:\n" + "\n".join(f"  - {e}" for e in errors)
+                raise Exception(error_msg)
             else:
                 print(f"✅ 메타데이터 최종 검증 통과")
             

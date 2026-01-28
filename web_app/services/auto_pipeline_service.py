@@ -341,8 +341,8 @@ class AutoPipelineService:
                     await asyncio.sleep(1)
                     progress = YouTubeService.get_upload_progress(upload_id)
                     if progress:
-                        if progress.get('step') == 'complete':
-                            yt_video_id = progress.get('video_id')
+                        if progress.get('step') == 'done':
+                            yt_video_id = progress.get('result', {}).get('video_id')
                             youtube_url = f"https://www.youtube.com/watch?v={yt_video_id}"
                             self.pipelines[pipeline_id]['result']['youtube'] = {
                                 'video_id': yt_video_id,
