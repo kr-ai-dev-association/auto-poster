@@ -412,21 +412,31 @@ async def generate_youtube_metadata(
     pdf: UploadFile = File(None),
     pdf_id: str = Form(None),
     plan_id: str = Form(None),  # 기획안 ID 추가
+    text_content: str = Form(None),  # 직접 입력 텍스트
     category: str = Form(...),
     lang: str = Form("ko"),
     user: models.User = Depends(get_current_user)
 ):
-    """PDF 분석 또는 기획 대본을 통해 유튜브 메타데이터를 생성합니다.
-    pdf 파일을 직접 업로드하거나, pdf_id 또는 plan_id를 참조할 수 있습니다.
+    """PDF 분석, 기획 대본, 또는 직접 입력 텍스트를 통해 유튜브 메타데이터를 생성합니다.
+    pdf 파일 업로드, pdf_id, plan_id, 또는 text_content를 사용할 수 있습니다.
     """
     if not youtube:
         return JSONResponse(status_code=503, content={"status": "error", "message": "Service not initialized. Please wait a moment and try again."})
 
+    # 디버그 로그: 수신된 파라미터 출력
+    print(f"📝 [메타데이터 생성] 수신된 파라미터:")
+    print(f"   - category: {category}")
+    print(f"   - lang: {lang}")
+    print(f"   - pdf_id: {pdf_id}")
+    print(f"   - plan_id: {plan_id}")
+    print(f"   - text_content: {len(text_content) if text_content else 0} 자")
+    print(f"   - pdf: {pdf.filename if pdf else 'None'}")
+
     try:
         from web_app.services.youtube_service import YouTubeMetadataValidator
-        
+
         content = None
-        text_content = None
+        final_text_content = None
 
         # 1. 기획안(plan_id)이 있는 경우: 대본 텍스트 사용 (PDF 업로드 불필요)
         if plan_id:
@@ -435,29 +445,34 @@ async def generate_youtube_metadata(
                 import json
                 with open(plan_path, 'r', encoding='utf-8') as f:
                     plan = json.load(f)
-                
+
                 # 대본 텍스트 구성
                 title = plan.get('title', 'Untitled')
-                text_content = f"Title: {title}\n\n"
-                
+                final_text_content = f"Title: {title}\n\n"
+
                 # 타겟 독자 등 메타 정보 추가
                 if 'target_audience' in plan:
-                     text_content += f"Target Audience: {plan['target_audience']}\n"
+                     final_text_content += f"Target Audience: {plan['target_audience']}\n"
                 if 'video_style' in plan:
-                     text_content += f"Style: {plan['video_style']}\n\n"
+                     final_text_content += f"Style: {plan['video_style']}\n\n"
 
                 # 슬라이드별 나레이션 합치기
                 for slide in plan.get('slides', []):
                      num = slide.get('slide_number', 0)
                      narration = slide.get('narration', '')
-                     content_text = slide.get('content', '')
-                     text_content += f"[Slide {num}]\nContent: {content_text}\nNarration: {narration}\n\n"
-                
-                print(f"📝 기획안({plan_id})에서 대본 추출 완료 (길이: {len(text_content)})")
+                     slide_content = slide.get('content', '')
+                     final_text_content += f"[Slide {num}]\nContent: {slide_content}\nNarration: {narration}\n\n"
+
+                print(f"📝 기획안({plan_id})에서 대본 추출 완료 (길이: {len(final_text_content)})")
             else:
                 return JSONResponse(status_code=404, content={"status": "error", "message": "Plan not found"})
 
-        # 2. PDF 내용 가져오기 (기획안이 없는 경우)
+        # 2. 직접 입력 텍스트가 있는 경우
+        elif text_content and text_content.strip():
+            final_text_content = text_content.strip()
+            print(f"📝 직접 입력 텍스트 사용 (길이: {len(final_text_content)}자)")
+
+        # 3. PDF 내용 가져오기
         elif pdf_id and pdf2mp4:
             # Gen Video에서 선택한 PDF 사용
             pdf_path = pdf2mp4.get_pdf_path(pdf_id)
@@ -469,10 +484,10 @@ async def generate_youtube_metadata(
             # 직접 업로드한 PDF 사용
             content = await pdf.read()
         else:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file, pdf_id, or plan_id is required"})
+            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file, pdf_id, plan_id, or text_content is required"})
 
         # 메타데이터 생성 호출 (text_content가 있으면 우선 사용)
-        metadata = await youtube.generate_metadata(content, category, lang, text_content=text_content)
+        metadata = await youtube.generate_metadata(content, category, lang, text_content=final_text_content)
 
         # 메타데이터 정제 (태그 특수문자 제거 등)
         metadata = YouTubeMetadataValidator.fix(metadata)
@@ -531,6 +546,7 @@ async def youtube_upload(
     video: UploadFile = File(...),
     pdf: UploadFile = File(None),
     pdf_id: str = Form(None),
+    metadata: str = Form(None),  # 직접 입력 모드에서 사전 생성된 메타데이터
     category: str = Form(...),
     lang: str = Form("ko"),
     use_thumbnail: bool = Form(True),
@@ -543,6 +559,17 @@ async def youtube_upload(
     try:
         video_content = await video.read()
         filename = video.filename
+        pdf_content = None
+        pre_generated_metadata = None
+
+        # 사전 생성된 메타데이터가 있는 경우 (직접 입력 모드)
+        if metadata:
+            import json
+            try:
+                pre_generated_metadata = json.loads(metadata)
+                print(f"📝 사전 생성된 메타데이터 사용: {pre_generated_metadata.get('title', 'No title')[:50]}...")
+            except json.JSONDecodeError:
+                return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid metadata JSON"})
 
         # PDF 내용 가져오기 (업로드 또는 Gen Video에서 선택)
         if pdf_id and pdf2mp4:
@@ -555,8 +582,9 @@ async def youtube_upload(
         elif pdf:
             # 직접 업로드한 PDF 사용
             pdf_content = await pdf.read()
-        else:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file or pdf_id is required"})
+        elif not pre_generated_metadata:
+            # 메타데이터도 없고 PDF도 없으면 에러
+            return JSONResponse(status_code=400, content={"status": "error", "message": "PDF file, pdf_id, or metadata is required"})
 
         # 업로드 ID 생성 및 초기 상태 설정
         upload_id = str(uuid.uuid4())
@@ -565,7 +593,14 @@ async def youtube_upload(
         # 백그라운드 작업 시작
         background_tasks.add_task(
             youtube.process_and_upload,
-            video_content, filename, pdf_content, category, lang, use_thumbnail, upload_id
+            video_content=video_content,
+            filename=filename,
+            pdf_content=pdf_content,
+            category=category,
+            lang=lang,
+            use_thumbnail=use_thumbnail,
+            upload_id=upload_id,
+            pre_metadata=pre_generated_metadata
         )
         
         return JSONResponse(content={"status": "processing", "upload_id": upload_id})

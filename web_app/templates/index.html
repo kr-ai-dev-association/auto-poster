@@ -744,9 +744,8 @@
                                     <label class="block text-sm font-bold text-gray-300 mb-2">메타데이터 언어 선택</label>
                                     <select x-model="ytLang"
                                         class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
-                                        <template x-for="lang in languages" :key="lang.id">
-                                            <option :value="lang.id" x-text="lang.name_ko + ' (' + lang.name_en + ')'"></option>
-                                        </template>
+                                        <option value="ko">한국어 (Korean)</option>
+                                        <option value="en">영어 (English)</option>
                                     </select>
                                 </div>
                                 <!-- Video Source Selection -->
@@ -861,7 +860,7 @@
                                         Source)</label>
 
                                     <!-- PDF 소스 선택 라디오 버튼 -->
-                                    <div class="flex gap-6 mb-3">
+                                    <div class="flex flex-wrap gap-4 mb-3">
                                         <label class="flex items-center gap-2 cursor-pointer">
                                             <input type="radio" x-model="ytPdfSource" value="upload"
                                                 class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
@@ -871,6 +870,11 @@
                                             <input type="radio" x-model="ytPdfSource" value="genvideo"
                                                 class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
                                             <span class="text-sm text-gray-300">📁 Gen Video PDF 선택</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" x-model="ytPdfSource" value="text"
+                                                class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
+                                            <span class="text-sm text-gray-300">✏️ 직접 내용 입력</span>
                                         </label>
                                     </div>
 
@@ -947,8 +951,26 @@
                                             </template>
                                         </div>
                                     </div>
+
+                                    <!-- 직접 내용 입력 모드 -->
+                                    <div x-show="ytPdfSource === 'text'" class="space-y-3">
+                                        <div class="text-xs text-gray-400 flex items-center gap-2 mb-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span>영상 내용, 대본, 또는 주제를 직접 입력하면 AI가 분석하여 메타데이터를 생성합니다.</span>
+                                        </div>
+                                        <textarea x-model="ytTextContent"
+                                            class="w-full px-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                                            rows="8"
+                                            placeholder="영상 내용, 대본, 또는 주제를 여기에 붙여넣으세요...&#10;&#10;예시:&#10;- 영상 대본 전체&#10;- 영상 주제 및 핵심 내용&#10;- 다루는 토픽들의 요약"></textarea>
+                                        <div class="text-xs text-gray-500 text-right">
+                                            <span x-text="(ytTextContent || '').length"></span> 자
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex items-center">
+                                <div class="flex items-center" x-show="ytPdfSource !== 'text'">
                                     <input type="checkbox" id="use_thumbnail" x-model="useThumbnail" checked
                                         class="h-4 w-4 text-red-600 focus:ring-red-500 bg-gray-700 border-gray-600 rounded">
                                     <label for="use_thumbnail" class="ml-2 block text-sm text-gray-300">PDF 첫 페이지를 썸네일로
@@ -969,8 +991,8 @@
                                 </ul>
                                 <div class="pt-4 space-y-3">
                                     <button @click="generateYoutubeMetadata()"
-                                        :disabled="((ytPdfSource === 'upload' && !pdfFile) || (ytPdfSource === 'genvideo' && !selectedGenPdf)) || ytLoading"
-                                        :class="((ytPdfSource === 'upload' && !pdfFile) || (ytPdfSource === 'genvideo' && !selectedGenPdf)) || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
+                                        :disabled="((ytPdfSource === 'upload' && !pdfFile) || (ytPdfSource === 'genvideo' && !selectedGenPdf) || (ytPdfSource === 'text' && !ytTextContent?.trim())) || ytLoading"
+                                        :class="((ytPdfSource === 'upload' && !pdfFile) || (ytPdfSource === 'genvideo' && !selectedGenPdf) || (ytPdfSource === 'text' && !ytTextContent?.trim())) || ytLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
                                         class="w-full py-3 text-white font-bold rounded-lg transition shadow-md flex justify-center items-center">
                                         <span x-show="!ytLoading">🔍 메타데이터 미리보기 생성</span>
                                         <svg x-show="ytLoading" class="animate-spin h-5 w-5 text-white"
@@ -4131,9 +4153,10 @@
                 selectedGenVideo: '',
 
                 // Youtube Poster - PDF Source Selection
-                ytPdfSource: 'upload', // 'upload' or 'genvideo'
+                ytPdfSource: 'upload', // 'upload', 'genvideo', or 'text'
                 selectedGenPdf: '',
                 generatedPdfs: [],
+                ytTextContent: '', // 직접 입력 텍스트
 
                 // Content Generator State
                 contentGenMode: 'manual', // 'manual' or 'auto'
@@ -4723,6 +4746,7 @@
                     this.pdfDragOver = false;
                     this.ytPdfSource = 'upload';
                     this.selectedGenPdf = '';
+                    this.ytTextContent = '';
 
                     // 설정 초기화
                     this.ytCategory = 'tech';
@@ -5703,7 +5727,7 @@
                 },
 
                 async generateYoutubeMetadata() {
-                    // PDF 소스 검증
+                    // 소스 검증
                     if (this.ytPdfSource === 'upload' && !this.pdfFile) {
                         alert('PDF 파일을 업로드해주세요.');
                         return;
@@ -5712,15 +5736,30 @@
                         alert('Gen Video에서 PDF를 선택해주세요.');
                         return;
                     }
-                    
+                    if (this.ytPdfSource === 'text' && !this.ytTextContent?.trim()) {
+                        alert('내용을 입력해주세요.');
+                        return;
+                    }
+
                     this.ytLoading = true;
                     const formData = new FormData();
 
-                    // PDF 소스에 따라 파라미터 설정
+                    // 디버그: 현재 설정된 값 출력
+                    console.log('📝 메타데이터 생성 파라미터:', {
+                        ytLang: this.ytLang,
+                        ytCategory: this.ytCategory,
+                        ytPdfSource: this.ytPdfSource,
+                        selectedGenPdf: this.selectedGenPdf,
+                        textContentLength: this.ytTextContent?.length || 0
+                    });
+
+                    // 소스에 따라 파라미터 설정
                     if (this.ytPdfSource === 'genvideo') {
                         formData.append('pdf_id', this.selectedGenPdf);
+                    } else if (this.ytPdfSource === 'text') {
+                        formData.append('text_content', this.ytTextContent);
                     } else {
-                    formData.append('pdf', this.pdfFile);
+                        formData.append('pdf', this.pdfFile);
                     }
                     formData.append('category', this.ytCategory);
                     formData.append('lang', this.ytLang);
@@ -6065,13 +6104,18 @@
                         alert('Gen Video에서 영상을 선택해주세요.');
                         return;
                     }
-                    // PDF 소스 검증
+                    // PDF 소스 검증 (text 모드 제외)
                     if (this.ytPdfSource === 'upload' && !this.pdfFile) {
                         alert('PDF 파일을 업로드해주세요.');
                         return;
                     }
                     if (this.ytPdfSource === 'genvideo' && !this.selectedGenPdf) {
                         alert('Gen Video에서 PDF를 선택해주세요.');
+                        return;
+                    }
+                    // text 모드에서는 메타데이터가 이미 생성되어 있어야 함
+                    if (this.ytPdfSource === 'text' && !this.ytMetadata) {
+                        alert('먼저 메타데이터 미리보기를 생성해주세요.');
                         return;
                     }
 
@@ -6103,24 +6147,30 @@
                             });
                         } else {
                             // 직접 업로드한 경우
-                    const formData = new FormData();
-                    formData.append('video', this.ytFile);
+                            const formData = new FormData();
+                            formData.append('video', this.ytFile);
 
                             // PDF 소스에 따라 파라미터 설정
                             if (this.ytPdfSource === 'genvideo') {
                                 formData.append('pdf_id', this.selectedGenPdf);
+                            } else if (this.ytPdfSource === 'text') {
+                                // 직접 내용 입력 모드: 이미 생성된 메타데이터 전송
+                                formData.append('metadata', JSON.stringify(this.ytMetadata));
+                                formData.append('use_thumbnail', false); // 텍스트 모드에서는 썸네일 없음
                             } else {
-                    formData.append('pdf', this.pdfFile);
+                                formData.append('pdf', this.pdfFile);
                             }
-                    formData.append('category', this.ytCategory);
+                            formData.append('category', this.ytCategory);
                             formData.append('lang', this.ytLang);
-                            formData.append('use_thumbnail', this.useThumbnail);
+                            if (this.ytPdfSource !== 'text') {
+                                formData.append('use_thumbnail', this.useThumbnail);
+                            }
 
                             response = await fetch('/api/youtube/upload', {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-                            body: formData
-                        });
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+                                body: formData
+                            });
                         }
 
                         const initialResult = await response.json();

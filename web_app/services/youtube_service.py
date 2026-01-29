@@ -16,149 +16,17 @@ project_root = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(project_root)
 
 # 숫자로 시작하는 디렉토리는 직접 import가 불가능하므로 importlib 사용
-def load_youtube_poster():
+def load_youtube_poster_module():
     module_path = os.path.join(project_root, 'youtube_poster', 'youtube_poster.py')
     spec = importlib.util.spec_from_file_location("youtube_poster", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.YouTubeAutoPoster
+    return module
 
-YouTubeAutoPoster = load_youtube_poster()
+_youtube_module = load_youtube_poster_module()
+YouTubeAutoPoster = _youtube_module.YouTubeAutoPoster
+YouTubeMetadataValidator = _youtube_module.YouTubeMetadataValidator  # 일원화된 검증기
 
-class YouTubeMetadataValidator:
-    """YouTube 메타데이터 검증기"""
-    
-    # YouTube API 제약사항
-    MAX_TITLE_LENGTH = 100
-    MAX_DESCRIPTION_LENGTH = 5000
-    MAX_TAGS_COUNT = 500
-    MAX_TAG_LENGTH = 30
-    
-    @staticmethod
-    def validate(metadata):
-        """
-        YouTube 메타데이터를 검증합니다.
-        
-        Returns:
-            tuple: (is_valid: bool, errors: list, warnings: list)
-        """
-        errors = []
-        warnings = []
-        
-        if not isinstance(metadata, dict):
-            errors.append("메타데이터는 딕셔너리 형식이어야 합니다.")
-            return False, errors, warnings
-        
-        # 필수 필드 검증
-        required_fields = ['title', 'description', 'tags']
-        for field in required_fields:
-            if field not in metadata:
-                errors.append(f"필수 필드 '{field}'가 없습니다.")
-        
-        if errors:
-            return False, errors, warnings
-        
-        # 제목 검증
-        title = str(metadata['title']).strip()
-        if not title:
-            errors.append("제목이 비어있습니다.")
-        elif len(title) > YouTubeMetadataValidator.MAX_TITLE_LENGTH:
-            errors.append(f"제목이 너무 깁니다. (최대 {YouTubeMetadataValidator.MAX_TITLE_LENGTH}자, 현재 {len(title)}자)")
-            # 자동 자르기 제안
-            warnings.append(f"제목을 {YouTubeMetadataValidator.MAX_TITLE_LENGTH}자로 자르는 것을 권장합니다.")
-        
-        # 설명 검증
-        description = str(metadata['description']).strip()
-        if not description:
-            errors.append("설명이 비어있습니다.")
-        elif len(description) > YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH:
-            errors.append(f"설명이 너무 깁니다. (최대 {YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH}자, 현재 {len(description)}자)")
-            warnings.append(f"설명을 {YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH}자로 자르는 것을 권장합니다.")
-        
-        # 태그 검증
-        tags = metadata['tags']
-        if not isinstance(tags, list):
-            errors.append("태그는 배열 형식이어야 합니다.")
-        elif len(tags) == 0:
-            warnings.append("태그가 없습니다. 검색 최적화를 위해 태그를 추가하는 것을 권장합니다.")
-        else:
-            if len(tags) > YouTubeMetadataValidator.MAX_TAGS_COUNT:
-                errors.append(f"태그가 너무 많습니다. (최대 {YouTubeMetadataValidator.MAX_TAGS_COUNT}개, 현재 {len(tags)}개)")
-                warnings.append(f"태그를 {YouTubeMetadataValidator.MAX_TAGS_COUNT}개로 줄이는 것을 권장합니다.")
-            
-            # 각 태그 검증
-            invalid_tags = []
-            for i, tag in enumerate(tags):
-                tag_str = str(tag).strip()
-                if not tag_str:
-                    invalid_tags.append(f"태그 #{i+1}: 빈 태그")
-                elif len(tag_str) > YouTubeMetadataValidator.MAX_TAG_LENGTH:
-                    invalid_tags.append(f"태그 #{i+1} ('{tag_str[:20]}...'): {len(tag_str)}자 (최대 {YouTubeMetadataValidator.MAX_TAG_LENGTH}자)")
-            
-            if invalid_tags:
-                errors.extend(invalid_tags)
-        
-        is_valid = len(errors) == 0
-        return is_valid, errors, warnings
-    
-    @staticmethod
-    def fix(metadata):
-        """
-        메타데이터를 자동으로 수정합니다 (제한 초과 시 자르기).
-        
-        Returns:
-            dict: 수정된 메타데이터
-        """
-        fixed = metadata.copy()
-        
-        # 제목 자르기
-        if 'title' in fixed:
-            title = str(fixed['title']).strip()
-            if len(title) > YouTubeMetadataValidator.MAX_TITLE_LENGTH:
-                fixed['title'] = title[:YouTubeMetadataValidator.MAX_TITLE_LENGTH].strip()
-                print(f"⚠️ 제목이 {len(title)}자에서 {len(fixed['title'])}자로 자동 자름")
-        
-        # 설명 자르기
-        if 'description' in fixed:
-            description = str(fixed['description']).strip()
-            if len(description) > YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH:
-                fixed['description'] = description[:YouTubeMetadataValidator.MAX_DESCRIPTION_LENGTH].strip()
-                print(f"⚠️ 설명이 {len(description)}자에서 {len(fixed['description'])}자로 자동 자름")
-        
-        # 태그 정리
-        if 'tags' in fixed and isinstance(fixed['tags'], list):
-            import re
-            fixed_tags = []
-            for tag in fixed['tags']:
-                tag_str = str(tag).strip()
-                if tag_str:
-                    # YouTube에서 허용하지 않는 문자 제거 (<, > 등)
-                    tag_str = tag_str.replace('<', '').replace('>', '')
-                    # 이모지 및 특수 유니코드 문자 제거 (알파벳, 숫자, 기본 문장부호만 허용)
-                    tag_str = re.sub(r'[^\w\s\-\'\"\.\,\!\?\&\#\@\(\)\[\]\:\;\+\=\/\\]', '', tag_str, flags=re.UNICODE)
-                    # 연속된 공백 정리
-                    tag_str = ' '.join(tag_str.split())
-
-                    if not tag_str:
-                        continue
-
-                    # 태그 길이 제한
-                    if len(tag_str) > YouTubeMetadataValidator.MAX_TAG_LENGTH:
-                        tag_str = tag_str[:YouTubeMetadataValidator.MAX_TAG_LENGTH].strip()
-                        print(f"⚠️ 태그 '{tag_str}'가 자동으로 자름")
-                    fixed_tags.append(tag_str)
-
-            # 빈 태그 제거 및 중복 제거
-            fixed_tags = list(dict.fromkeys([t for t in fixed_tags if t.strip()]))
-
-            # 태그 개수 제한
-            if len(fixed_tags) > YouTubeMetadataValidator.MAX_TAGS_COUNT:
-                fixed_tags = fixed_tags[:YouTubeMetadataValidator.MAX_TAGS_COUNT]
-                print(f"⚠️ 태그가 {len(fixed_tags)}개로 자동 제한")
-
-            fixed['tags'] = fixed_tags
-        
-        return fixed
 
 class YouTubeService:
     # 진행률 저장소 (클래스 변수)
@@ -410,14 +278,22 @@ class YouTubeService:
 
         # 프롬프트 구성
         prompt = f"""
-        [CRITICAL] You MUST analyze the attached PDF/content and extract its ACTUAL topic, key points, and information.
+        [CRITICAL - LANGUAGE REQUIREMENT]
+        ⚠️ YOU MUST GENERATE ALL OUTPUT IN {lang_str.upper()} LANGUAGE. THIS IS MANDATORY.
+        - Title: MUST be in {lang_str}
+        - Description: MUST be in {lang_str}
+        - Tags: MUST be in {lang_str}
+        Even if the source content is in a different language, you MUST translate and write everything in {lang_str}.
+
+        [TASK] Analyze the attached PDF/content and extract its ACTUAL topic, key points, and information.
         Generate YouTube-optimized metadata in {lang_str} based on the ACTUAL CONTENT of the PDF/text provided.
 
         [INSTRUCTIONS]
-        1. Title: Create a click-worthy, dramatic title that reflects the ACTUAL CONTENT of the PDF.
+        1. Title: Create a click-worthy, dramatic title IN {lang_str.upper()} that reflects the ACTUAL CONTENT of the PDF.
            - The title must be about the specific topic covered in the PDF, not generic.
+           - IMPORTANT: Write the title in {lang_str}, not in the source language.
 
-        2. Description STRUCTURE (MUST follow this exact format):
+        2. Description STRUCTURE (MUST follow this exact format, ALL IN {lang_str.upper()}):
 
            PART 1 - CONTENT SECTION (Write based on PDF content):
            - Opening hook: A dramatic one-line quote or statement about the topic
@@ -779,17 +655,58 @@ class YouTubeService:
                         metadata = json.loads(cleaned, strict=False)
                         print(f"✅ JSON 파싱 성공 (추가 정리 후)")
                     except json.JSONDecodeError as e2:
-                        print(f"❌ JSON 파싱 완전 실패: {e2}")
-                        print(f"📝 최종 시도 텍스트 (처음 2000자): {cleaned[:2000]}")
-                        print(f"📝 에러 위치: line {e2.lineno}, column {e2.colno}")
-                        if e2.lineno and e2.colno:
-                            lines = cleaned.split('\n')
-                            if e2.lineno <= len(lines):
-                                error_line = lines[e2.lineno - 1]
-                                print(f"📝 에러 라인: {error_line}")
-                                if e2.colno <= len(error_line):
-                                    print(f"📝 에러 위치 표시: {error_line[:e2.colno-1]}>>>{error_line[e2.colno-1:min(e2.colno+20, len(error_line))]}")
-                        raise Exception(f"JSON 파싱 실패: {str(e2)}. 응답 텍스트를 확인하세요.")
+                        print(f"⚠️ JSON 파싱 실패, 필드별 추출 시도 중...")
+
+                        # 필드별 추출 시도 (description에 이스케이프 안된 따옴표가 있는 경우)
+                        try:
+                            # title 추출
+                            title_match = re.search(r'"title"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', cleaned)
+                            title = title_match.group(1) if title_match else "Default Title"
+
+                            # tags 배열 추출
+                            tags_match = re.search(r'"tags"\s*:\s*\[(.*?)\]', cleaned, re.DOTALL)
+                            tags = []
+                            if tags_match:
+                                tags_str = tags_match.group(1)
+                                # 태그 문자열에서 개별 태그 추출
+                                tag_items = re.findall(r'"([^"]*)"', tags_str)
+                                tags = [t.strip() for t in tag_items if t.strip()]
+
+                            # description 추출 (title과 tags 사이의 모든 텍스트)
+                            desc_match = re.search(r'"description"\s*:\s*"(.*?)",\s*"tags"', cleaned, re.DOTALL)
+                            if not desc_match:
+                                # 대안: tags가 먼저 오는 경우
+                                desc_match = re.search(r'"description"\s*:\s*"(.*?)"\s*}', cleaned, re.DOTALL)
+
+                            description = ""
+                            if desc_match:
+                                description = desc_match.group(1)
+                                # 이스케이프 되지 않은 따옴표를 이스케이프
+                                description = description.replace('\\"', '##ESCAPED_QUOTE##')
+                                description = description.replace('"', '\\"')
+                                description = description.replace('##ESCAPED_QUOTE##', '\\"')
+                                # 줄바꿈 이스케이프
+                                description = description.replace('\n', '\\n').replace('\r', '\\r')
+
+                            metadata = {
+                                "title": title,
+                                "description": description,
+                                "tags": tags
+                            }
+                            print(f"✅ 필드별 추출 성공: title={len(title)}자, description={len(description)}자, tags={len(tags)}개")
+                        except Exception as extract_error:
+                            print(f"❌ 필드별 추출도 실패: {extract_error}")
+                            print(f"❌ JSON 파싱 완전 실패: {e2}")
+                            print(f"📝 최종 시도 텍스트 (처음 2000자): {cleaned[:2000]}")
+                            print(f"📝 에러 위치: line {e2.lineno}, column {e2.colno}")
+                            if e2.lineno and e2.colno:
+                                lines = cleaned.split('\n')
+                                if e2.lineno <= len(lines):
+                                    error_line = lines[e2.lineno - 1]
+                                    print(f"📝 에러 라인: {error_line}")
+                                    if e2.colno <= len(error_line):
+                                        print(f"📝 에러 위치 표시: {error_line[:e2.colno-1]}>>>{error_line[e2.colno-1:min(e2.colno+20, len(error_line))]}")
+                            raise Exception(f"JSON 파싱 실패: {str(e2)}. 응답 텍스트를 확인하세요.")
             
             # 메타데이터 검증
             print(f"🔍 메타데이터 검증 중...")
@@ -876,11 +793,12 @@ class YouTubeService:
             traceback.print_exc()
             return None
 
-    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, upload_id=None, gen_video_id=None, text_content=None):
+    async def process_and_upload(self, video_content, filename, pdf_content, category, lang='ko', use_thumbnail=True, upload_id=None, gen_video_id=None, text_content=None, pre_metadata=None):
         """영상을 처리하고 유튜브에 업로드합니다.
 
         Args:
             text_content: 대본 또는 나레이션 텍스트 (이 값이 있으면 PDF 대신 사용)
+            pre_metadata: 사전 생성된 메타데이터 (직접 입력 모드에서 사용)
         """
         if upload_id:
             self.update_upload_progress(upload_id, 'init', 5, '업로드 준비 중...')
@@ -892,42 +810,58 @@ class YouTubeService:
         video_path = os.path.join(v_dir, f"raw_{filename}")
         with open(video_path, "wb") as f:
             f.write(video_content)
-        
-        pdf_path = os.path.join(v_dir, "temp_metadata_source.pdf")
-        with open(pdf_path, "wb") as f:
-            f.write(pdf_content)
 
-        # 썸네일 생성
+        pdf_path = None
         thumbnail_path = None
-        if use_thumbnail:
-            thumbnail_path = os.path.join(v_dir, "temp_thumbnail.jpg")
-            thumbnail_path = self.generate_thumbnail_from_pdf(pdf_content, thumbnail_path)
+
+        # PDF가 있는 경우에만 저장 및 썸네일 생성
+        if pdf_content:
+            pdf_path = os.path.join(v_dir, "temp_metadata_source.pdf")
+            with open(pdf_path, "wb") as f:
+                f.write(pdf_content)
+
+            # 썸네일 생성
+            if use_thumbnail:
+                thumbnail_path = os.path.join(v_dir, "temp_thumbnail.jpg")
+                thumbnail_path = self.generate_thumbnail_from_pdf(pdf_content, thumbnail_path)
 
         try:
-            # 2. 메타데이터 생성
-            desc_path = os.path.join(v_dir, f'desc_{lang}.md')
-            if not os.path.exists(desc_path):
-                desc_path = os.path.join(v_dir, 'desc.md')
-            
-            desc_template = ""
-            if os.path.exists(desc_path):
-                with open(desc_path, 'r', encoding='utf-8') as f:
-                    desc_template = f.read()
+            # 2. 메타데이터 처리
+            metadata = None
 
-            if upload_id:
-                self.update_upload_progress(upload_id, 'metadata', 15, 'YouTube 메타데이터 생성 중 (AI 분석)...')
-
-            # 대본(text_content)이 있으면 우선 사용, 없으면 PDF에서 추출
-            if text_content and len(text_content) >= 100:
-                print(f"📝 메타데이터 생성 시작 (대본 텍스트: {len(text_content)} 문자)")
-                metadata = await self.generate_metadata(None, category, lang, text_content=text_content)
+            # 사전 생성된 메타데이터가 있으면 그대로 사용 (직접 입력 모드)
+            if pre_metadata:
+                print(f"📝 사전 생성된 메타데이터 사용: {pre_metadata.get('title', 'N/A')[:50]}...")
+                metadata = pre_metadata
+                if upload_id:
+                    self.update_upload_progress(upload_id, 'metadata_done', 40, '사전 생성된 메타데이터 사용')
             else:
-                print(f"📝 메타데이터 생성 시작 (PDF: {pdf_path})")
-                # YouTube API 인증 없이 메타데이터 생성 (generate_metadata 메서드 사용)
-                with open(pdf_path, 'rb') as f:
-                    pdf_content = f.read()
-                metadata = await self.generate_metadata(pdf_content, category, lang)
-            print(f"✅ 메타데이터 생성 완료: {metadata.get('title', 'N/A')[:50]}...")
+                # 메타데이터 생성 필요
+                desc_path = os.path.join(v_dir, f'desc_{lang}.md')
+                if not os.path.exists(desc_path):
+                    desc_path = os.path.join(v_dir, 'desc.md')
+
+                desc_template = ""
+                if os.path.exists(desc_path):
+                    with open(desc_path, 'r', encoding='utf-8') as f:
+                        desc_template = f.read()
+
+                if upload_id:
+                    self.update_upload_progress(upload_id, 'metadata', 15, 'YouTube 메타데이터 생성 중 (AI 분석)...')
+
+                # 대본(text_content)이 있으면 우선 사용, 없으면 PDF에서 추출
+                if text_content and len(text_content) >= 100:
+                    print(f"📝 메타데이터 생성 시작 (대본 텍스트: {len(text_content)} 문자)")
+                    metadata = await self.generate_metadata(None, category, lang, text_content=text_content)
+                elif pdf_path:
+                    print(f"📝 메타데이터 생성 시작 (PDF: {pdf_path})")
+                    with open(pdf_path, 'rb') as f:
+                        pdf_content_read = f.read()
+                    metadata = await self.generate_metadata(pdf_content_read, category, lang)
+                else:
+                    raise Exception("메타데이터 생성에 필요한 PDF 또는 텍스트가 없습니다.")
+
+                print(f"✅ 메타데이터 생성 완료: {metadata.get('title', 'N/A')[:50]}...")
             
             if upload_id:
                 self.update_upload_progress(upload_id, 'metadata_done', 40, '메타데이터 생성 완료, 검증 중...')
