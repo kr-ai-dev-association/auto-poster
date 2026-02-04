@@ -128,10 +128,9 @@ class YouTubeMetadataValidator:
             for tag in fixed['tags']:
                 tag_str = str(tag).strip()
                 if tag_str:
-                    # YouTube에서 허용하지 않는 문자 제거 (<, > 등)
-                    tag_str = tag_str.replace('<', '').replace('>', '')
-                    # 이모지 및 특수 유니코드 문자 제거 (알파벳, 숫자, 기본 문장부호만 허용)
-                    tag_str = re.sub(r'[^\w\s\-\'\"\.\,\!\?\&\#\@\(\)\[\]\:\;\+\=\/\\]', '', tag_str, flags=re.UNICODE)
+                    # YouTube 태그는 글자, 숫자, 공백만 허용 (특수문자 모두 제거)
+                    # \w는 유니코드 문자(한글 등) 포함
+                    tag_str = re.sub(r'[^\w\s]', '', tag_str, flags=re.UNICODE)
                     # 연속된 공백 정리
                     tag_str = ' '.join(tag_str.split())
 
@@ -320,6 +319,10 @@ class YouTubeAutoPoster:
 
         # 메타데이터 정제 (일원화된 로직 사용)
         fixed_metadata = YouTubeMetadataValidator.fix(metadata)
+
+        # 디버깅: 태그 출력
+        tags = fixed_metadata.get('tags', [])
+        print(f"📋 업로드할 태그 ({len(tags)}개): {tags[:10]}{'...' if len(tags) > 10 else ''}")
 
         body = {
             'snippet': {
