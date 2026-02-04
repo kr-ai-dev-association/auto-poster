@@ -151,6 +151,16 @@ class YouTubeMetadataValidator:
                 fixed_tags = fixed_tags[:YouTubeMetadataValidator.MAX_TAGS_COUNT]
                 print(f"⚠️ 태그가 {len(fixed_tags)}개로 자동 제한")
 
+            # 태그 총 길이 제한 (YouTube 500자 제한)
+            MAX_TOTAL_TAG_LENGTH = 400  # 여유있게 400자로 설정
+            total_length = sum(len(t) for t in fixed_tags)
+            if total_length > MAX_TOTAL_TAG_LENGTH:
+                print(f"⚠️ 태그 총 길이 {total_length}자 > {MAX_TOTAL_TAG_LENGTH}자, 태그 수 줄이는 중...")
+                while fixed_tags and sum(len(t) for t in fixed_tags) > MAX_TOTAL_TAG_LENGTH:
+                    removed = fixed_tags.pop()
+                    print(f"   - 태그 제거: '{removed}'")
+                print(f"✅ 태그 {len(fixed_tags)}개로 조정 (총 {sum(len(t) for t in fixed_tags)}자)")
+
             fixed['tags'] = fixed_tags
 
         return fixed
@@ -322,7 +332,15 @@ class YouTubeAutoPoster:
 
         # 디버깅: 태그 출력
         tags = fixed_metadata.get('tags', [])
-        print(f"📋 업로드할 태그 ({len(tags)}개): {tags[:10]}{'...' if len(tags) > 10 else ''}")
+        total_tag_chars = sum(len(t) for t in tags)
+        print(f"📋 업로드할 태그 ({len(tags)}개, 총 {total_tag_chars}자):")
+        for i, tag in enumerate(tags):
+            # 비ASCII 문자 확인
+            non_ascii = [c for c in tag if ord(c) > 127]
+            if non_ascii:
+                print(f"   [{i+1}] '{tag}' ({len(tag)}자) ⚠️ 비ASCII: {non_ascii}")
+            else:
+                print(f"   [{i+1}] '{tag}' ({len(tag)}자)")
 
         body = {
             'snippet': {
