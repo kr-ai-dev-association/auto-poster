@@ -535,11 +535,23 @@ class YouTubeService:
             # 파싱 실패 시 추가 정리 시도
             if metadata is None:
                 print(f"🔧 추가 정리 시도 중...")
-                
-                # 제어 문자 제거
-                import string
-                printable = set(string.printable)
-                cleaned = ''.join(filter(lambda x: x in printable, clean_text))
+
+                # 제어 문자만 제거 (한글 등 유니코드 문자는 보존)
+                # ASCII 제어 문자 (0-31)만 제거하되, 탭/줄바꿈/캐리지리턴은 유지
+                def remove_control_chars(text):
+                    result = []
+                    for char in text:
+                        code = ord(char)
+                        # 제어 문자 (0-31) 중 탭(9), 줄바꿈(10), 캐리지리턴(13)만 허용
+                        if code < 32 and code not in (9, 10, 13):
+                            continue
+                        # DEL 문자 (127) 제거
+                        if code == 127:
+                            continue
+                        result.append(char)
+                    return ''.join(result)
+
+                cleaned = remove_control_chars(clean_text)
                 
                 # 다시 JSON 추출
                 json_text = extract_json_object(cleaned)
