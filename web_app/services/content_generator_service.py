@@ -556,7 +556,7 @@ image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작�
                 config=types.GenerateContentConfig(
                     tools=tools,  # 구글 검색 도구 추가
                     temperature=0.2,
-                    max_output_tokens=8192
+                    max_output_tokens=16384
                     # response_mime_type 제거 - Search 도구와 호환 불가
                 )
             )
