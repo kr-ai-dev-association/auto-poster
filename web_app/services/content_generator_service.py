@@ -364,8 +364,8 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
 
         # 언어별 프롬프트 완전 분리
         if language == 'en':
-            prompt = f"""You are a YouTube video content planning expert.
-Create a content plan with {target_slides} slides based on the following topic.
+            prompt = f"""You are a YouTube video content planning expert and professional editorial writer.
+Create a **high-quality content plan** with {target_slides} slides based on the following topic.
 
 **CRITICAL: ALL content MUST be written in ENGLISH. This includes title, description, all slide titles, content, narrations, hook, call_to_action, and tags. Do NOT use any Korean or other languages.**
 
@@ -387,6 +387,30 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 
 {f"## Additional Instructions: {additional_instructions}" if additional_instructions else ""}
 
+## Narration Quality Standard (MUST follow):
+Each slide's narration must be written at a **professional editorial level**:
+- **2+ paragraphs**, minimum 300 characters (30-45 seconds per slide)
+- **Paragraph 1**: Core concept explanation + background knowledge, historical context, or scientific principles with in-depth analysis
+- **Paragraph 2**: Practical applications, expert tips, or actionable insights the viewer can immediately use
+- NOT a simple list — write as a **narrative with logical flow** and **professional analysis**
+
+### Narration Quality Example:
+❌ Bad: "Tomato spaghetti is a popular dish. Let's learn how to make it."
+✅ Good: "Tomato spaghetti transcends its role as a simple carbohydrate dish — it is a cultural icon that originated in southern Naples, Italy, and has become a standard in kitchens worldwide. The modern home cooking trend pursues what might be called 'professional amateurism,' aiming to transplant restaurant-level precision into the domestic kitchen. This guide presents the most efficient yet gastronomically valuable tomato spaghetti recipe achievable at home."
+
+## Image Prompt Quality Standard (MUST follow):
+image_prompt must be written at a **professional photography direction** level:
+- **Composition**: wide shot, close-up, flat-lay, macro, etc.
+- **Lighting**: golden hour, studio lighting, dramatic side light, etc.
+- **Camera**: camera model, lens type, aperture (e.g., Phase One XF, 80mm, f/2.8)
+- **Mood/Color**: warm tones, moody atmosphere, vibrant colors, etc.
+- **Resolution**: 8k resolution, photorealistic, hyper-realistic texture
+- **3+ sentences** of detailed visual description
+
+### Image Prompt Quality Example:
+❌ Bad: "A plate of tomato spaghetti on a table"
+✅ Good: "A wide, cinematic shot of a warm, sunlit rustic Italian kitchen. In the foreground, a beautifully plated tomato spaghetti with a glossy sauce and a fresh basil leaf sits on a dark, textured stone table. Soft steam is rising from the plate. The lighting is natural golden hour window light, creating long, soft shadows. Captured with a Phase One XF camera, 80mm lens, f/2.8, hyper-realistic texture, 8k resolution."
+
 ## Output Format (Must output in JSON format):
 ```json
 {{
@@ -398,10 +422,10 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
   "slides": [
     {{
       "slide_number": 1,
-      "title": "Slide title",
+      "title": "Slide title (subtitle: specific title with core keyword)",
       "content": "ONE SHORT sentence (max 15 words) - key message displayed at bottom of slide",
-      "narration": "Narration script for this slide (for TTS, natural conversational tone, minimum 150 characters, 20-30 seconds)",
-      "image_prompt": "Detailed image prompt based on THIS slide's specific content (English, cinematic, visual metaphor of the slide theme). If web_image_keyword is specified, MUST include instruction to prominently feature that element.",
+      "narration": "Professional editorial-level narration script (for TTS, natural conversational tone, 2+ paragraphs, minimum 300 characters, 30-45 seconds). Include background knowledge, expert analysis, and practical insights.",
+      "image_prompt": "Professional photography-level image prompt (English, 3+ sentences). Specify composition, lighting, camera/lens, mood, and resolution. If web_image_keyword is specified, MUST include instruction to prominently feature that element.",
       "web_image_keyword": "Specific image/element to search and MUST appear in the final image (e.g., 'Tesla Model 3 car', 'Elon Musk portrait', 'iPhone 16 product photo'). Leave empty string if not needed.",
       "web_image_query": "Web search query for real photos/images (English, specific search terms)",
       "use_web_image": true/false,
@@ -416,10 +440,10 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 ```
 
 ## Guidelines:
-1. Each slide's narration is a TTS script, so write in natural conversational English
-2. **Important: Each narration must be at least 150 characters (20-30 seconds). Total video should be 5-7+ minutes with sufficient script content**
+1. Each slide's narration is a TTS script, so write in natural conversational English while maintaining **professional depth**
+2. **CRITICAL: Each narration must be at least 300 characters, 2+ paragraphs (30-45 seconds). Total video should be 7-10+ minutes with substantial script content**
 3. **CRITICAL: "content" field is displayed on screen - must be ONE SHORT sentence (max 15 words). Put all details in "narration" instead.**
-4. **image_prompt MUST be specific to each slide's content** - describe visual elements, metaphors, and scenes that represent the slide's theme
+4. **image_prompt must be at professional photography direction level** - MUST include composition, lighting, camera/lens, mood, and resolution. 3+ sentences.
 5. First slide should be a strong intro, last slide should include CTA outro
 6. Include teasers/previews in the middle to maintain viewer retention
 7. **ALL content must be in English (only image_prompt, web_image_keyword, and web_image_query are always in English)**
@@ -427,11 +451,12 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 9. **web_image_keyword**: The SPECIFIC image element that MUST appear in the generated image. Examples: 'OpenAI logo', 'Samsung Galaxy S25 phone', 'Taylor Swift photo'. This image will be searched, downloaded, and Gemini will be instructed to prominently feature it in the generated slide.
 10. web_image_query: The search query to find the web_image_keyword (e.g., "OpenAI logo high resolution", "Samsung Galaxy S25 official product photo")
 11. use_web_image: Set to true if web_image_keyword is specified and a real image reference is needed
-12. **Total narration should be at least 2500 characters (approximately 5 minutes)**
+12. **Total narration should be at least 4000 characters (approximately 7-10 minutes)**
+13. **Include a subtitle in the title field for a professional feel** (e.g., "The Red Temptation: Cultural Value and Legacy of Tomato Spaghetti")
 """
         else:
-            prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가입니다.
-다음 주제를 기반으로 {target_slides}개의 슬라이드로 구성된 콘텐츠 기획안을 작성해주세요.
+            prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가이자 전문 에디토리얼 작가입니다.
+다음 주제를 기반으로 {target_slides}개의 슬라이드로 구성된 **고품질 콘텐츠 기획안**을 작성해주세요.
 
 **중요: 모든 콘텐츠는 반드시 한국어로 작성해야 합니다. title, description, 슬라이드의 title, content, narration, hook, call_to_action, tags 모두 한국어로 작성하세요.**
 
@@ -453,6 +478,30 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 
 {f"## 추가 지시사항: {additional_instructions}" if additional_instructions else ""}
 
+## 나레이션 품질 기준 (반드시 준수):
+각 슬라이드의 narration은 **전문 에디토리얼 수준**으로 작성해야 합니다:
+- **2문단 이상**, 최소 300자 이상 (30-45초 분량)
+- **1문단**: 핵심 개념 설명 + 배경 지식/역사적 맥락/과학적 원리 등 깊이 있는 분석
+- **2문단**: 실용적 적용 방법, 전문가 팁, 또는 시청자가 바로 활용할 수 있는 인사이트
+- 단순 나열이 아닌, **논리적 흐름**과 **전문적 분석**이 포함된 서술형 대본
+
+### 나레이션 품질 예시:
+❌ 나쁜 예: "토마토 스파게티는 인기 있는 요리입니다. 만드는 방법을 알아보겠습니다."
+✅ 좋은 예: "토마토 스파게티는 단순한 탄수화물 섭취를 위한 수단을 넘어, 이탈리아 남부 나폴리에서 시작되어 전 세계 주방의 표준이 된 문화적 아이콘입니다. 현대의 홈 쿠킹 트렌드는 레스토랑 수준의 정교한 기술을 가정 내 조리 환경에 이식하려는 '전문가적 아마추어리즘'을 지향합니다. 본 기획안은 집에서 수행할 수 있는 가장 효율적이면서도 미식적 가치가 높은 레시피를 제안하고자 합니다."
+
+## 이미지 프롬프트 품질 기준 (반드시 준수):
+image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작성해야 합니다:
+- **구도**: wide shot, close-up, flat-lay, macro 등 구체적 촬영 구도
+- **조명**: golden hour, studio lighting, dramatic side light 등 조명 지시
+- **카메라**: 카메라 모델, 렌즈 종류, 조리개 값 (예: Phase One XF, 80mm, f/2.8)
+- **분위기/색감**: warm tones, moody atmosphere, vibrant colors 등
+- **해상도**: 8k resolution, photorealistic, hyper-realistic texture
+- **3문장 이상**의 상세한 시각적 묘사
+
+### 이미지 프롬프트 품질 예시:
+❌ 나쁜 예: "A plate of tomato spaghetti on a table"
+✅ 좋은 예: "A wide, cinematic shot of a warm, sunlit rustic Italian kitchen. In the foreground, a beautifully plated tomato spaghetti with a glossy sauce and a fresh basil leaf sits on a dark, textured stone table. Soft steam is rising from the plate. The lighting is natural golden hour window light, creating long, soft shadows. Captured with a Phase One XF camera, 80mm lens, f/2.8, hyper-realistic texture, 8k resolution."
+
 ## 출력 형식 (반드시 JSON 형식으로 출력):
 ```json
 {{
@@ -464,11 +513,11 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
   "slides": [
     {{
       "slide_number": 1,
-      "title": "슬라이드 제목",
+      "title": "슬라이드 제목 (부제: 핵심 키워드를 포함한 구체적 제목)",
       "content": "화면 하단에 표시될 핵심 메시지 한 문장 (최대 15단어)",
-      "narration": "이 슬라이드에서 읽을 나레이션 대본 (TTS용, 자연스러운 구어체, 최소 150자 이상, 20-30초 분량)",
-      "image_prompt": "이 슬라이드의 구체적인 내용에 맞는 상세한 이미지 프롬프트 (영어, 시네마틱, 슬라이드 주제의 시각적 메타포). web_image_keyword가 지정된 경우 해당 요소를 반드시 눈에 띄게 포함하라는 지시 필수.",
-      "web_image_keyword": "검색하여 최종 이미지에 반드시 나타나야 할 구체적인 이미지/요소 (예: 'Tesla Model 3 car', 'Elon Musk portrait', 'iPhone 16 product photo'). 필요 없으면 빈 문자열.",
+      "narration": "전문 에디토리얼 수준의 나레이션 대본 (TTS용, 자연스러운 구어체, 2문단 이상, 최소 300자 이상, 30-45초 분량). 배경 지식, 전문적 분석, 실용적 인사이트를 포함하여 깊이 있게 작성.",
+      "image_prompt": "프로페셔널 포토그래피 수준의 이미지 프롬프트 (영어, 3문장 이상). 구도/조명/카메라/렌즈/분위기/해상도를 구체적으로 지시. web_image_keyword가 지정된 경우 해당 요소를 반드시 눈에 띄게 포함.",
+      "web_image_keyword": "검색하여 최종 이미지에 반드시 나타나야 할 구체적인 이미지/요소 (예: 'Tesla Model 3 car', 'Elon Musk portrait'). 필요 없으면 빈 문자열.",
       "web_image_query": "이 슬라이드에 사용할 실제 사진/이미지를 웹에서 검색할 쿼리 (영어, 구체적인 검색어)",
       "use_web_image": true/false,
       "duration_seconds": 예상_표시_시간_초
@@ -482,10 +531,10 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 ```
 
 ## 주의사항:
-1. 각 슬라이드의 narration은 TTS로 읽을 대본이므로 자연스러운 구어체로 작성
-2. **중요: 각 narration은 반드시 150자 이상으로 작성 (20-30초 분량). 전체 영상이 5-7분 이상이 되도록 충분한 분량의 대본 작성 필수**
+1. 각 슬라이드의 narration은 TTS로 읽을 대본이므로 자연스러운 구어체로 작성하되, **전문적 깊이**를 유지
+2. **핵심: 각 narration은 반드시 300자 이상, 2문단 이상으로 작성 (30-45초 분량). 전체 영상이 7-10분 이상이 되도록 충분한 분량의 대본 작성 필수**
 3. **핵심: "content" 필드는 화면에 표시됩니다 - 반드시 한 문장(최대 15단어)으로 작성. 상세 내용은 모두 "narration"에 작성하세요.**
-4. **image_prompt는 각 슬라이드의 내용에 특화되어야 합니다** - 슬라이드 주제를 나타내는 시각적 요소, 메타포, 장면을 구체적으로 설명하세요
+4. **image_prompt는 프로페셔널 포토그래피 디렉션 수준으로 작성** - 구도, 조명, 카메라/렌즈, 분위기, 해상도를 반드시 포함. 3문장 이상.
 5. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
 6. 중간에 시청 유지를 위한 티저/예고 포함
 7. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt, web_image_keyword, web_image_query만 영어)**
@@ -493,7 +542,8 @@ If the user has provided a detailed slide scenario/structure in the topic (e.g.,
 9. **web_image_keyword**: 생성된 이미지에 **반드시 나타나야 할** 구체적인 이미지 요소. 예: 'OpenAI logo', 'Samsung Galaxy S25 phone', 'Taylor Swift photo'. 이 이미지는 웹에서 검색/다운로드되어 Gemini가 생성하는 슬라이드에 눈에 띄게 포함됩니다.
 10. web_image_query: web_image_keyword를 찾기 위한 검색 쿼리 (예: "OpenAI logo high resolution", "Samsung Galaxy S25 official product photo")
 11. use_web_image: web_image_keyword가 지정되어 실제 이미지 참조가 필요한 경우 true로 설정
-12. **전체 narration 합계가 최소 2500자 이상이 되도록 작성 (약 5분 분량)**
+12. **전체 narration 합계가 최소 4000자 이상이 되도록 작성 (약 7-10분 분량)**
+13. **title 필드에 부제를 포함하여 구체적이고 전문적인 느낌을 부여** (예: "인류의 미각을 사로잡은 붉은 유혹: 토마토 스파게티의 문화적 가치")
 """
 
         try:

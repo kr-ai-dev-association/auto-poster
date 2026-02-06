@@ -427,6 +427,75 @@ AI 기반으로 YouTube 영상용 슬라이드 콘텐츠를 자동 생성합니�
 
 ---
 
+## 🎨 콘텐츠 기획안 프롬프트 설계
+
+AI 기획안 생성(`content_generator_service.py`)의 프롬프트는 **전문 에디토리얼 수준**의 콘텐츠를 생성하도록 설계되었습니다.
+
+### 프롬프트 구조
+
+```
+역할 정의 → 언어/구조 제약 → 주제 입력 → 나레이션 품질 기준 → 이미지 프롬프트 품질 기준 → JSON 출력 형식 → 주의사항
+```
+
+### JSON 출력 구조
+
+| 필드 | 설명 | 사용처 |
+|------|------|--------|
+| `title` | 영상 제목 (부제 포함) | YouTube 메타데이터 |
+| `description` | 영상 설명 (2-3문장) | YouTube 메타데이터 |
+| `slides[].title` | 슬라이드 제목 | 이미지 텍스트 오버레이 |
+| `slides[].content` | 화면 표시 핵심 메시지 (**최대 15단어**) | 이미지 텍스트 오버레이 |
+| `slides[].narration` | TTS 나레이션 대본 (**300자+, 2문단+**) | 오디오 생성, PDF 메타데이터, Smart 모드 타이밍 |
+| `slides[].image_prompt` | 이미지 생성 프롬프트 (영어, **3문장+**) | Gemini 이미지 생성 |
+| `slides[].web_image_keyword` | 웹 검색 이미지 키워드 | 참조 이미지 다운로드 |
+| `slides[].web_image_query` | 웹 이미지 검색 쿼리 | Google Search |
+| `slides[].use_web_image` | 웹 이미지 사용 여부 | 이미지 생성 분기 |
+| `hook` | 영상 시작 후크 (0-30초) | 인트로 |
+| `call_to_action` | 구독/좋아요 유도 멘트 | 아웃트로 |
+| `tags` | 관련 태그 목록 | YouTube 태그 |
+
+### 나레이션 품질 기준
+
+| 항목 | 기준 |
+|------|------|
+| **길이** | 슬라이드당 최소 300자, 2문단 이상 (30-45초) |
+| **전체 합계** | 최소 4,000자 이상 (7-10분 영상) |
+| **1문단** | 핵심 개념 + 배경 지식/역사적 맥락/과학적 원리 분석 |
+| **2문단** | 실용적 적용 방법, 전문가 팁, 시청자 인사이트 |
+| **문체** | 자연스러운 구어체 + 전문적 깊이 (에디토리얼 수준) |
+
+**예시:**
+> 토마토 스파게티는 단순한 탄수화물 섭취를 위한 수단을 넘어, 이탈리아 남부 나폴리에서 시작되어 전 세계 주방의 표준이 된 문화적 아이콘입니다. 현대의 홈 쿠킹 트렌드는 레스토랑 수준의 정교한 기술을 가정 내 조리 환경에 이식하려는 '전문가적 아마추어리즘'을 지향합니다...
+
+### 이미지 프롬프트 품질 기준
+
+프로페셔널 포토그래피 디렉션 수준으로 작성하며 다음 요소를 **반드시 포함**:
+
+| 요소 | 설명 | 예시 |
+|------|------|------|
+| **구도** | 촬영 앵글/프레이밍 | wide shot, close-up, flat-lay, macro |
+| **조명** | 광원 종류/방향 | golden hour, studio lighting, dramatic side light |
+| **카메라** | 장비/렌즈/설정 | Phase One XF, 80mm lens, f/2.8 |
+| **분위기** | 색감/무드 | warm tones, moody atmosphere, vibrant |
+| **해상도** | 출력 품질 | 8k resolution, photorealistic |
+
+**예시:**
+> A wide, cinematic shot of a warm, sunlit rustic Italian kitchen. In the foreground, a beautifully plated tomato spaghetti with a glossy sauce and a fresh basil leaf sits on a dark, textured stone table. Soft steam is rising from the plate. The lighting is natural golden hour window light, creating long, soft shadows. Captured with a Phase One XF camera, 80mm lens, f/2.8, hyper-realistic texture, 8k resolution.
+
+### 언어 규칙
+
+| 언어 모드 | 한국어 필드 | 영어 필드 |
+|-----------|------------|----------|
+| `ko` (한국어) | title, description, content, narration, hook, call_to_action, tags | image_prompt, web_image_keyword, web_image_query |
+| `en` (영어) | — | 모든 필드 |
+
+### 도구 연동
+
+- **Google Search**: 실시간 정보/최신 뉴스 주제에 자동 사용
+- **모델**: Gemini (temperature: 0.2, max_output_tokens: 8192)
+
+---
+
 ## 🔒 보안 설정
 
 ### 환경 구분

@@ -30,6 +30,16 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="Auto Poster")
 
+# CORS 설정 (모바일 앱 및 외부 클라이언트 지원)
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # 정적 파일 및 템플릿 설정
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
