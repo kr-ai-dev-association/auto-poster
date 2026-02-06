@@ -492,7 +492,7 @@ AI 기획안 생성(`content_generator_service.py`)의 프롬프트는 **전문 
 ### 도구 연동
 
 - **Google Search**: 실시간 정보/최신 뉴스 주제에 자동 사용
-- **모델**: Gemini (temperature: 0.2, max_output_tokens: 8192)
+- **모델**: Gemini (temperature: 0.2, max_output_tokens: 16384)
 
 ---
 
