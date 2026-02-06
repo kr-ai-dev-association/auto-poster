@@ -14,7 +14,7 @@ import javax.inject.Inject
 data class LoginUiState(
     val email: String = "",
     val password: String = "",
-    val saveEmail: Boolean = false,
+    val autoLogin: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isLoggedIn: Boolean = false,
@@ -35,18 +35,30 @@ class LoginViewModel @Inject constructor(
 
     private fun checkExistingSession() {
         viewModelScope.launch {
+            val autoLoginEnabled = authRepository.isAutoLoginEnabled()
             val savedEmail = authRepository.getSavedEmail()
             if (savedEmail != null) {
-                _uiState.update { it.copy(email = savedEmail, saveEmail = true) }
+                _uiState.update { it.copy(email = savedEmail, autoLogin = autoLoginEnabled) }
             }
 
+            // 1. 기존 토큰으로 세션 확인
             authRepository.validateSession()
                 .onSuccess {
                     _uiState.update { it.copy(isLoggedIn = true, isCheckingSession = false) }
+                    return@launch
                 }
-                .onFailure {
-                    _uiState.update { it.copy(isCheckingSession = false) }
-                }
+
+            // 2. 토큰 만료 시 저장된 자격증명으로 자동 로그인
+            if (autoLoginEnabled) {
+                authRepository.tryAutoLogin()
+                    .onSuccess {
+                        _uiState.update { it.copy(isLoggedIn = true, isCheckingSession = false) }
+                        return@launch
+                    }
+            }
+
+            // 3. 둘 다 실패 시 로그인 화면 표시
+            _uiState.update { it.copy(isCheckingSession = false) }
         }
     }
 
@@ -58,8 +70,8 @@ class LoginViewModel @Inject constructor(
         _uiState.update { it.copy(password = password, errorMessage = null) }
     }
 
-    fun onSaveEmailToggle(checked: Boolean) {
-        _uiState.update { it.copy(saveEmail = checked) }
+    fun onAutoLoginToggle(checked: Boolean) {
+        _uiState.update { it.copy(autoLogin = checked) }
     }
 
     fun login() {
@@ -74,10 +86,10 @@ class LoginViewModel @Inject constructor(
 
             authRepository.login(state.email, state.password)
                 .onSuccess {
-                    if (state.saveEmail) {
-                        authRepository.saveEmail(state.email)
+                    if (state.autoLogin) {
+                        authRepository.saveCredentials(state.email, state.password)
                     } else {
-                        authRepository.clearSavedEmail()
+                        authRepository.clearCredentials()
                     }
                     _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
                 }

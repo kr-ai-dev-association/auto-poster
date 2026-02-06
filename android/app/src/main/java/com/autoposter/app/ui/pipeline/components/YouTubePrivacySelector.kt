@@ -1,9 +1,10 @@
 package com.autoposter.app.ui.pipeline.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.YouTube
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,7 +36,7 @@ fun YouTubePrivacySelector(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
-                Icons.Default.YouTube,
+                Icons.Default.PlayArrow,
                 contentDescription = null,
                 tint = RedError,
                 modifier = Modifier.size(18.dp)
@@ -47,29 +48,30 @@ fun YouTubePrivacySelector(
             )
         }
 
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            privacyOptions.forEachIndexed { index, option ->
-                SegmentedButton(
-                    selected = selected == option.value,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            privacyOptions.forEach { option ->
+                val isSelected = selected == option.value
+                OutlinedButton(
                     onClick = { onSelect(option.value) },
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = privacyOptions.size,
-                        baseShape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (isSelected) IndigoPrimary.copy(alpha = 0.3f)
+                        else DarkSurfaceVariant.copy(alpha = 0.5f),
+                        contentColor = if (isSelected) IndigoLight else TextSecondary
                     ),
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = IndigoPrimary.copy(alpha = 0.3f),
-                        activeContentColor = IndigoLight,
-                        inactiveContainerColor = DarkSurfaceVariant.copy(alpha = 0.5f),
-                        inactiveContentColor = TextSecondary,
-                        activeBorderColor = IndigoPrimary,
-                        inactiveBorderColor = DarkBorder
+                    border = BorderStroke(
+                        1.dp,
+                        if (isSelected) IndigoPrimary else DarkBorder
                     )
                 ) {
                     Text(
                         option.label,
                         fontSize = 13.sp,
-                        fontWeight = if (selected == option.value) FontWeight.SemiBold else FontWeight.Normal
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                     )
                 }
             }

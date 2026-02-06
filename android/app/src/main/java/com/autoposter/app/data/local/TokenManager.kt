@@ -23,6 +23,8 @@ class TokenManager @Inject constructor(
         private val TOKEN_KEY = stringPreferencesKey("access_token")
         private val PIPELINE_ID_KEY = stringPreferencesKey("running_pipeline_id")
         private val SAVED_EMAIL_KEY = stringPreferencesKey("saved_email")
+        private val SAVED_PASSWORD_KEY = stringPreferencesKey("saved_password")
+        private val AUTO_LOGIN_KEY = stringPreferencesKey("auto_login")
     }
 
     val tokenFlow: Flow<String?> = context.dataStore.data.map { it[TOKEN_KEY] }
@@ -55,5 +57,31 @@ class TokenManager @Inject constructor(
 
     suspend fun clearSavedEmail() {
         context.dataStore.edit { it.remove(SAVED_EMAIL_KEY) }
+    }
+
+    suspend fun getSavedPassword(): String? = context.dataStore.data.first()[SAVED_PASSWORD_KEY]
+
+    suspend fun savePassword(password: String) {
+        context.dataStore.edit { it[SAVED_PASSWORD_KEY] = password }
+    }
+
+    suspend fun clearSavedPassword() {
+        context.dataStore.edit { it.remove(SAVED_PASSWORD_KEY) }
+    }
+
+    suspend fun isAutoLoginEnabled(): Boolean =
+        context.dataStore.data.first()[AUTO_LOGIN_KEY] == "true"
+
+    suspend fun setAutoLogin(enabled: Boolean) {
+        context.dataStore.edit { it[AUTO_LOGIN_KEY] = if (enabled) "true" else "false" }
+    }
+
+    suspend fun clearCredentials() {
+        context.dataStore.edit {
+            it.remove(SAVED_EMAIL_KEY)
+            it.remove(SAVED_PASSWORD_KEY)
+            it.remove(AUTO_LOGIN_KEY)
+            it.remove(TOKEN_KEY)
+        }
     }
 }

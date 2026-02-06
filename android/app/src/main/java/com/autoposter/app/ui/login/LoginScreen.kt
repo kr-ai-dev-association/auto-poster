@@ -2,7 +2,9 @@ package com.autoposter.app.ui.login
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -49,13 +51,15 @@ fun LoginScreen(viewModel: LoginViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .background(DarkBackground)
+            .imePadding()
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 400.dp),
+                .widthIn(max = 400.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -79,9 +83,6 @@ fun LoginScreen(viewModel: LoginViewModel) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 color = DarkSurface,
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = null
-                ).let { null },
                 tonalElevation = 2.dp
             ) {
                 Column(
@@ -151,21 +152,21 @@ fun LoginScreen(viewModel: LoginViewModel) {
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    // Save email checkbox
+                    // Auto-login checkbox
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Checkbox(
-                            checked = uiState.saveEmail,
-                            onCheckedChange = viewModel::onSaveEmailToggle,
+                            checked = uiState.autoLogin,
+                            onCheckedChange = viewModel::onAutoLoginToggle,
                             colors = CheckboxDefaults.colors(
                                 checkedColor = IndigoPrimary,
                                 uncheckedColor = DarkBorder
                             )
                         )
                         Text(
-                            text = "이메일 저장",
+                            text = "자동 로그인",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary
                         )

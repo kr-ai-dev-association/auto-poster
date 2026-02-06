@@ -33,6 +33,8 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun validateSession(): Result<UserResponse> {
+        val token = tokenManager.getToken()
+            ?: return Result.failure(Exception("No token"))
         return try {
             val user = authApi.getMe()
             Result.success(user)
@@ -51,4 +53,20 @@ class AuthRepository @Inject constructor(
     suspend fun saveEmail(email: String) = tokenManager.saveEmail(email)
 
     suspend fun clearSavedEmail() = tokenManager.clearSavedEmail()
+
+    suspend fun saveCredentials(email: String, password: String) {
+        tokenManager.saveEmail(email)
+        tokenManager.savePassword(password)
+        tokenManager.setAutoLogin(true)
+    }
+
+    suspend fun clearCredentials() = tokenManager.clearCredentials()
+
+    suspend fun isAutoLoginEnabled(): Boolean = tokenManager.isAutoLoginEnabled()
+
+    suspend fun tryAutoLogin(): Result<UserResponse> {
+        val email = tokenManager.getSavedEmail() ?: return Result.failure(Exception("No saved email"))
+        val password = tokenManager.getSavedPassword() ?: return Result.failure(Exception("No saved password"))
+        return login(email, password)
+    }
 }

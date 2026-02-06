@@ -79,7 +79,7 @@ fun ConfigSection(
                 }
             }
 
-            HorizontalDivider(color = GlassBorder)
+            Divider(color = GlassBorder)
 
             // Topic
             Text("콘텐츠 주제/아이디어 *", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
