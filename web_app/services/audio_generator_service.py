@@ -210,6 +210,142 @@ class AudioGeneratorService:
                 'message': str(e)
             }
 
+    def _split_script_into_chunks(self, script: str, language: str = 'ko', target_seconds: int = 50) -> List[str]:
+        """
+        스크립트를 문장 경계에서 ~target_seconds 단위로 분할합니다.
+        긴 TTS 생성 시 발생하는 금속성 잡음을 방지합니다.
+
+        Args:
+            script: 전체 스크립트 텍스트
+            language: 언어 코드 ('ko' 또는 'en')
+            target_seconds: 목표 청크 길이 (초)
+
+        Returns:
+            분할된 스크립트 청크 리스트
+        """
+        import re
+
+        # 발화 속도 추정 (초당 문자/단어 수)
+        if language == 'ko':
+            # 한국어: ~350자/분 → ~5.8자/초
+            chars_per_second = 5.8
+        else:
+            # 영어: ~150단어/분 → ~2.5단어/초 → ~13자/초 (평균 단어 길이 5.2자)
+            chars_per_second = 13.0
+
+        target_chars = int(target_seconds * chars_per_second)
+
+        # 문장 단위로 분할 (., !, ?, 。 뒤의 공백/줄바꿈 기준)
+        sentences = re.split(r'(?<=[.!?。])\s+', script.strip())
+        # 빈 문장 제거
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        if not sentences:
+            return [script]
+
+        chunks = []
+        current_chunk = []
+        current_length = 0
+
+        for sentence in sentences:
+            sentence_len = len(sentence)
+
+            # 현재 청크에 문장을 추가하면 목표를 초과하는지 확인
+            if current_length + sentence_len > target_chars and current_chunk:
+                # 현재 청크 저장하고 새 청크 시작
+                chunks.append(' '.join(current_chunk))
+                current_chunk = [sentence]
+                current_length = sentence_len
+            else:
+                current_chunk.append(sentence)
+                current_length += sentence_len
+
+        # 마지막 청크 처리
+        if current_chunk:
+            last_chunk = ' '.join(current_chunk)
+            # 마지막 청크가 너무 짧으면 (10초 미만) 이전 청크에 병합
+            min_chars = int(10 * chars_per_second)
+            if len(last_chunk) < min_chars and chunks:
+                chunks[-1] = chunks[-1] + ' ' + last_chunk
+            else:
+                chunks.append(last_chunk)
+
+        return chunks if chunks else [script]
+
+    async def _generate_single_chunk(self, text: str, voice: str) -> bytes:
+        """
+        단일 텍스트 청크에 대해 TTS를 생성하고 PCM 오디오 데이터를 반환합니다.
+
+        Args:
+            text: TTS로 변환할 텍스트
+            voice: 음성 이름
+
+        Returns:
+            PCM 오디오 데이터 (WAV 헤더 제외)
+        """
+        response = await self.async_client.models.generate_content(
+            model=self.tts_model,
+            contents=text,
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name=voice
+                        )
+                    )
+                )
+            )
+        )
+
+        inline_data = response.candidates[0].content.parts[0].inline_data
+        audio_data = inline_data.data
+
+        # WAV 헤더가 있으면 제거하여 순수 PCM 데이터만 반환
+        if audio_data[:4] == b'RIFF':
+            # WAV 헤더(44바이트) 건너뛰기
+            import struct
+            # data 청크 위치 찾기
+            pos = 12  # 'RIFF' + size + 'WAVE' 이후
+            while pos < len(audio_data) - 8:
+                chunk_id = audio_data[pos:pos+4]
+                chunk_size = struct.unpack('<I', audio_data[pos+4:pos+8])[0]
+                if chunk_id == b'data':
+                    return audio_data[pos+8:pos+8+chunk_size]
+                pos += 8 + chunk_size
+            # data 청크를 못 찾으면 44바이트 이후 전체 반환
+            return audio_data[44:]
+
+        return audio_data
+
+    def _build_wav(self, pcm_data: bytes) -> bytes:
+        """PCM 데이터에 WAV 헤더를 추가합니다."""
+        import struct
+        sample_rate = 24000
+        bits_per_sample = 16
+        num_channels = 1
+        byte_rate = sample_rate * num_channels * bits_per_sample // 8
+        block_align = num_channels * bits_per_sample // 8
+        data_size = len(pcm_data)
+
+        wav_header = struct.pack(
+            '<4sI4s4sIHHIIHH4sI',
+            b'RIFF',
+            36 + data_size,
+            b'WAVE',
+            b'fmt ',
+            16,
+            1,   # PCM
+            num_channels,
+            sample_rate,
+            byte_rate,
+            block_align,
+            bits_per_sample,
+            b'data',
+            data_size
+        )
+        return wav_header + pcm_data
+
     async def generate_audio_from_script(
         self,
         script: str,
@@ -221,6 +357,7 @@ class AudioGeneratorService:
     ) -> Dict[str, Any]:
         """
         대본에서 TTS를 사용하여 오디오를 생성합니다.
+        긴 스크립트는 ~50초 단위로 분할하여 개별 생성 후 합성합니다.
 
         Args:
             script: 읽을 대본 텍스트
@@ -242,7 +379,6 @@ class AudioGeneratorService:
         if content_id:
             output_filename = content_id
         elif not output_filename:
-            import uuid
             output_filename = f"audio_{uuid.uuid4().hex[:8]}"
 
         output_path = os.path.join(self.output_dir, f"{output_filename}.wav")
@@ -250,62 +386,33 @@ class AudioGeneratorService:
         logger.info(f"Generating audio with voice '{voice}' for script ({len(script)} chars)")
 
         try:
-            # Gemini TTS 요청 (비동기)
-            response = await self.async_client.models.generate_content(
-                model=self.tts_model,
-                contents=script,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice
-                            )
-                        )
-                    )
-                )
-            )
+            # 스크립트를 청크로 분할
+            chunks = self._split_script_into_chunks(script, language)
+            chunk_count = len(chunks)
 
-            # 오디오 데이터 추출
-            inline_data = response.candidates[0].content.parts[0].inline_data
-            audio_data = inline_data.data
-            mime_type = inline_data.mime_type if hasattr(inline_data, 'mime_type') else 'audio/pcm'
+            if chunk_count == 1:
+                # 짧은 스크립트: 단일 호출
+                logger.info(f"🎵 단일 청크 생성 ({len(chunks[0])}자)")
+                pcm_data = await self._generate_single_chunk(chunks[0], voice)
+            else:
+                # 긴 스크립트: 청크별 생성 후 합성
+                total_chars = sum(len(c) for c in chunks)
+                logger.info(f"🎵 오디오 청크 분할: {chunk_count}개 청크 (총 {total_chars}자)")
 
-            logger.info(f"TTS response mime_type: {mime_type}, data size: {len(audio_data)} bytes")
+                pcm_parts = []
+                for i, chunk in enumerate(chunks):
+                    logger.info(f"🎵 청크 {i+1}/{chunk_count} 생성 중... ({len(chunk)}자)")
+                    chunk_pcm = await self._generate_single_chunk(chunk, voice)
+                    chunk_duration = len(chunk_pcm) / (24000 * 2)  # 24kHz, 16-bit, mono
+                    logger.info(f"✅ 청크 {i+1}/{chunk_count} 완료 ({chunk_duration:.1f}초)")
+                    pcm_parts.append(chunk_pcm)
 
-            # WAV 헤더가 없는 PCM 데이터인지 확인 (어떤 mime_type이든 RIFF 헤더가 없으면 추가)
-            if audio_data[:4] != b'RIFF':
-                # PCM 데이터에 WAV 헤더 추가 (24kHz, 16-bit, mono - Gemini TTS 기본값)
-                import struct
-                sample_rate = 24000
-                bits_per_sample = 16
-                num_channels = 1
-                byte_rate = sample_rate * num_channels * bits_per_sample // 8
-                block_align = num_channels * bits_per_sample // 8
-                data_size = len(audio_data)
+                # PCM 데이터 합성
+                logger.info(f"🔗 {chunk_count}개 청크 합성 중...")
+                pcm_data = b''.join(pcm_parts)
 
-                wav_header = struct.pack(
-                    '<4sI4s4sIHHIIHH4sI',
-                    b'RIFF',
-                    36 + data_size,
-                    b'WAVE',
-                    b'fmt ',
-                    16,  # fmt chunk size
-                    1,   # audio format (PCM)
-                    num_channels,
-                    sample_rate,
-                    byte_rate,
-                    block_align,
-                    bits_per_sample,
-                    b'data',
-                    data_size
-                )
-                audio_data = wav_header + audio_data
-                logger.info(f"Added WAV header to PCM data (original mime_type: {mime_type})")
-
-            # MP3 형식인 경우 확장자 변경
-            if 'mp3' in mime_type:
-                output_path = output_path.replace('.wav', '.mp3')
+            # WAV 파일 빌드
+            audio_data = self._build_wav(pcm_data)
 
             with open(output_path, 'wb') as f:
                 f.write(audio_data)
@@ -315,22 +422,19 @@ class AudioGeneratorService:
 
             # 재생 시간 계산
             duration = 0
-            if output_path.endswith('.wav'):
-                import wave
-                try:
-                    with wave.open(output_path, 'rb') as wav_file:
-                        frames = wav_file.getnframes()
-                        rate = wav_file.getframerate()
-                        duration = frames / float(rate)
-                except Exception as wav_err:
-                    logger.warning(f"Could not read WAV duration: {wav_err}")
-                    # 파일 크기로 대략적인 재생 시간 추정 (24kHz, 16-bit, mono)
-                    duration = file_size / (24000 * 2)
-            else:
-                # MP3 등 다른 형식의 경우 대략적 추정
-                duration = file_size / 16000  # 대략적 추정
+            import wave
+            try:
+                with wave.open(output_path, 'rb') as wav_file:
+                    frames = wav_file.getnframes()
+                    rate = wav_file.getframerate()
+                    duration = frames / float(rate)
+            except Exception as wav_err:
+                logger.warning(f"Could not read WAV duration: {wav_err}")
+                duration = len(pcm_data) / (24000 * 2)
 
             logger.info(f"Audio generated: {output_path} ({duration:.1f}s, {file_size} bytes)")
+            if chunk_count > 1:
+                logger.info(f"✅ 오디오 합성 완료: {chunk_count}개 청크 → 총 {duration:.1f}초")
 
             # 실제 저장된 파일명 추출
             actual_filename = os.path.basename(output_path)
@@ -344,9 +448,9 @@ class AudioGeneratorService:
                 'voice': voice,
                 'script': script,
                 'language': language,
+                'chunk_count': chunk_count,
                 **(metadata or {})
             }
-            # content_id가 있으면 추가
             if content_id:
                 meta_data['content_id'] = content_id
             with open(meta_path, 'w', encoding='utf-8') as f:
