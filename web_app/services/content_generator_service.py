@@ -1248,26 +1248,43 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
         return images
 
 
+    def _split_title_subtitle(self, title: str):
+        """제목에서 메인 타이틀과 부제를 분리합니다.
+        형식: '메인 제목 : 부제' 또는 '메인 제목: 부제'
+        """
+        import re
+        # ' : ' 또는 ': ' 패턴으로 분리 (첫 번째 콜론 기준)
+        match = re.split(r'\s*:\s*', title, maxsplit=1)
+        if len(match) == 2 and len(match[1].strip()) > 0:
+            return match[0].strip(), match[1].strip()
+        return title.strip(), None
+
     def _add_text_overlay(self, img: Image.Image, slide_number: int, title: str, content: str) -> Image.Image:
-        """이미지 위에 텍스트(제목, 내용, 번호)를 합성합니다."""
+        """이미지 위에 텍스트(제목, 부제, 내용, 번호)를 합성합니다."""
         draw = ImageDraw.Draw(img)
         width, height = img.size
-        
+
         # 폰트 로드 (설치된 NotoSansCJK 사용)
         try:
             # 폰트 크기 설정 (1920x1080 기준)
             title_font_size = 60
+            subtitle_font_size = 32
             content_font_size = 40
             badge_font_size = 30
-            
+
             font_bold = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", title_font_size)
+            font_subtitle = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", subtitle_font_size)
             font_regular = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", content_font_size)
             font_badge = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", badge_font_size)
         except OSError:
             logger.warning("Korean font not found, using default. Text might not render correctly.")
             font_bold = ImageFont.load_default()
+            font_subtitle = ImageFont.load_default()
             font_regular = ImageFont.load_default()
             font_badge = ImageFont.load_default()
+
+        # 제목/부제 분리
+        main_title, subtitle = self._split_title_subtitle(title)
 
         # 1. 슬라이드 번호 배지 (좌측 상단)
         badge_text = f"#{slide_number}"
@@ -1275,48 +1292,50 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
         bbox = draw.textbbox((0, 0), badge_text, font=font_badge)
         badge_w = bbox[2] - bbox[0] + badge_padding * 2
         badge_h = bbox[3] - bbox[1] + badge_padding * 2
-        
+
         # 배지 배경 (반투명 검정)
-        # PIL draw.rectangle은 투명도 지원 안함 -> 별도 레이어 필요
         overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
         draw_overlay = ImageDraw.Draw(overlay)
-        
+
         draw_overlay.rounded_rectangle(
             [(20, 20), (20 + badge_w, 20 + badge_h)],
             radius=10, fill=(0, 0, 0, 160)
         )
-        
-        # 2. 제목 영역 (상단) - 그라데이션 대신 반투명 박스
-        # 제목 줄바꿈
-        wrapped_title = textwrap.fill(title, width=30) # 대략적인 글자수 제한
-        
+
+        # 2. 제목 영역 (상단) - 메인 타이틀 + 부제
+        wrapped_title = textwrap.fill(main_title, width=30)
+
         # 제목 높이 계산
         title_bbox = draw.multiline_textbbox((0, 0), wrapped_title, font=font_bold, spacing=10)
-        title_h = title_bbox[3] - title_bbox[1] + 60 # 여백 포함
-        
-        # 상단 오버레이
+        title_h = title_bbox[3] - title_bbox[1] + 60
+
+        # 부제 높이 계산
+        subtitle_h = 0
+        wrapped_subtitle = None
+        if subtitle:
+            wrapped_subtitle = textwrap.fill(subtitle, width=45)
+            sub_bbox = draw.multiline_textbbox((0, 0), wrapped_subtitle, font=font_subtitle, spacing=6)
+            subtitle_h = sub_bbox[3] - sub_bbox[1] + 30
+
+        # 상단 오버레이 (부제 공간 포함)
         draw_overlay.rectangle(
-            [(0, 0), (width, 150 + title_h)], # 넉넉하게
-            fill=(0, 0, 0, 100) # 전체 상단 어둡게
+            [(0, 0), (width, 150 + title_h + subtitle_h)],
+            fill=(0, 0, 0, 100)
         )
-        
+
         # 3. 내용 영역 (하단) - 한 문장만 표시
         if content:
-            # 리스트인 경우 첫 번째 항목만 사용
             if isinstance(content, list):
                 content_text = content[0] if content else ""
             else:
                 content_text = content
 
-            # 한 문장으로 제한 (최대 80자)
             content_text = content_text.strip()
             if len(content_text) > 80:
                 content_text = content_text[:77] + "..."
 
-            # 줄바꿈 없이 한 줄로 표시
             wrapped_content = content_text
 
-            # 하단 오버레이 - 간결하게
             content_bbox = draw.textbbox((0, 0), wrapped_content, font=font_regular)
             content_h = content_bbox[3] - content_bbox[1] + 40
 
@@ -1327,35 +1346,51 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
 
         # 오버레이 합성
         img = Image.alpha_composite(img.convert('RGBA'), overlay)
-        draw = ImageDraw.Draw(img) # 다시 draw 생성 (합성된 이미지용)
+        draw = ImageDraw.Draw(img)
 
-        # 텍스트 그리기 (흰색)
-        
+        # 텍스트 그리기
+
         # 배지 텍스트
         draw.text((20 + badge_padding, 20 + badge_padding), badge_text, font=font_badge, fill="white", anchor="lt")
-        
-        # 제목 텍스트 (중앙 정렬 또는 좌측 정렬)
-        # 상단 영역 중앙
+
+        # 메인 제목 (흰색, 60pt)
+        title_y = 100
         draw.multiline_text(
-            (width/2, 100), 
-            wrapped_title, 
-            font=font_bold, 
-            fill="white", 
-            anchor="ma", 
+            (width/2, title_y),
+            wrapped_title,
+            font=font_bold,
+            fill="white",
+            anchor="ma",
             align="center",
             spacing=10
         )
-        
-        # 내용 텍스트 (하단 중앙) - 한 줄로 표시
+
+        # 부제 (밝은 노란색, 32pt, 메인 제목 아래)
+        if subtitle and wrapped_subtitle:
+            # 메인 제목의 실제 렌더링 높이 계산
+            title_rendered_bbox = draw.multiline_textbbox((width/2, title_y), wrapped_title, font=font_bold, spacing=10, anchor="ma")
+            subtitle_y = title_rendered_bbox[3] + 20  # 제목 아래 20px 여백
+
+            draw.multiline_text(
+                (width/2, subtitle_y),
+                wrapped_subtitle,
+                font=font_subtitle,
+                fill=(255, 255, 102),  # 밝은 노란색
+                anchor="ma",
+                align="center",
+                spacing=6
+            )
+
+        # 내용 텍스트 (하단 중앙)
         if content:
             draw.text(
                 (width/2, height - 50),
                 wrapped_content,
                 font=font_regular,
                 fill="white",
-                anchor="mm"  # middle-middle (중앙 기준)
+                anchor="mm"
             )
-            
+
         return img.convert('RGB')
 
 
