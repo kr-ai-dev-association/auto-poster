@@ -210,7 +210,7 @@ class AudioGeneratorService:
                 'message': str(e)
             }
 
-    def _split_script_into_chunks(self, script: str, language: str = 'ko', target_seconds: int = 50) -> List[str]:
+    def _split_script_into_chunks(self, script: str, language: str = 'ko', target_seconds: int = 110) -> List[str]:
         """
         스크립트를 문장 경계에서 ~target_seconds 단위로 분할합니다.
         긴 TTS 생성 시 발생하는 금속성 잡음을 방지합니다.
@@ -218,7 +218,7 @@ class AudioGeneratorService:
         Args:
             script: 전체 스크립트 텍스트
             language: 언어 코드 ('ko' 또는 'en')
-            target_seconds: 목표 청크 길이 (초)
+            target_seconds: 목표 청크 길이 (초, 기본 110초 ≈ 2분)
 
         Returns:
             분할된 스크립트 청크 리스트
@@ -235,10 +235,24 @@ class AudioGeneratorService:
 
         target_chars = int(target_seconds * chars_per_second)
 
-        # 문장 단위로 분할 (., !, ?, 。 뒤의 공백/줄바꿈 기준)
-        sentences = re.split(r'(?<=[.!?。])\s+', script.strip())
+        # 문장 단위로 분할:
+        # 1차: 빈 줄(단락 구분)로 먼저 분할
+        # 2차: 문장 끝 부호(. ! ? 。) 뒤의 공백/줄바꿈으로 분할
+        # 이렇게 하면 대화체에서도 완전한 문장 경계에서 끊어짐
+        paragraphs = re.split(r'\n\s*\n', script.strip())
+        sentences = []
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            # 단락 내에서 문장 단위로 추가 분할
+            parts = re.split(r'(?<=[.!?。])\s+', para)
+            for p in parts:
+                p = p.strip()
+                if p:
+                    sentences.append(p)
         # 빈 문장 제거
-        sentences = [s.strip() for s in sentences if s.strip()]
+        sentences = [s for s in sentences if s]
 
         if not sentences:
             return [script]
@@ -346,6 +360,47 @@ class AudioGeneratorService:
         )
         return wav_header + pcm_data
 
+    def _normalize_pcm_volume(self, pcm_parts: List[bytes], target_peak: float = 0.9) -> List[bytes]:
+        """
+        각 청크의 볼륨을 동일한 피크 레벨로 정규화합니다.
+
+        Args:
+            pcm_parts: PCM 데이터 리스트 (16-bit signed, mono)
+            target_peak: 목표 피크 레벨 (0.0~1.0, 기본 0.9 = 90%)
+
+        Returns:
+            정규화된 PCM 데이터 리스트
+        """
+        import array
+
+        target_amplitude = int(32767 * target_peak)
+        normalized = []
+
+        for pcm_data in pcm_parts:
+            samples = array.array('h')
+            samples.frombytes(pcm_data)
+
+            if not samples:
+                normalized.append(pcm_data)
+                continue
+
+            # 피크 진폭 계산
+            peak = max(abs(s) for s in samples)
+
+            if peak == 0:
+                normalized.append(pcm_data)
+                continue
+
+            # 스케일 팩터 계산 및 적용
+            scale = target_amplitude / peak
+            for i in range(len(samples)):
+                samples[i] = max(-32768, min(32767, int(samples[i] * scale)))
+
+            normalized.append(samples.tobytes())
+            logger.debug(f"볼륨 정규화: peak {peak} → {target_amplitude} (scale {scale:.2f})")
+
+        return normalized
+
     async def generate_audio_from_script(
         self,
         script: str,
@@ -357,7 +412,7 @@ class AudioGeneratorService:
     ) -> Dict[str, Any]:
         """
         대본에서 TTS를 사용하여 오디오를 생성합니다.
-        긴 스크립트는 ~50초 단위로 분할하여 개별 생성 후 합성합니다.
+        긴 스크립트는 ~2분 단위로 문장 경계에서 분할하여 개별 생성 후 합성합니다.
 
         Args:
             script: 읽을 대본 텍스트
@@ -407,9 +462,19 @@ class AudioGeneratorService:
                     logger.info(f"✅ 청크 {i+1}/{chunk_count} 완료 ({chunk_duration:.1f}초)")
                     pcm_parts.append(chunk_pcm)
 
-                # PCM 데이터 합성
-                logger.info(f"🔗 {chunk_count}개 청크 합성 중...")
-                pcm_data = b''.join(pcm_parts)
+                # 볼륨 정규화
+                logger.info(f"🔊 {chunk_count}개 청크 볼륨 정규화 중...")
+                pcm_parts = self._normalize_pcm_volume(pcm_parts)
+
+                # PCM 데이터 합성 (청크 사이에 1초 무음 삽입)
+                logger.info(f"🔗 {chunk_count}개 청크 합성 중... (청크 간 1초 무음 삽입)")
+                silence_1sec = b'\x00' * (24000 * 2)  # 24kHz, 16-bit, mono = 48000 bytes
+                parts_with_gaps = []
+                for i, part in enumerate(pcm_parts):
+                    parts_with_gaps.append(part)
+                    if i < len(pcm_parts) - 1:  # 마지막 청크 뒤에는 무음 불필요
+                        parts_with_gaps.append(silence_1sec)
+                pcm_data = b''.join(parts_with_gaps)
 
             # WAV 파일 빌드
             audio_data = self._build_wav(pcm_data)
