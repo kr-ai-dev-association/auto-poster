@@ -5,6 +5,6 @@ import retrofit2.http.GET
 
 interface ConfigApi {
 
-    @GET("/api/genvideo/categories")
+    @GET("/api/common/categories")
     suspend fun getCategories(): CategoriesResponse
 }

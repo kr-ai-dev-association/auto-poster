@@ -70,8 +70,9 @@ class PipelineViewModel @Inject constructor(
                 // Use default if API fails
                 _categories.value = listOf(
                     Category("tech", "테크", "Tech"),
-                    Category("educational", "교육", "Educational"),
                     Category("entertainment", "엔터테인먼트", "Entertainment"),
+                    Category("beauty", "뷰티", "Beauty"),
+                    Category("lifestyle", "라이프스타일", "Lifestyle"),
                 )
             }
         }
