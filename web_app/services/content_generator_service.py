@@ -60,6 +60,48 @@ def extract_first_json(text: str) -> Optional[str]:
     return None
 
 
+def get_flat_sub_slides(plan: dict) -> list:
+    """
+    기존/신규 기획안 모두를 flat sub_slide 리스트로 정규화합니다.
+    - 신규 기획안 (sub_slides 있음): 각 sub_slide를 개별 항목으로 반환
+    - 레거시 기획안 (sub_slides 없음): 슬라이드 = 단일 sub_slide로 변환
+    """
+    result = []
+    for slide in plan.get('slides', []):
+        slide_num = slide.get('slide_number', 0)
+        title = slide.get('title', '')
+
+        if 'sub_slides' in slide and slide['sub_slides']:
+            for sub in slide['sub_slides']:
+                result.append({
+                    'slide_number': slide_num,
+                    'sub_number': sub.get('sub_number', 1),
+                    'title': title,
+                    'type': sub.get('type', 'title' if sub.get('sub_number', 1) == 1 else 'detail'),
+                    'content': sub.get('content', ''),
+                    'narration': sub.get('narration', ''),
+                    'image_prompt': sub.get('image_prompt', ''),
+                    'web_image_keyword': sub.get('web_image_keyword', ''),
+                    'web_image_query': sub.get('web_image_query', ''),
+                    'use_web_image': sub.get('use_web_image', False),
+                })
+        else:
+            # 레거시 포맷: 슬라이드 = 단일 sub_slide
+            result.append({
+                'slide_number': slide_num,
+                'sub_number': 1,
+                'title': title,
+                'type': 'title',
+                'content': slide.get('content', ''),
+                'narration': slide.get('narration', ''),
+                'image_prompt': slide.get('image_prompt', ''),
+                'web_image_keyword': slide.get('web_image_keyword', ''),
+                'web_image_query': slide.get('web_image_query', ''),
+                'use_web_image': slide.get('use_web_image', False),
+            })
+    return result
+
+
 class ContentGeneratorService:
     """콘텐츠 기획 및 이미지 생성, PDF 출력 서비스"""
 
@@ -183,7 +225,7 @@ class ContentGeneratorService:
 
         return images[:max_images]
 
-    async def download_web_image(self, image_url: str, plan_id: str, slide_number: int) -> Optional[str]:
+    async def download_web_image(self, image_url: str, plan_id: str, slide_number: int, sub_number: int = 1) -> Optional[str]:
         """
         웹에서 이미지를 다운로드하여 저장합니다.
 
@@ -191,6 +233,7 @@ class ContentGeneratorService:
             image_url: 이미지 URL
             plan_id: 기획안 ID
             slide_number: 슬라이드 번호
+            sub_number: 서브슬라이드 번호
 
         Returns:
             저장된 이미지 경로 또는 None
@@ -223,7 +266,7 @@ class ContentGeneratorService:
                         return None
 
                     # PNG로 저장
-                    filename = f"{plan_id}_web_{slide_number:02d}.png"
+                    filename = f"{plan_id}_web_{slide_number:02d}_{sub_number:02d}.png"
                     filepath = os.path.join(self.web_images_dir, filename)
 
                     # RGB로 변환 (RGBA, P 등 처리)
@@ -253,6 +296,7 @@ class ContentGeneratorService:
         search_query: str,
         plan_id: str,
         slide_number: int,
+        sub_number: int = 1,
         max_attempts: int = 3
     ) -> Optional[str]:
         """
@@ -262,6 +306,7 @@ class ContentGeneratorService:
             search_query: 검색 쿼리 (슬라이드 관련 키워드)
             plan_id: 기획안 ID
             slide_number: 슬라이드 번호
+            sub_number: 서브슬라이드 번호
             max_attempts: 최대 시도 횟수
 
         Returns:
@@ -305,10 +350,11 @@ Return ONLY the top 3 most relevant URLs, one per line, no other text."""
                         downloaded_path = await self.download_web_image(
                             img_info['url'],
                             plan_id,
-                            slide_number
+                            slide_number,
+                            sub_number
                         )
                         if downloaded_path:
-                            logger.info(f"Successfully downloaded image for slide {slide_number} from {url}")
+                            logger.info(f"Successfully downloaded image for slide {slide_number}-{sub_number} from {url}")
                             return downloaded_path
 
                 except Exception as e:
@@ -423,12 +469,28 @@ image_prompt must be written at a **professional photography direction** level:
     {{
       "slide_number": 1,
       "title": "Slide title (subtitle: specific title with core keyword)",
-      "content": "ONE SHORT sentence (max 15 words) - key message displayed at bottom of slide",
-      "narration": "Professional editorial-level narration script (for TTS, natural conversational tone, 2+ paragraphs, minimum 300 characters, 30-45 seconds). Include background knowledge, expert analysis, and practical insights.",
-      "image_prompt": "Professional photography-level image prompt (English, 3+ sentences). Specify composition, lighting, camera/lens, mood, and resolution. If web_image_keyword is specified, MUST include instruction to prominently feature that element.",
-      "web_image_keyword": "Specific image/element to search and MUST appear in the final image (e.g., 'Tesla Model 3 car', 'Elon Musk portrait', 'iPhone 16 product photo'). Leave empty string if not needed.",
-      "web_image_query": "Web search query for real photos/images (English, specific search terms)",
-      "use_web_image": true/false,
+      "sub_slides": [
+        {{
+          "sub_number": 1,
+          "type": "title",
+          "content": "ONE SHORT sentence (max 15 words) - key message for this sub-slide",
+          "narration": "Narration for this sub-slide (15-25 seconds, 100+ characters). Topic introduction with background context.",
+          "image_prompt": "Professional photography-level image prompt (English, 3+ sentences). Specify composition, lighting, camera/lens, mood, and resolution.",
+          "web_image_keyword": "Specific element to search (e.g., 'Tesla Model 3 car'). Leave empty string if not needed.",
+          "web_image_query": "Web search query for real photos/images (English)",
+          "use_web_image": true/false
+        }},
+        {{
+          "sub_number": 2,
+          "type": "detail",
+          "content": "Detail point (max 15 words) - specific data, comparison, or insight",
+          "narration": "Narration for this detail sub-slide (15-25 seconds, 100+ characters). Deep analysis, data, expert insights.",
+          "image_prompt": "Detailed visualization prompt (English, 3+ sentences). Focus on the specific detail being explained.",
+          "web_image_keyword": "",
+          "web_image_query": "",
+          "use_web_image": false
+        }}
+      ],
       "duration_seconds": estimated_display_time_seconds
     }},
     ...
@@ -439,20 +501,28 @@ image_prompt must be written at a **professional photography direction** level:
 }}
 ```
 
+## Sub-slide Rules (CRITICAL):
+- Each slide MUST have 2-4 sub_slides
+- sub_slides[0] MUST have type="title": introduces the slide topic with a visual overview
+- sub_slides[1+] MUST have type="detail": specific data, comparisons, analysis, or deeper explanations
+- Each sub_slide narration: minimum 100 characters, 15-25 seconds
+- Total narration per slide (sum of all sub_slide narrations): minimum 300 characters, 30-45 seconds
+- Each sub_slide gets its OWN image — write distinct image_prompt for each
+- web_image_keyword/web_image_query: typically used only on the "title" sub_slide
+
 ## Guidelines:
-1. Each slide's narration is a TTS script, so write in natural conversational English while maintaining **professional depth**
-2. **CRITICAL: Each narration must be at least 300 characters, 2+ paragraphs (30-45 seconds). Total video should be 7-10+ minutes with substantial script content**
+1. Each sub_slide's narration is a TTS script, so write in natural conversational English while maintaining **professional depth**
+2. **CRITICAL: Total narration per slide must be at least 300 characters (sum of sub_slide narrations). Total video should be 7-10+ minutes**
 3. **CRITICAL: "content" field is displayed on screen - must be ONE SHORT sentence (max 15 words). Put all details in "narration" instead.**
 4. **image_prompt must be at professional photography direction level** - MUST include composition, lighting, camera/lens, mood, and resolution. 3+ sentences.
 5. First slide should be a strong intro, last slide should include CTA outro
 6. Include teasers/previews in the middle to maintain viewer retention
 7. **ALL content must be in English (only image_prompt, web_image_keyword, and web_image_query are always in English)**
 8. Content should be based on the latest facts from search results
-9. **web_image_keyword**: The SPECIFIC image element that MUST appear in the generated image. Examples: 'OpenAI logo', 'Samsung Galaxy S25 phone', 'Taylor Swift photo'. This image will be searched, downloaded, and Gemini will be instructed to prominently feature it in the generated slide.
-10. web_image_query: The search query to find the web_image_keyword (e.g., "OpenAI logo high resolution", "Samsung Galaxy S25 official product photo")
-11. use_web_image: Set to true if web_image_keyword is specified and a real image reference is needed
-12. **Total narration should be at least 4000 characters (approximately 7-10 minutes)**
-13. **Include a subtitle in the title field for a professional feel** (e.g., "The Red Temptation: Cultural Value and Legacy of Tomato Spaghetti")
+9. **web_image_keyword**: The SPECIFIC image element that MUST appear in the generated image. This image will be searched, downloaded, and Gemini will prominently feature it in the generated slide.
+10. use_web_image: Set to true if web_image_keyword is specified and a real image reference is needed
+11. **Total narration should be at least 4000 characters (approximately 7-10 minutes)**
+12. **Include a subtitle in the title field for a professional feel** (e.g., "The Red Temptation: Cultural Value and Legacy of Tomato Spaghetti")
 """
         else:
             prompt = f"""당신은 YouTube 영상 콘텐츠 기획 전문가이자 전문 에디토리얼 작가입니다.
@@ -514,12 +584,28 @@ image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작�
     {{
       "slide_number": 1,
       "title": "슬라이드 제목 (부제: 핵심 키워드를 포함한 구체적 제목)",
-      "content": "화면 하단에 표시될 핵심 메시지 한 문장 (최대 15단어)",
-      "narration": "전문 에디토리얼 수준의 나레이션 대본 (TTS용, 자연스러운 구어체, 2문단 이상, 최소 300자 이상, 30-45초 분량). 배경 지식, 전문적 분석, 실용적 인사이트를 포함하여 깊이 있게 작성.",
-      "image_prompt": "프로페셔널 포토그래피 수준의 이미지 프롬프트 (영어, 3문장 이상). 구도/조명/카메라/렌즈/분위기/해상도를 구체적으로 지시. web_image_keyword가 지정된 경우 해당 요소를 반드시 눈에 띄게 포함.",
-      "web_image_keyword": "검색하여 최종 이미지에 반드시 나타나야 할 구체적인 이미지/요소 (예: 'Tesla Model 3 car', 'Elon Musk portrait'). 필요 없으면 빈 문자열.",
-      "web_image_query": "이 슬라이드에 사용할 실제 사진/이미지를 웹에서 검색할 쿼리 (영어, 구체적인 검색어)",
-      "use_web_image": true/false,
+      "sub_slides": [
+        {{
+          "sub_number": 1,
+          "type": "title",
+          "content": "핵심 메시지 한 문장 (최대 15단어) - 주제 소개",
+          "narration": "이 서브슬라이드의 나레이션 (15-25초, 100자 이상). 주제 소개 및 배경 설명.",
+          "image_prompt": "프로페셔널 포토그래피 수준의 이미지 프롬프트 (영어, 3문장 이상). 구도/조명/카메라/렌즈/분위기/해상도 지시.",
+          "web_image_keyword": "검색할 구체적 이미지 요소 (예: 'Tesla Model 3 car'). 필요 없으면 빈 문자열.",
+          "web_image_query": "웹 이미지 검색 쿼리 (영어)",
+          "use_web_image": true/false
+        }},
+        {{
+          "sub_number": 2,
+          "type": "detail",
+          "content": "세부 핵심 포인트 (최대 15단어) - 구체적 데이터/비교/분석",
+          "narration": "세부 설명 나레이션 (15-25초, 100자 이상). 심층 분석, 데이터, 전문가 인사이트.",
+          "image_prompt": "세부 시각화 프롬프트 (영어, 3문장 이상). 설명하는 구체적 내용에 집중한 이미지.",
+          "web_image_keyword": "",
+          "web_image_query": "",
+          "use_web_image": false
+        }}
+      ],
       "duration_seconds": 예상_표시_시간_초
     }},
     ...
@@ -530,20 +616,28 @@ image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작�
 }}
 ```
 
+## 서브슬라이드 규칙 (반드시 준수):
+- 각 슬라이드는 반드시 2~4개의 sub_slides를 포함
+- sub_slides[0]은 type="title": 슬라이드 주제를 시각적 개요와 함께 소개
+- sub_slides[1+]은 type="detail": 구체적 데이터, 비교, 분석, 심층 설명
+- 각 sub_slide 나레이션: 최소 100자, 15-25초 분량
+- 슬라이드당 전체 나레이션 합계 (모든 sub_slide narration 합): 최소 300자, 30-45초
+- 각 sub_slide는 **독립된 이미지**를 가짐 — 각각 고유한 image_prompt 작성
+- web_image_keyword/web_image_query: 보통 "title" 타입 sub_slide에서만 사용
+
 ## 주의사항:
-1. 각 슬라이드의 narration은 TTS로 읽을 대본이므로 자연스러운 구어체로 작성하되, **전문적 깊이**를 유지
-2. **핵심: 각 narration은 반드시 300자 이상, 2문단 이상으로 작성 (30-45초 분량). 전체 영상이 7-10분 이상이 되도록 충분한 분량의 대본 작성 필수**
+1. 각 sub_slide의 narration은 TTS로 읽을 대본이므로 자연스러운 구어체로 작성하되, **전문적 깊이**를 유지
+2. **핵심: 슬라이드당 전체 narration은 반드시 300자 이상 (sub_slide narration 합계). 전체 영상이 7-10분 이상이 되도록 충분한 분량의 대본 작성 필수**
 3. **핵심: "content" 필드는 화면에 표시됩니다 - 반드시 한 문장(최대 15단어)으로 작성. 상세 내용은 모두 "narration"에 작성하세요.**
 4. **image_prompt는 프로페셔널 포토그래피 디렉션 수준으로 작성** - 구도, 조명, 카메라/렌즈, 분위기, 해상도를 반드시 포함. 3문장 이상.
 5. 첫 슬라이드는 강력한 인트로, 마지막은 CTA 포함 아웃트로
 6. 중간에 시청 유지를 위한 티저/예고 포함
 7. **반드시 한국어로 title, description, content, narration, hook, call_to_action, tags 작성 (image_prompt, web_image_keyword, web_image_query만 영어)**
 8. 검색된 정보의 출처나 시점을 명확히 알 필요는 없지만, 내용은 최신 사실에 기반해야 함
-9. **web_image_keyword**: 생성된 이미지에 **반드시 나타나야 할** 구체적인 이미지 요소. 예: 'OpenAI logo', 'Samsung Galaxy S25 phone', 'Taylor Swift photo'. 이 이미지는 웹에서 검색/다운로드되어 Gemini가 생성하는 슬라이드에 눈에 띄게 포함됩니다.
-10. web_image_query: web_image_keyword를 찾기 위한 검색 쿼리 (예: "OpenAI logo high resolution", "Samsung Galaxy S25 official product photo")
-11. use_web_image: web_image_keyword가 지정되어 실제 이미지 참조가 필요한 경우 true로 설정
-12. **전체 narration 합계가 최소 4000자 이상이 되도록 작성 (약 7-10분 분량)**
-13. **title 필드에 부제를 포함하여 구체적이고 전문적인 느낌을 부여** (예: "인류의 미각을 사로잡은 붉은 유혹: 토마토 스파게티의 문화적 가치")
+9. **web_image_keyword**: 생성된 이미지에 **반드시 나타나야 할** 구체적인 이미지 요소. 이 이미지는 웹에서 검색/다운로드되어 Gemini가 생성하는 슬라이드에 눈에 띄게 포함됩니다.
+10. use_web_image: web_image_keyword가 지정되어 실제 이미지 참조가 필요한 경우 true로 설정
+11. **전체 narration 합계가 최소 4000자 이상이 되도록 작성 (약 7-10분 분량)**
+12. **title 필드에 부제를 포함하여 구체적이고 전문적인 느낌을 부여** (예: "인류의 미각을 사로잡은 붉은 유혹: 토마토 스파게티의 문화적 가치")
 """
 
         try:
@@ -556,7 +650,7 @@ image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작�
                 config=types.GenerateContentConfig(
                     tools=tools,  # 구글 검색 도구 추가
                     temperature=0.2,
-                    max_output_tokens=16384
+                    max_output_tokens=65536
                     # response_mime_type 제거 - Search 도구와 호환 불가
                 )
             )
@@ -591,6 +685,39 @@ image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작�
                 # 파싱 실패 시 로깅 강화
                 logger.error(f"JSON Decode Error. Extracted text preview: {json_str[:200]}...")
                 raise ValueError(f"Failed to parse extracted JSON: {e}")
+
+            # sub_slides 폴백: Gemini가 sub_slides를 생성하지 않은 슬라이드 자동 보정
+            for slide in content_plan.get('slides', []):
+                if 'sub_slides' not in slide or not slide['sub_slides']:
+                    narration = slide.get('narration', '')
+                    # 나레이션을 문장 경계에서 2분할
+                    sentences = re.split(r'(?<=[.!?。])\s+', narration)
+                    mid = max(1, len(sentences) // 2)
+                    part1 = ' '.join(sentences[:mid])
+                    part2 = ' '.join(sentences[mid:]) if mid < len(sentences) else ''
+                    slide['sub_slides'] = [
+                        {
+                            'sub_number': 1,
+                            'type': 'title',
+                            'content': slide.get('content', ''),
+                            'narration': part1 if part2 else narration,
+                            'image_prompt': slide.get('image_prompt', ''),
+                            'web_image_keyword': slide.get('web_image_keyword', ''),
+                            'web_image_query': slide.get('web_image_query', ''),
+                            'use_web_image': slide.get('use_web_image', False),
+                        },
+                        {
+                            'sub_number': 2,
+                            'type': 'detail',
+                            'content': slide.get('content', ''),
+                            'narration': part2 if part2 else narration,
+                            'image_prompt': slide.get('image_prompt', ''),
+                            'web_image_keyword': '',
+                            'web_image_query': '',
+                            'use_web_image': False,
+                        },
+                    ]
+                    logger.info(f"Auto-generated sub_slides for slide {slide.get('slide_number', '?')}")
 
             # 기획안 저장 (content_id가 있으면 사용, 없으면 기존 방식)
             if content_id:
@@ -642,12 +769,12 @@ image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작�
         content: str = '',
         language: str = 'ko',
         reference_images: List[str] = None,
-        web_image_keyword: str = ''
+        web_image_keyword: str = '',
+        sub_number: int = 1,
+        sub_type: str = 'title'
     ) -> Dict[str, Any]:
         """
         슬라이드용 이미지를 생성합니다.
-        Nano Banana Pro (Gemini 3) 모델을 사용하여 고품질 배경 이미지를 생성하고,
-        Python PIL을 사용하여 텍스트를 합성합니다 (한글 렌더링 품질 확보).
 
         Args:
             image_prompt: 이미지 생성 프롬프트
@@ -659,7 +786,9 @@ image_prompt는 **프로페셔널 포토그래피 디렉션** 수준으로 작�
             content: 슬라이드 콘텐츠 (핵심 내용)
             language: 텍스트 언어 (ko/en)
             web_image_keyword: 반드시 이미지에 포함되어야 할 웹 이미지 키워드
-            reference_images: 참조 이미지 파일 경로 리스트 (웹에서 다운로드한 이미지)
+            reference_images: 참조 이미지 파일 경로 리스트
+            sub_number: 서브슬라이드 번호 (1부터 시작)
+            sub_type: 서브슬라이드 타입 ('title' 또는 'detail')
 
         Returns:
             Dict containing image path
@@ -723,7 +852,7 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
 - Pure visual representation of the concept.
 """
 
-        logger.info(f"Generating image for slide {slide_number}: {title[:30] if title else image_prompt[:30]}... (refs: {len(reference_images) if reference_images else 0})")
+        logger.info(f"Generating image for slide {slide_number}-{sub_number} ({sub_type}): {title[:30] if title else image_prompt[:30]}... (refs: {len(reference_images) if reference_images else 0})")
 
         try:
             # contents 구성: 참조 이미지가 있으면 이미지와 텍스트 함께 전송
@@ -770,7 +899,7 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
                 raise ValueError("No image generated")
 
             # 이미지 처리
-            image_filename = f"{plan_id}_slide_{slide_number:02d}.png"
+            image_filename = f"{plan_id}_slide_{slide_number:02d}_{sub_number:02d}.png"
             image_path = os.path.join(self.output_dir, image_filename)
 
             # PIL로 이미지 로드
@@ -781,8 +910,8 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
             target_width, target_height = 1920, 1080
             img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
             
-            # 텍스트 오버레이 합성 (한글 렌더링 해결)
-            img = self._add_text_overlay(img, slide_number, title, content)
+            # 텍스트 오버레이 합성
+            img = self._add_text_overlay(img, slide_number, title, content, sub_type=sub_type)
 
             img.save(image_path, 'PNG', quality=95)
 
@@ -791,15 +920,18 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
             return {
                 'status': 'success',
                 'slide_number': slide_number,
+                'sub_number': sub_number,
+                'sub_type': sub_type,
                 'image_path': image_path,
                 'filename': image_filename
             }
 
         except Exception as e:
-            logger.error(f"Image generation failed for slide {slide_number}: {e}")
+            logger.error(f"Image generation failed for slide {slide_number}-{sub_number}: {e}")
             return {
                 'status': 'error',
                 'slide_number': slide_number,
+                'sub_number': sub_number,
                 'message': str(e)
             }
 
@@ -829,60 +961,66 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
         with open(plan_path, 'r', encoding='utf-8') as f:
             plan = json.load(f)
 
-        slides = plan.get('slides', [])
         language = plan.get('language', 'ko')
-        total_slides = len(slides)
+
+        # sub_slides 지원: flat 리스트로 정규화
+        flat_sub_slides = get_flat_sub_slides(plan)
+        total_images = len(flat_sub_slides)
         results = []
         web_image_count = 0
 
-        for i, slide in enumerate(slides):
-            slide_number = slide.get('slide_number', i + 1)
-            title = slide.get('title', '')
-            content = slide.get('content', '')
+        for i, sub_slide in enumerate(flat_sub_slides):
+            slide_number = sub_slide['slide_number']
+            sub_number = sub_slide['sub_number']
+            sub_type = sub_slide['type']
+            title = sub_slide['title'] if sub_type == 'title' else ''
+            content = sub_slide['content']
 
             if progress_callback:
-                progress_callback(i + 1, total_slides, f"Processing image {i + 1}/{total_slides}")
+                progress_callback(i + 1, total_images, f"Processing image {i + 1}/{total_images}")
 
             reference_images = []
 
-            # 웹 이미지 다운로드 시도 (use_web_image가 true인 슬라이드)
-            if use_web_images and slide.get('use_web_image', False):
-                web_query = slide.get('web_image_query', '')
+            # 웹 이미지 다운로드 시도 (use_web_image가 true인 서브슬라이드)
+            if use_web_images and sub_slide.get('use_web_image', False):
+                web_query = sub_slide.get('web_image_query', '')
                 if web_query:
-                    logger.info(f"Searching web images for slide {slide_number}: {web_query[:50]}")
+                    logger.info(f"Searching web images for slide {slide_number}-{sub_number}: {web_query[:50]}")
 
                     if progress_callback:
-                        progress_callback(i + 1, total_slides, f"Searching web image {i + 1}/{total_slides}")
+                        progress_callback(i + 1, total_images, f"Searching web image {i + 1}/{total_images}")
 
-                    # 웹 이미지 다운로드 (참조용으로 사용)
                     web_image_path = await self.search_and_download_images_for_slide(
                         search_query=web_query,
                         plan_id=plan_id,
-                        slide_number=slide_number
+                        slide_number=slide_number,
+                        sub_number=sub_number
                     )
 
                     if web_image_path:
                         reference_images.append(web_image_path)
                         web_image_count += 1
-                        logger.info(f"Web image downloaded for slide {slide_number} as reference")
+                        logger.info(f"Web image downloaded for slide {slide_number}-{sub_number} as reference")
 
-            # AI 이미지 생성 (웹 이미지가 있으면 참조로 사용)
+            # AI 이미지 생성
             if progress_callback:
                 if reference_images:
-                    progress_callback(i + 1, total_slides, f"Generating AI image with reference {i + 1}/{total_slides}")
+                    progress_callback(i + 1, total_images, f"Generating AI image with reference {i + 1}/{total_images}")
                 else:
-                    progress_callback(i + 1, total_slides, f"Generating AI image {i + 1}/{total_slides}")
+                    progress_callback(i + 1, total_images, f"Generating AI image {i + 1}/{total_images}")
 
             result = await self.generate_slide_image(
-                image_prompt=slide.get('image_prompt', ''),
+                image_prompt=sub_slide.get('image_prompt', ''),
                 slide_number=slide_number,
                 plan_id=plan_id,
                 title=title,
-                narration=slide.get('narration', ''),
+                narration=sub_slide.get('narration', ''),
                 content=content,
                 language=language,
                 reference_images=reference_images if reference_images else None,
-                web_image_keyword=slide.get('web_image_keyword', '')
+                web_image_keyword=sub_slide.get('web_image_keyword', ''),
+                sub_number=sub_number,
+                sub_type=sub_type
             )
             result['source'] = 'ai_with_ref' if reference_images else 'ai'
             result['reference_count'] = len(reference_images)
@@ -890,7 +1028,7 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
             results.append(result)
 
             # API 레이트 리밋 방지
-            if i < total_slides - 1:
+            if i < total_images - 1:
                 await asyncio.sleep(2)
 
         # 성공한 이미지 수 계산
@@ -898,9 +1036,9 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
         with_ref_count = sum(1 for r in results if r.get('reference_count', 0) > 0 and r['status'] == 'success')
 
         return {
-            'status': 'success' if success_count == total_slides else 'partial',
+            'status': 'success' if success_count == total_images else 'partial',
             'plan_id': plan_id,
-            'total': total_slides,
+            'total': total_images,
             'success': success_count,
             'web_references_used': web_image_count,
             'ai_with_reference': with_ref_count,
@@ -931,23 +1069,26 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
         with open(plan_path, 'r', encoding='utf-8') as f:
             plan = json.load(f)
 
-        slides = plan.get('slides', [])
         pdf_title = title or plan.get('title', f'Content_{plan_id}')
+
+        # sub_slides 지원: flat 리스트로 정규화
+        flat_sub_slides = get_flat_sub_slides(plan)
 
         # 이미지 파일 수집
         image_files = []
-        for slide in slides:
-            slide_num = slide.get('slide_number', 0)
-            image_filename = f"{plan_id}_slide_{slide_num:02d}.png"
+        for sub in flat_sub_slides:
+            slide_num = sub['slide_number']
+            sub_num = sub['sub_number']
+            image_filename = f"{plan_id}_slide_{slide_num:02d}_{sub_num:02d}.png"
             image_path = os.path.join(self.output_dir, image_filename)
             if os.path.exists(image_path):
-                image_files.append((slide_num, image_path))
+                image_files.append((slide_num, sub_num, image_path, sub.get('narration', '')))
 
         if not image_files:
             return {'status': 'error', 'message': 'No images found for this plan'}
 
-        # 슬라이드 번호순 정렬
-        image_files.sort(key=lambda x: x[0])
+        # (slide_number, sub_number) 순 정렬
+        image_files.sort(key=lambda x: (x[0], x[1]))
 
         # PDF 생성 (content_id 기반 파일명 사용)
         # plan_id가 content_id 형식이면 그대로 사용, 아니면 기존 방식
@@ -964,18 +1105,15 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
         page_width = 1920 * 0.75  # 포인트로 변환 (약 1440pt)
         page_height = 1080 * 0.75  # 약 810pt
 
-        # 나레이션 텍스트 수집 (슬라이드 번호 순서대로)
-        narrations = []
-        for slide_num, _ in image_files:
-            slide_data = next((s for s in slides if s.get('slide_number') == slide_num), None)
-            narrations.append(slide_data.get('narration', '') if slide_data else '')
+        # 나레이션 텍스트 수집 (sub_slide별)
+        narrations = [item[3] for item in image_files]
 
         # 임시 PDF 파일 경로
         temp_pdf_path = pdf_path + '.temp'
 
         c = canvas.Canvas(temp_pdf_path, pagesize=(page_width, page_height))
 
-        for slide_num, image_path in image_files:
+        for slide_num, sub_num, image_path, _ in image_files:
             img = Image.open(image_path)
             img_reader = ImageReader(img)
             c.drawImage(img_reader, 0, 0, width=page_width, height=page_height)
@@ -1228,22 +1366,29 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
                 filepath = os.path.join(self.output_dir, filename)
                 stat = os.stat(filepath)
 
-                # 슬라이드 번호 추출
+                # 슬라이드 번호 + 서브 번호 추출
+                # 새 형식: {plan_id}_slide_01_02.png → slide_num=1, sub_num=2
+                # 레거시 형식: {plan_id}_slide_01.png → slide_num=1, sub_num=1
                 try:
-                    slide_num = int(filename.split('_slide_')[1].split('.')[0])
+                    parts = filename.split('_slide_')[1].split('.')[0]  # "01_02" or "01"
+                    nums = parts.split('_')
+                    slide_num = int(nums[0])
+                    sub_num = int(nums[1]) if len(nums) > 1 else 1
                 except (IndexError, ValueError):
                     slide_num = 0
+                    sub_num = 1
 
                 images.append({
                     'filename': filename,
                     'filepath': filepath,
                     'size': stat.st_size,
                     'slide_number': slide_num,
+                    'sub_number': sub_num,
                     'created_at': stat.st_mtime
                 })
 
-        # 슬라이드 번호순 정렬
-        images.sort(key=lambda x: x['slide_number'])
+        # (slide_number, sub_number) 순 정렬
+        images.sort(key=lambda x: (x['slide_number'], x['sub_number']))
 
         return images
 
@@ -1259,71 +1404,60 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
             return match[0].strip(), match[1].strip()
         return title.strip(), None
 
-    def _add_text_overlay(self, img: Image.Image, slide_number: int, title: str, content: str) -> Image.Image:
-        """이미지 위에 텍스트(제목, 부제, 내용, 번호)를 합성합니다."""
+    def _add_text_overlay(self, img: Image.Image, slide_number: int, title: str, content: str, sub_type: str = 'title') -> Image.Image:
+        """이미지 위에 텍스트를 합성합니다.
+        sub_type='title': 상단 제목+부제 + 하단 content
+        sub_type='detail': 하단 content만 (더 큰 폰트)
+        """
         draw = ImageDraw.Draw(img)
         width, height = img.size
 
         # 폰트 로드 (설치된 NotoSansCJK 사용)
         try:
-            # 폰트 크기 설정 (1920x1080 기준)
             title_font_size = 60
             subtitle_font_size = 32
             content_font_size = 40
-            badge_font_size = 30
+            detail_content_font_size = 48  # detail 타입용 큰 폰트
 
             font_bold = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", title_font_size)
             font_subtitle = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", subtitle_font_size)
             font_regular = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", content_font_size)
-            font_badge = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", badge_font_size)
+            font_detail = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", detail_content_font_size)
         except OSError:
             logger.warning("Korean font not found, using default. Text might not render correctly.")
             font_bold = ImageFont.load_default()
             font_subtitle = ImageFont.load_default()
             font_regular = ImageFont.load_default()
-            font_badge = ImageFont.load_default()
+            font_detail = ImageFont.load_default()
 
-        # 제목/부제 분리
-        main_title, subtitle = self._split_title_subtitle(title)
-
-        # 1. 슬라이드 번호 배지 (좌측 상단)
-        badge_text = f"#{slide_number}"
-        badge_padding = 15
-        bbox = draw.textbbox((0, 0), badge_text, font=font_badge)
-        badge_w = bbox[2] - bbox[0] + badge_padding * 2
-        badge_h = bbox[3] - bbox[1] + badge_padding * 2
-
-        # 배지 배경 (반투명 검정)
         overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
         draw_overlay = ImageDraw.Draw(overlay)
 
-        draw_overlay.rounded_rectangle(
-            [(20, 20), (20 + badge_w, 20 + badge_h)],
-            radius=10, fill=(0, 0, 0, 160)
-        )
+        if sub_type == 'title' and title:
+            # 제목/부제 분리
+            main_title, subtitle = self._split_title_subtitle(title)
 
-        # 2. 제목 영역 (상단) - 메인 타이틀 + 부제
-        wrapped_title = textwrap.fill(main_title, width=30)
+            # 제목 영역 (상단) - 메인 타이틀 + 부제
+            wrapped_title = textwrap.fill(main_title, width=30)
+            title_bbox = draw.multiline_textbbox((0, 0), wrapped_title, font=font_bold, spacing=10)
+            title_h = title_bbox[3] - title_bbox[1] + 60
 
-        # 제목 높이 계산
-        title_bbox = draw.multiline_textbbox((0, 0), wrapped_title, font=font_bold, spacing=10)
-        title_h = title_bbox[3] - title_bbox[1] + 60
+            # 부제 높이 계산
+            subtitle_h = 0
+            wrapped_subtitle = None
+            if subtitle:
+                wrapped_subtitle = textwrap.fill(subtitle, width=45)
+                sub_bbox = draw.multiline_textbbox((0, 0), wrapped_subtitle, font=font_subtitle, spacing=6)
+                subtitle_h = sub_bbox[3] - sub_bbox[1] + 30
 
-        # 부제 높이 계산
-        subtitle_h = 0
-        wrapped_subtitle = None
-        if subtitle:
-            wrapped_subtitle = textwrap.fill(subtitle, width=45)
-            sub_bbox = draw.multiline_textbbox((0, 0), wrapped_subtitle, font=font_subtitle, spacing=6)
-            subtitle_h = sub_bbox[3] - sub_bbox[1] + 30
+            # 상단 오버레이
+            draw_overlay.rectangle(
+                [(0, 0), (width, 150 + title_h + subtitle_h)],
+                fill=(0, 0, 0, 100)
+            )
 
-        # 상단 오버레이 (부제 공간 포함)
-        draw_overlay.rectangle(
-            [(0, 0), (width, 150 + title_h + subtitle_h)],
-            fill=(0, 0, 0, 100)
-        )
-
-        # 3. 내용 영역 (하단) - 한 문장만 표시
+        # 내용 영역 (하단)
+        wrapped_content = None
         if content:
             if isinstance(content, list):
                 content_text = content[0] if content else ""
@@ -1335,8 +1469,9 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
                 content_text = content_text[:77] + "..."
 
             wrapped_content = content_text
+            use_font = font_detail if sub_type == 'detail' else font_regular
 
-            content_bbox = draw.textbbox((0, 0), wrapped_content, font=font_regular)
+            content_bbox = draw.textbbox((0, 0), wrapped_content, font=use_font)
             content_h = content_bbox[3] - content_bbox[1] + 40
 
             draw_overlay.rectangle(
@@ -1349,44 +1484,45 @@ The reference image shows "{web_image_keyword}". You MUST prominently feature th
         draw = ImageDraw.Draw(img)
 
         # 텍스트 그리기
+        if sub_type == 'title' and title:
+            main_title, subtitle = self._split_title_subtitle(title)
+            wrapped_title = textwrap.fill(main_title, width=30)
 
-        # 배지 텍스트
-        draw.text((20 + badge_padding, 20 + badge_padding), badge_text, font=font_badge, fill="white", anchor="lt")
-
-        # 메인 제목 (흰색, 60pt)
-        title_y = 100
-        draw.multiline_text(
-            (width/2, title_y),
-            wrapped_title,
-            font=font_bold,
-            fill="white",
-            anchor="ma",
-            align="center",
-            spacing=10
-        )
-
-        # 부제 (밝은 노란색, 32pt, 메인 제목 아래)
-        if subtitle and wrapped_subtitle:
-            # 메인 제목의 실제 렌더링 높이 계산
-            title_rendered_bbox = draw.multiline_textbbox((width/2, title_y), wrapped_title, font=font_bold, spacing=10, anchor="ma")
-            subtitle_y = title_rendered_bbox[3] + 20  # 제목 아래 20px 여백
-
+            # 메인 제목 (흰색, 60pt)
+            title_y = 100
             draw.multiline_text(
-                (width/2, subtitle_y),
-                wrapped_subtitle,
-                font=font_subtitle,
-                fill=(255, 255, 102),  # 밝은 노란색
+                (width/2, title_y),
+                wrapped_title,
+                font=font_bold,
+                fill="white",
                 anchor="ma",
                 align="center",
-                spacing=6
+                spacing=10
             )
 
+            # 부제 (밝은 노란색, 32pt)
+            if subtitle:
+                wrapped_subtitle = textwrap.fill(subtitle, width=45)
+                title_rendered_bbox = draw.multiline_textbbox((width/2, title_y), wrapped_title, font=font_bold, spacing=10, anchor="ma")
+                subtitle_y = title_rendered_bbox[3] + 20
+
+                draw.multiline_text(
+                    (width/2, subtitle_y),
+                    wrapped_subtitle,
+                    font=font_subtitle,
+                    fill=(255, 255, 102),
+                    anchor="ma",
+                    align="center",
+                    spacing=6
+                )
+
         # 내용 텍스트 (하단 중앙)
-        if content:
+        if wrapped_content:
+            use_font = font_detail if sub_type == 'detail' else font_regular
             draw.text(
                 (width/2, height - 50),
                 wrapped_content,
-                font=font_regular,
+                font=use_font,
                 fill="white",
                 anchor="mm"
             )

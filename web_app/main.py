@@ -2148,6 +2148,17 @@ class PipelineStartRequest(BaseModel):
     youtube_privacy: str = 'private'
 
 
+class QueueItemRequest(BaseModel):
+    topic: str
+    category: str = 'tech'
+    target_slides: int = 15
+    language: str = 'ko'
+    additional_instructions: str = ''
+    voice: str = 'Leda'
+    script_style: str = 'educational'
+    youtube_privacy: str = 'private'
+
+
 @app.post("/api/pipeline/start")
 async def start_auto_pipeline(
     request: PipelineStartRequest,
@@ -2232,6 +2243,58 @@ async def cancel_pipeline(pipeline_id: str, user: models.User = Depends(get_curr
         return {"status": "success", "message": "Pipeline cancelled"}
     else:
         raise HTTPException(status_code=400, detail="Cannot cancel pipeline")
+
+
+# ── Pipeline Queue Endpoints ──────────────────────────────────────────
+
+@app.post("/api/pipeline/queue/add")
+async def add_to_queue(request: QueueItemRequest, user: models.User = Depends(get_current_user)):
+    """큐에 파이프라인 항목을 추가합니다."""
+    item = auto_pipeline.add_to_queue(
+        topic=request.topic,
+        category=request.category,
+        target_slides=request.target_slides,
+        language=request.language,
+        additional_instructions=request.additional_instructions,
+        voice=request.voice,
+        script_style=request.script_style,
+        youtube_privacy=request.youtube_privacy,
+        user_id=user.id,
+    )
+    return JSONResponse(content={"status": "success", "item": item})
+
+
+@app.delete("/api/pipeline/queue/{item_id}")
+async def remove_from_queue(item_id: str, user: models.User = Depends(get_current_user)):
+    """대기 중인 큐 항목을 삭제합니다."""
+    success = auto_pipeline.remove_from_queue(item_id)
+    if success:
+        return {"status": "success", "message": "Item removed from queue"}
+    else:
+        raise HTTPException(status_code=400, detail="Cannot remove item (not found or already running)")
+
+
+@app.post("/api/pipeline/queue/start")
+async def start_queue(user: models.User = Depends(get_current_user)):
+    """큐 순차 처리를 시작합니다."""
+    result = await auto_pipeline.start_queue()
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result["message"])
+    return JSONResponse(content=result)
+
+
+@app.get("/api/pipeline/queue/status")
+async def get_queue_status(user: models.User = Depends(get_current_user)):
+    """전체 큐 상태를 조회합니다."""
+    status = auto_pipeline.get_queue_status(user.id)
+    return JSONResponse(content={"status": "success", **status})
+
+
+@app.post("/api/pipeline/queue/stop")
+async def stop_queue(user: models.User = Depends(get_current_user)):
+    """현재 항목 완료 후 큐를 중지합니다."""
+    result = auto_pipeline.stop_queue()
+    return JSONResponse(content=result)
 
 
 if __name__ == "__main__":

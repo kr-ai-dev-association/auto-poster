@@ -3,9 +3,9 @@ import json
 import logging
 import asyncio
 import uuid
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from datetime import datetime
-from .content_generator_service import content_generator
+from .content_generator_service import content_generator, get_flat_sub_slides
 from .audio_generator_service import audio_generator
 from .pdf2mp4_service import PDF2MP4Service
 from .youtube_service import YouTubeService
@@ -23,6 +23,12 @@ class AutoPipelineService:
 
     def __init__(self):
         self.pipelines: Dict[str, Dict[str, Any]] = {}  # 진행 중인 파이프라인 상태 추적
+        # 큐 상태
+        self.queue: List[Dict[str, Any]] = []          # 대기 항목 리스트
+        self.queue_active: bool = False                 # 큐 프로세서 활성 여부
+        self.queue_processor_task = None                # asyncio Task
+        self.current_queue_item_id: Optional[str] = None
+        self.queue_completed: List[Dict[str, Any]] = [] # 완료/실패 항목
 
     def get_pipeline_status(self, pipeline_id: str) -> Optional[Dict[str, Any]]:
         """파이프라인 상태를 조회합니다."""
@@ -169,19 +175,19 @@ class AutoPipelineService:
             if image_result.get('status') == 'error':
                 raise Exception(f"Image generation failed: {image_result.get('message')}")
 
-            # 성공한 슬라이드 번호 추출
+            # 성공한 (slide_number, sub_number) 튜플 추출
             image_results = image_result.get('results', [])
-            successful_slide_numbers = [
-                r.get('slide_number') for r in image_results
+            successful_sub_slides = [
+                (r.get('slide_number'), r.get('sub_number', 1)) for r in image_results
                 if r.get('status') == 'success'
             ]
-            logger.info(f"[Pipeline {pipeline_id}] Successful slides: {successful_slide_numbers}")
+            logger.info(f"[Pipeline {pipeline_id}] Successful sub-slides: {len(successful_sub_slides)}")
 
             self.pipelines[pipeline_id]['result']['images'] = {
                 'total': image_result.get('total'),
                 'success': image_result.get('success'),
                 'web_references': image_result.get('web_references_used', 0),
-                'successful_slides': successful_slide_numbers
+                'successful_sub_slides': [(s, sub) for s, sub in successful_sub_slides]
             }
             self.pipelines[pipeline_id]['steps_completed'].append('image_generation')
 
@@ -210,19 +216,19 @@ class AutoPipelineService:
             update_status('script_generation', 55, '대본 생성 중...')
             logger.info(f"[Pipeline {pipeline_id}] Step 4: Generating script from successful slides")
 
-            # 성공한 슬라이드의 나레이션만 추출하여 TTS 스크립트로 사용
-            slides = plan.get('slides', [])
+            # 성공한 서브슬라이드의 나레이션만 추출하여 TTS 스크립트로 사용
+            flat_sub_slides = get_flat_sub_slides(plan)
             successful_narrations = []
-            for slide in slides:
-                slide_num = slide.get('slide_number')
-                if slide_num in successful_slide_numbers:
-                    narration = slide.get('narration', '')
+            for sub in flat_sub_slides:
+                key = (sub['slide_number'], sub['sub_number'])
+                if key in successful_sub_slides:
+                    narration = sub.get('narration', '')
                     if narration:
                         successful_narrations.append(narration)
 
             # 나레이션 합치기 (자연스러운 전환을 위해 줄바꿈 추가)
             full_script = '\n\n'.join(successful_narrations)
-            logger.info(f"[Pipeline {pipeline_id}] Script from {len(successful_narrations)} slides, {len(full_script)} chars")
+            logger.info(f"[Pipeline {pipeline_id}] Script from {len(successful_narrations)} sub-slides, {len(full_script)} chars")
             # 예상 읽기 시간 계산 (한국어 평균 분당 300자, 영어 평균 분당 150단어)
             if language == 'ko':
                 estimated_duration = len(full_script) / 300 * 60  # 초 단위
@@ -483,6 +489,171 @@ class AutoPipelineService:
                 self.pipelines[pipeline_id]['error'] = 'Cancelled by user'
                 return True
         return False
+
+    # ===== 큐 시스템 =====
+
+    def add_to_queue(
+        self,
+        topic: str,
+        category: str = 'tech',
+        target_slides: int = 15,
+        language: str = 'ko',
+        additional_instructions: str = '',
+        voice: str = 'Leda',
+        script_style: str = 'educational',
+        youtube_privacy: str = 'private',
+        user_id: int = None,
+        user_email: str = None
+    ) -> Dict[str, Any]:
+        """큐에 파이프라인 항목을 추가합니다."""
+        item_id = content_id_service.generate_content_id('queue')
+        item = {
+            'id': item_id,
+            'topic': topic,
+            'category': category,
+            'target_slides': target_slides,
+            'language': language,
+            'additional_instructions': additional_instructions,
+            'voice': voice,
+            'script_style': script_style,
+            'youtube_privacy': youtube_privacy,
+            'user_id': user_id,
+            'user_email': user_email,
+            'status': 'pending',
+            'pipeline_id': None,
+            'added_at': datetime.now().isoformat(),
+            'error': None,
+            'result': None
+        }
+        self.queue.append(item)
+        logger.info(f"[Queue] Added item {item_id}: {topic[:50]}")
+        return item
+
+    def remove_from_queue(self, item_id: str) -> bool:
+        """대기 중인 항목을 큐에서 제거합니다."""
+        for i, item in enumerate(self.queue):
+            if item['id'] == item_id and item['status'] == 'pending':
+                self.queue.pop(i)
+                logger.info(f"[Queue] Removed item {item_id}")
+                return True
+        return False
+
+    def get_queue_status(self, user_id: int = None) -> Dict[str, Any]:
+        """전체 큐 상태를 반환합니다."""
+        pending_items = [item for item in self.queue if item['status'] == 'pending']
+        running_item = None
+        for item in self.queue:
+            if item['status'] == 'running':
+                running_item = dict(item)  # 복사본
+                # 실행 중인 파이프라인의 실시간 진행률 추가
+                if item.get('pipeline_id') and item['pipeline_id'] in self.pipelines:
+                    pipeline = self.pipelines[item['pipeline_id']]
+                    running_item['progress'] = pipeline.get('progress', 0)
+                    running_item['current_step'] = pipeline.get('current_step', '')
+                    running_item['steps_completed'] = pipeline.get('steps_completed', [])
+                    running_item['message'] = pipeline.get('message', '')
+                break
+
+        return {
+            'active': self.queue_active,
+            'current_item': running_item,
+            'pending': pending_items,
+            'completed': self.queue_completed[-20:],
+            'total_pending': len(pending_items),
+            'total_completed': len(self.queue_completed)
+        }
+
+    async def start_queue(self) -> Dict[str, Any]:
+        """큐 순차 처리를 시작합니다."""
+        if self.queue_active:
+            return {"status": "error", "message": "Queue is already running"}
+
+        pending = [item for item in self.queue if item['status'] == 'pending']
+        if not pending:
+            return {"status": "error", "message": "No pending items in queue"}
+
+        self.queue_active = True
+        self.queue_processor_task = asyncio.create_task(self._process_queue())
+        logger.info(f"[Queue] Started processing {len(pending)} items")
+        return {"status": "success", "message": f"Queue started with {len(pending)} items"}
+
+    def stop_queue(self) -> Dict[str, Any]:
+        """현재 항목 완료 후 큐를 중지합니다."""
+        if not self.queue_active:
+            return {"status": "info", "message": "Queue is not running"}
+        self.queue_active = False
+        logger.info("[Queue] Stop requested (will finish current item)")
+        return {"status": "success", "message": "Queue will stop after current item completes"}
+
+    async def _process_queue(self):
+        """내부: 큐 항목을 순차적으로 처리합니다."""
+        try:
+            while self.queue_active:
+                # 다음 대기 항목 찾기
+                next_item = None
+                for item in self.queue:
+                    if item['status'] == 'pending':
+                        next_item = item
+                        break
+
+                if not next_item:
+                    logger.info("[Queue] No more pending items")
+                    break
+
+                # running으로 변경
+                next_item['status'] = 'running'
+                pipeline_id = self.create_pipeline_id()
+                next_item['pipeline_id'] = pipeline_id
+                next_item['started_at'] = datetime.now().isoformat()
+                self.current_queue_item_id = next_item['id']
+
+                logger.info(f"[Queue] Processing item {next_item['id']}: {next_item['topic'][:50]}")
+
+                try:
+                    result = await self.run_full_pipeline(
+                        topic=next_item['topic'],
+                        category=next_item['category'],
+                        target_slides=next_item['target_slides'],
+                        language=next_item['language'],
+                        additional_instructions=next_item.get('additional_instructions', ''),
+                        voice=next_item.get('voice', 'Leda'),
+                        script_style=next_item.get('script_style', 'educational'),
+                        youtube_privacy=next_item.get('youtube_privacy', 'private'),
+                        user_id=next_item.get('user_id'),
+                        user_email=next_item.get('user_email'),
+                        pipeline_id=pipeline_id
+                    )
+
+                    next_item['status'] = 'completed' if result.get('status') == 'success' else 'failed'
+                    next_item['result'] = {
+                        'title': result.get('title'),
+                        'youtube_url': result.get('youtube_url'),
+                        'duration': result.get('duration')
+                    }
+                    if result.get('status') != 'success':
+                        next_item['error'] = result.get('message', 'Unknown error')
+
+                except Exception as e:
+                    logger.error(f"[Queue] Item {next_item['id']} failed: {e}")
+                    next_item['status'] = 'failed'
+                    next_item['error'] = str(e)
+
+                next_item['completed_at'] = datetime.now().isoformat()
+
+                # 완료 목록으로 이동
+                self.queue.remove(next_item)
+                self.queue_completed.append(next_item)
+                self.current_queue_item_id = None
+
+                logger.info(f"[Queue] Item {next_item['id']} {next_item['status']}")
+
+        except Exception as e:
+            logger.error(f"[Queue] Processor error: {e}")
+        finally:
+            self.queue_active = False
+            self.current_queue_item_id = None
+            self.queue_processor_task = None
+            logger.info("[Queue] Processor stopped")
 
 
 # 싱글톤 인스턴스

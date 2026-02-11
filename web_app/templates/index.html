@@ -1428,18 +1428,130 @@
                                             </label>
                                         </div>
                                     </div>
-                                    <!-- 파이프라인 시작 버튼 -->
-                                    <button @click="startAutoPipeline()" :disabled="!autoPipelineTopic || autoPipelineRunning"
-                                        class="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-3 text-lg">
-                                        <svg x-show="autoPipelineRunning" class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <svg x-show="!autoPipelineRunning" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                        </svg>
-                                        <span x-text="autoPipelineRunning ? '파이프라인 실행 중...' : '전체 자동화 시작'"></span>
-                                    </button>
+                                    <!-- 파이프라인 시작 / 대기열 추가 버튼 -->
+                                    <div class="flex gap-3">
+                                        <button @click="startAutoPipeline()" :disabled="!autoPipelineTopic || autoPipelineRunning || pipelineQueueActive"
+                                            class="flex-1 py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-base">
+                                            <svg x-show="autoPipelineRunning" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <svg x-show="!autoPipelineRunning" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                            </svg>
+                                            <span x-text="autoPipelineRunning ? '실행 중...' : '즉시 시작'"></span>
+                                        </button>
+                                        <button @click="addToQueue()" :disabled="!autoPipelineTopic"
+                                            class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-base">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                            </svg>
+                                            대기열 추가
+                                        </button>
+                                    </div>
+
+                                    <!-- 대기열 목록 -->
+                                    <div x-show="pipelineQueue.length > 0 || pipelineQueueActive" class="mt-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h5 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                                                <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                                                </svg>
+                                                대기열
+                                                <span class="text-xs text-gray-500 font-normal"
+                                                    x-text="'(' + pipelineQueueCompleted.length + ' 완료 / ' + pipelineQueue.filter(q => q.status === 'pending').length + ' 대기)'"></span>
+                                            </h5>
+                                            <div class="flex gap-2">
+                                                <button x-show="pipelineQueue.some(q => q.status === 'pending') && !pipelineQueueActive"
+                                                    @click="startQueue()"
+                                                    class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg font-medium transition-colors flex items-center gap-1">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                                    </svg>
+                                                    대기열 시작
+                                                </button>
+                                                <button x-show="pipelineQueueActive"
+                                                    @click="stopQueue()"
+                                                    class="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded-lg font-medium transition-colors flex items-center gap-1">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                                                    </svg>
+                                                    현재 항목 후 중지
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- 큐 항목 리스트 -->
+                                        <div class="space-y-2 max-h-60 overflow-y-auto">
+                                            <template x-for="item in pipelineQueue" :key="item.id">
+                                                <div class="flex items-center gap-3 p-3 rounded-lg text-sm transition-all"
+                                                    :class="{
+                                                        'bg-blue-900/30 border border-blue-600/50': item.status === 'running',
+                                                        'bg-gray-800/50 border border-gray-700/50': item.status === 'pending',
+                                                        'bg-green-900/20 border border-green-700/30': item.status === 'completed',
+                                                        'bg-red-900/20 border border-red-700/30': item.status === 'failed'
+                                                    }">
+                                                    <!-- 상태 아이콘 -->
+                                                    <div class="flex-shrink-0">
+                                                        <svg x-show="item.status === 'running'" class="w-5 h-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        <svg x-show="item.status === 'pending'" class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                        </svg>
+                                                        <svg x-show="item.status === 'completed'" class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                        <svg x-show="item.status === 'failed'" class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        </svg>
+                                                    </div>
+                                                    <!-- 주제 + 카테고리 -->
+                                                    <div class="flex-1 min-w-0">
+                                                        <p class="text-white truncate" x-text="item.topic"></p>
+                                                        <div class="flex items-center gap-2 mt-0.5">
+                                                            <span class="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400" x-text="item.category"></span>
+                                                            <span x-show="item.status === 'running' && item.progress" class="text-xs text-blue-400" x-text="item.progress + '%'"></span>
+                                                        </div>
+                                                    </div>
+                                                    <!-- 삭제 버튼 (pending만) -->
+                                                    <button x-show="item.status === 'pending'" @click="removeFromQueue(item.id)"
+                                                        class="flex-shrink-0 p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-900/30 rounded transition-colors">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <!-- 완료 항목 접기/펼치기 -->
+                                        <div x-show="pipelineQueueCompleted.length > 0" class="mt-3">
+                                            <button @click="$refs.queueCompletedList.classList.toggle('hidden')"
+                                                class="text-xs text-gray-500 hover:text-gray-400 flex items-center gap-1">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                                완료된 항목 (<span x-text="pipelineQueueCompleted.length"></span>)
+                                            </button>
+                                            <div x-ref="queueCompletedList" class="hidden mt-2 space-y-1">
+                                                <template x-for="item in pipelineQueueCompleted" :key="item.id">
+                                                    <div class="flex items-center gap-2 px-3 py-2 rounded text-xs"
+                                                        :class="item.status === 'completed' ? 'text-green-500/70' : 'text-red-500/70'">
+                                                        <svg x-show="item.status === 'completed'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                        <svg x-show="item.status === 'failed'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        </svg>
+                                                        <span class="truncate" x-text="item.topic"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1779,7 +1891,7 @@
                                         <h4 class="text-white font-medium text-xs truncate"
                                             x-text="contentGenPlan?.title"></h4>
                                         <p class="text-gray-400 text-xs mt-1"
-                                            x-text="(contentGenPlan?.slides?.length || 0) + '개 슬라이드'"></p>
+                                            x-text="(contentGenPlan?.slides?.length || 0) + '개 슬라이드 / ' + ((contentGenPlan?.slides || []).reduce((sum, s) => sum + (s.sub_slides?.length || 1), 0)) + '개 프레임'"></p>
                                     </div>
 
                                     <!-- 슬라이드 목록 (축소) -->
@@ -1793,6 +1905,9 @@
                                                         x-text="slide.slide_number"></span>
                                                     <span class="text-gray-300 truncate flex-1 text-xs"
                                                         x-text="slide.title"></span>
+                                                    <span x-show="slide.sub_slides?.length"
+                                                        class="text-cyan-400 text-[10px] flex-shrink-0"
+                                                        x-text="(slide.sub_slides?.length || 0) + ' frames'"></span>
                                                     <span x-show="contentGenImageResults[index]?.status === 'success'"
                                                         class="text-green-400 text-xs flex-shrink-0">✓</span>
                                                     <span x-show="contentGenImageResults[index]?.status === 'error'"
@@ -1803,22 +1918,31 @@
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                                     </svg>
                                                 </div>
-                                                <!-- 이미지 프롬프트 표시 (확장 시) -->
+                                                <!-- 서브슬라이드 표시 (확장 시) -->
                                                 <div x-show="contentGenExpandedSlide === index" x-collapse
                                                     class="px-2 pb-2 pt-1 border-t border-gray-600/50">
-                                                    <p class="text-[10px] text-purple-400 font-medium mb-1">🎨 Image Prompt:</p>
-                                                    <p class="text-[10px] text-gray-400 leading-relaxed whitespace-pre-wrap"
-                                                        x-text="slide.image_prompt || '(프롬프트 없음)'"></p>
-                                                    <template x-if="slide.web_image_keyword">
-                                                        <div class="mt-2">
-                                                            <p class="text-[10px] text-yellow-400 font-medium mb-1">⭐ Web Image Keyword (필수 포함):</p>
-                                                            <p class="text-[10px] text-yellow-200" x-text="slide.web_image_keyword"></p>
+                                                    <template x-if="slide.sub_slides?.length">
+                                                        <div class="space-y-2">
+                                                            <template x-for="(sub, si) in slide.sub_slides" :key="si">
+                                                                <div class="bg-gray-800/40 rounded p-1.5">
+                                                                    <div class="flex items-center gap-1 mb-1">
+                                                                        <span class="text-[10px] font-medium"
+                                                                            :class="sub.type === 'title' ? 'text-blue-400' : 'text-orange-400'"
+                                                                            x-text="sub.type === 'title' ? 'TITLE' : 'DETAIL'"></span>
+                                                                        <span class="text-[10px] text-gray-500" x-text="'#' + sub.sub_number"></span>
+                                                                        <span class="text-[10px] text-gray-400 truncate" x-text="sub.content"></span>
+                                                                    </div>
+                                                                    <p class="text-[10px] text-purple-400 leading-relaxed truncate"
+                                                                        x-text="sub.image_prompt ? '🎨 ' + sub.image_prompt.substring(0, 80) + '...' : ''"></p>
+                                                                </div>
+                                                            </template>
                                                         </div>
                                                     </template>
-                                                    <template x-if="slide.web_image_query">
-                                                        <div class="mt-2">
-                                                            <p class="text-[10px] text-green-400 font-medium mb-1">🔍 Web Image Query:</p>
-                                                            <p class="text-[10px] text-gray-400" x-text="slide.web_image_query"></p>
+                                                    <template x-if="!slide.sub_slides?.length">
+                                                        <div>
+                                                            <p class="text-[10px] text-purple-400 font-medium mb-1">🎨 Image Prompt:</p>
+                                                            <p class="text-[10px] text-gray-400 leading-relaxed whitespace-pre-wrap"
+                                                                x-text="slide.image_prompt || '(프롬프트 없음)'"></p>
                                                         </div>
                                                     </template>
                                                 </div>
@@ -1831,11 +1955,11 @@
                                         <div class="flex justify-between text-xs text-gray-400 mb-1">
                                             <span>이미지 생성 중...</span>
                                             <span
-                                                x-text="contentGenImageProgress + '/' + (contentGenPlan?.slides?.length || 0)"></span>
+                                                x-text="contentGenImageProgress + '/' + ((contentGenPlan?.slides || []).reduce((sum, s) => sum + (s.sub_slides?.length || 1), 0))"></span>
                                         </div>
                                         <div class="w-full bg-gray-700 rounded-full h-1.5">
                                             <div class="bg-blue-600 h-1.5 rounded-full transition-all"
-                                                :style="'width: ' + (contentGenImageProgress / (contentGenPlan?.slides?.length || 1) * 100) + '%'">
+                                                :style="'width: ' + (contentGenImageProgress / ((contentGenPlan?.slides || []).reduce((sum, s) => sum + (s.sub_slides?.length || 1), 0) || 1) * 100) + '%'">
                                             </div>
                                         </div>
                                     </div>
@@ -4210,6 +4334,13 @@
                 ],
                 autoPipelinePollingInterval: null,
 
+                // Pipeline Queue State
+                pipelineQueue: [],
+                pipelineQueueActive: false,
+                pipelineQueueCurrentItem: null,
+                pipelineQueueCompleted: [],
+                pipelineQueuePollingInterval: null,
+
                 // Audio Generator State
                 audioGenPdfFile: null,
                 audioGenPdfSource: null,  // PDF 소스 정보: { type: 'content'|'genvideo'|'upload', id: string, filename: string }
@@ -4333,6 +4464,11 @@
                     const savedPipelineId = localStorage.getItem('running_pipeline_id');
                     if (savedPipelineId) {
                         await this.restoreRunningPipeline(savedPipelineId);
+                    }
+
+                    // 실행 중인 큐 복구
+                    if (localStorage.getItem('pipeline_queue_active') === 'true') {
+                        this.startQueuePolling();
                     }
 
                     // mainTab 변경 감지 - 탭 진입 시 해당 목록 로드
@@ -8295,6 +8431,137 @@
                         }
                     } catch (error) {
                         console.error('Pipeline cancel error:', error);
+                    }
+                },
+
+                // ===== Pipeline Queue Functions =====
+                async addToQueue() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch('/api/pipeline/queue/add', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                topic: this.autoPipelineTopic,
+                                category: this.autoPipelineCategory,
+                                target_slides: this.autoPipelineSlideCount,
+                                language: this.autoPipelineLanguage,
+                                additional_instructions: this.autoPipelineInstructions,
+                                voice: this.autoPipelineVoice,
+                                script_style: 'educational',
+                                youtube_privacy: this.autoPipelinePrivacy
+                            })
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.pipelineQueue.push(data.item);
+                            this.autoPipelineTopic = '';
+                            this.autoPipelineInstructions = '';
+                        }
+                    } catch (error) {
+                        console.error('Failed to add to queue:', error);
+                    }
+                },
+
+                async removeFromQueue(itemId) {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch(`/api/pipeline/queue/${itemId}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.pipelineQueue = this.pipelineQueue.filter(q => q.id !== itemId);
+                        }
+                    } catch (error) {
+                        console.error('Failed to remove from queue:', error);
+                    }
+                },
+
+                async startQueue() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch('/api/pipeline/queue/start', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                            this.pipelineQueueActive = true;
+                            localStorage.setItem('pipeline_queue_active', 'true');
+                            this.startQueuePolling();
+                        }
+                    } catch (error) {
+                        console.error('Failed to start queue:', error);
+                    }
+                },
+
+                async stopQueue() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        await fetch('/api/pipeline/queue/stop', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                    } catch (error) {
+                        console.error('Failed to stop queue:', error);
+                    }
+                },
+
+                startQueuePolling() {
+                    if (this.pipelineQueuePollingInterval) {
+                        clearInterval(this.pipelineQueuePollingInterval);
+                    }
+                    this.pipelineQueuePollingInterval = setInterval(async () => {
+                        await this.pollQueueStatus();
+                    }, 2000);
+                    // 즉시 한 번 실행
+                    this.pollQueueStatus();
+                },
+
+                stopQueuePolling() {
+                    if (this.pipelineQueuePollingInterval) {
+                        clearInterval(this.pipelineQueuePollingInterval);
+                        this.pipelineQueuePollingInterval = null;
+                    }
+                },
+
+                async pollQueueStatus() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const response = await fetch('/api/pipeline/queue/status', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            this.pipelineQueueActive = data.active;
+                            this.pipelineQueue = [...(data.current_item ? [data.current_item] : []), ...data.pending];
+                            this.pipelineQueueCompleted = data.completed;
+
+                            // 현재 실행 중 항목이 있으면 기존 진행률 UI에 연동
+                            if (data.current_item) {
+                                this.pipelineQueueCurrentItem = data.current_item;
+                                this.autoPipelineRunning = true;
+                                this.autoPipelineId = data.current_item.pipeline_id || data.current_item.id;
+                                this.autoPipelineProgress = data.current_item.progress || 0;
+                                this.autoPipelineMessage = data.current_item.message || '';
+                                this.autoPipelineCurrentStep = data.current_item.current_step || '';
+                                this.autoPipelineCompletedSteps = data.current_item.steps_completed || [];
+                                this.autoPipelineStatus = 'running';
+                            } else if (!this.pipelineQueueActive) {
+                                // 큐 완료
+                                this.autoPipelineRunning = false;
+                                this.autoPipelineStatus = '';
+                                this.stopQueuePolling();
+                                localStorage.removeItem('pipeline_queue_active');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Failed to poll queue status:', error);
                     }
                 },
 
