@@ -1714,7 +1714,7 @@
                                     생성된 기획안이 없습니다
                                 </div>
 
-                                <div x-show="contentGenPlanList.length > 0" class="space-y-2 max-h-48 overflow-y-auto">
+                                <div x-show="contentGenPlanList.length > 0" class="space-y-2 max-h-96 overflow-y-auto">
                                     <template x-for="plan in contentGenPlanList" :key="plan.plan_id">
                                         <div class="bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors cursor-pointer"
                                             :class="{'ring-2 ring-purple-500': contentGenPlanId === plan.plan_id}"
@@ -1918,7 +1918,7 @@
                                 </div>
 
                                 <div x-show="contentGenImageList.length > 0"
-                                    class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
+                                    class="grid grid-cols-2 gap-3 max-h-[32rem] overflow-y-auto pr-1">
                                     <template x-for="img in contentGenImageList" :key="img.filename">
                                         <div class="relative group aspect-video bg-gray-700 rounded-lg overflow-hidden cursor-pointer border border-gray-600 hover:border-blue-500 transition-colors shadow-md"
                                             @click="previewContentImage(img.filename)">
@@ -2161,7 +2161,7 @@
                                     생성된 PDF가 없습니다
                                 </div>
 
-                                <div x-show="contentGenPdfList.length > 0" class="space-y-2 max-h-48 overflow-y-auto">
+                                <div x-show="contentGenPdfList.length > 0" class="space-y-2 max-h-[36rem] overflow-y-auto">
                                     <template x-for="pdf in contentGenPdfList" :key="pdf.filename">
                                         <div class="bg-gray-700/50 rounded-lg p-3 hover:bg-gray-700 transition-colors">
                                             <div class="flex items-start justify-between gap-2">
